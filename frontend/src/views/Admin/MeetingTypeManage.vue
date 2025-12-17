@@ -230,9 +230,9 @@ onMounted(fetchTypes)
 
 <style scoped>
 .type-manage {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 /* 头部样式调整 */

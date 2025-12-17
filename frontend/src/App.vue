@@ -3,20 +3,30 @@
 </template>
 
 <script setup>
-  import { useSidebar } from '@/composables/useSidebar'
-const { isCollapse } = useSidebar()
+// App.vue 只作为根容器，布局由 Dashboard.vue 控制
 </script>
-<template>
-  <el-aside :width="isCollapse ? '64px' : '240px'">
-    <el-menu :collapse="isCollapse">
-      </el-menu>
-  </el-aside>
-  </template>
+
 <style>
-/* Global reset or minimal styles */
-body {
+html, body {
   margin: 0;
   padding: 0;
-  background-color: #f4f4f5;
+  height: 100%;
+  background-color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 简单的过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

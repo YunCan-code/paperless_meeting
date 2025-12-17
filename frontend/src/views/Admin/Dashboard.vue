@@ -10,16 +10,8 @@
             <h1>Paperless</h1>
             <p>Meeting System</p>
           </div>
-          <!-- 折叠按钮放在Header右侧 -->
-          <div class="collapse-trigger" @click="toggleCollapse" v-show="!isCollapse">
-            <el-icon :size="18"><Fold /></el-icon>
           </div>
-        </div>
 
-        <!-- Collapsed状态下的展开按钮 -->
-        <div class="collapse-trigger centered" @click="toggleCollapse" v-show="isCollapse">
-          <el-icon :size="18"><Expand /></el-icon>
-        </div>
 
         <el-menu
           router
@@ -51,14 +43,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { Calendar, User, List, Monitor, Fold, Expand } from '@element-plus/icons-vue'
+import { useSidebar } from '@/composables/useSidebar'
 
-const isCollapse = ref(false)
-
-const toggleCollapse = () => {
-  isCollapse.value = !isCollapse.value
-}
+// 使用全局侧边栏状态，与子页面共享
+const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
 </script>
 
 <style scoped>

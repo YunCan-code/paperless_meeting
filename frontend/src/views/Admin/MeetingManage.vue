@@ -2,9 +2,23 @@
   <div class="meeting-manage">
     <!-- 页面头部 -->
     <div class="page-header">
-      <div class="title-section">
-        <h1>会议管理</h1>
-        <p class="subtitle">管理会议日程与文件分发</p>
+      <div class="header-left">
+        <el-button 
+          class="collapse-btn" 
+          link 
+          @click="toggleSidebar"
+        >
+          <el-icon size="24" color="#64748b">
+            <Fold v-if="!isCollapse" />
+            <Expand v-else />
+          </el-icon>
+        </el-button>
+        <el-divider direction="vertical" class="header-divider" />
+        
+        <div class="title-group">
+          <h1 class="page-title">会议管理</h1>
+          <p class="page-subtitle">管理会议日程与文件分发</p>
+        </div>
       </div>
     </div>
 
@@ -85,7 +99,10 @@
 import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
-import { Calendar, Timer as Clock, User, CircleCheck } from '@element-plus/icons-vue'
+import { Calendar, Timer as Clock, User, CircleCheck, Fold, Expand } from '@element-plus/icons-vue'
+import { useSidebar } from '@/composables/useSidebar'
+
+const { isCollapse, toggleSidebar } = useSidebar()
 
 import SessionCalendar from './components/SessionCalendar.vue'
 import TodayMeetings from './components/TodayMeetings.vue'
@@ -163,27 +180,57 @@ onMounted(async () => {
   gap: 24px;
 }
 
+/* 头部样式调整 */
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
+  padding: 0 4px;
 }
-.title-section h1 {
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.collapse-btn {
+  padding: 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  height: auto;
+}
+.collapse-btn:hover {
+  background-color: #f1f5f9;
+}
+
+.header-divider {
+  height: 24px;
+  border-color: #cbd5e1;
+  margin: 0 4px;
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: var(--color-slate-900);
+  color: #1e293b;
+  line-height: 1.2;
 }
-.subtitle {
+.page-subtitle {
   margin: 4px 0 0;
-  color: var(--color-slate-500);
+  color: #64748b;
   font-size: 14px;
+  line-height: 1.4;
 }
 
 /* Stats Row */
-.stats-row {
-  /* no extra margin needed, gap handles it */
-}
+/* .stats-row 使用默认 row 样式 */
 .stat-card {
   border: none;
   background: white;

@@ -1,8 +1,31 @@
 <template>
   <div>
-    <div class="header">
-      <h2>人员管理</h2>
-      <el-button type="primary" @click="dialogVisible = true">添加人员</el-button>
+    <div class="page-header">
+      <div class="header-left">
+        <el-button 
+          class="collapse-btn" 
+          link 
+          @click="toggleSidebar"
+        >
+          <el-icon size="24" color="#64748b">
+            <Fold v-if="!isCollapse" />
+            <Expand v-else />
+          </el-icon>
+        </el-button>
+        <el-divider direction="vertical" class="header-divider" />
+        
+        <div class="title-group">
+          <h2 class="page-title">人员管理</h2>
+          <p class="page-subtitle">管理系统用户及组织架构</p>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <el-button type="primary" @click="dialogVisible = true">
+          <el-icon class="el-icon--left"><Plus /></el-icon>
+          添加人员
+        </el-button>
+      </div>
     </div>
 
     <!-- 人员列表表格 -->
@@ -45,6 +68,10 @@
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Fold, Expand, Plus } from '@element-plus/icons-vue'
+import { useSidebar } from '@/composables/useSidebar'
+
+const { isCollapse, toggleSidebar } = useSidebar()
 
 const users = ref([])
 const loading = ref(false)
@@ -99,10 +126,58 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.header {
+/* 头部样式调整 */
+.page-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.header-left {
+  display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.collapse-btn {
+  padding: 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  height: auto;
+}
+.collapse-btn:hover {
+  background-color: #f1f5f9;
+}
+
+.header-divider {
+  height: 24px;
+  border-color: #cbd5e1;
+  margin: 0 4px;
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.2;
+}
+.page-subtitle {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
 }
 </style>
