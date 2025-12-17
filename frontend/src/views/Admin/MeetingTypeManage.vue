@@ -1,73 +1,120 @@
 <template>
   <div class="type-manage">
-    <!-- 单一容器卡片 -->
-    <el-card class="main-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
-            <h2>会议类型管理</h2>
-            <p class="subtitle">管理会议的分类类型，为每种会议赋予独特标识</p>
-          </div>
-          <el-button type="primary" @click="openDialog()">
-            <el-icon class="el-icon--left"><Plus /></el-icon>
-            添加类型
-          </el-button>
-        </div>
-      </template>
-
-      <!-- 类型列表 -->
-      <div class="type-list" v-loading="loading">
-        <div 
-          v-for="(item, index) in types" 
-          :key="item.id" 
-          class="type-item"
-          :style="{ '--accent-color': getColor(index) }"
+    <div class="page-header">
+      <div class="header-left">
+        <el-button 
+          class="collapse-btn" 
+          link 
+          @click="toggleSidebar"
         >
-          <div class="color-bar"></div>
-          <div class="item-content">
-            <div class="item-main">
-              <span class="type-badge" :style="{ backgroundColor: getColor(index) + '20', color: getColor(index) }">
-                {{ item.name }}
-              </span>
-              <p class="type-desc">{{ item.description || '暂无描述' }}</p>
+          <el-icon size="24" color="#64748b">
+            <Expand v-if="isCollapse" />
+            <Fold v-else />
+          </el-icon>
+        </el-button>
+        <el-divider direction="vertical" class="header-divider" />
+        
+        <div class="title-group">
+          <h2 class="page-title">会议类型配置</h2>
+          <p class="page-subtitle">定义系统中的会议分类标准</p>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <el-button type="primary" size="large" @click="openDialog()" class="add-btn">
+          <el-icon class="el-icon--left"><Plus /></el-icon>
+          新建类型
+        </el-button>
+      </div>
+    </div>
+
+    <div v-if="loading" class="loading-grid">
+       <el-skeleton v-for="i in 4" :key="i" animated class="skeleton-card">
+        <template #template>
+          <el-skeleton-item variant="rect" style="height: 140px; border-radius: 12px;" />
+        </template>
+      </el-skeleton>
+    </div>
+    
+    <div v-else-if="types.length > 0" class="type-grid">
+      <div 
+        v-for="(item, index) in types" 
+        :key="item.id" 
+        class="grid-card"
+        :style="{ 
+          '--theme-color': getColor(index),
+          '--theme-bg': getColor(index) + '15' 
+        }"
+      >
+        <div class="card-deco-line"></div>
+        <div class="card-body">
+          <div class="card-top">
+            <div class="type-icon">
+              <el-icon size="24">
+                <component :is="getSmartIcon(item.name)" />
+              </el-icon>
             </div>
-            <div class="item-meta">
-              <span class="meta-time">
-                <el-icon><Clock /></el-icon>
-                {{ formatDate(item.created_at) }}
-              </span>
+            <div class="card-actions">
+              <el-tooltip content="编辑" placement="top">
+                <el-button circle size="small" @click="openDialog(item)">
+                  <el-icon><Edit /></el-icon>
+                </el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button circle size="small" type="danger" plain @click="handleDelete(item)">
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </el-tooltip>
             </div>
           </div>
-          <div class="item-actions">
-            <el-button link @click="openDialog(item)">
-              <el-icon><Edit /></el-icon>
-            </el-button>
-            <el-button link type="danger" @click="handleDelete(item)">
-              <el-icon><Delete /></el-icon>
-            </el-button>
+          <h3 class="card-title">{{ item.name }}</h3>
+          <p class="card-desc">{{ item.description || '该类型暂无详细描述说明...' }}</p>
+          <div class="card-footer">
+            <span class="date-tag">
+              <el-icon><Clock /></el-icon>
+              {{ formatDate(item.created_at) }}
+            </span>
           </div>
         </div>
-
-        <!-- 空状态 -->
-        <el-empty v-if="types.length === 0 && !loading" description="暂无类型" :image-size="100">
-          <el-button type="primary" @click="openDialog()">创建第一个类型</el-button>
-        </el-empty>
       </div>
-    </el-card>
+    </div>
+    
+    <div v-else class="empty-state">
+      <el-empty description="暂无会议类型数据" :image-size="160">
+        <el-button type="primary" @click="openDialog()">创建第一个类型</el-button>
+      </el-empty>
+    </div>
 
-    <!-- 添加/编辑 对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑类型' : '添加类型'" width="420px" destroy-on-close>
-      <el-form :model="form" label-position="top">
+    <el-dialog 
+      v-model="dialogVisible" 
+      :title="isEdit ? '编辑类型' : '添加类型'" 
+      width="460px" 
+      destroy-on-close 
+      align-center
+      class="custom-dialog"
+    >
+      <el-form :model="form" label-position="top" size="large">
         <el-form-item label="类型名称" required>
           <el-input v-model="form.name" placeholder="如：党组会、办公会" maxlength="20" show-word-limit />
         </el-form-item>
         <el-form-item label="描述说明">
-          <el-input v-model="form.description" type="textarea" :rows="3" placeholder="可选，对该类型的简要说明" maxlength="100" show-word-limit />
+          <el-input 
+            v-model="form.description" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="可选，对该类型的简要说明..." 
+            maxlength="100" 
+            show-word-limit 
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave" :loading="saving">{{ isEdit ? '保存修改' : '添加类型' }}</el-button>
+        <div class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleSave" :loading="saving">
+            {{ isEdit ? '保存修改' : '立即创建' }}
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -77,37 +124,52 @@
 import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Clock, Edit, Delete } from '@element-plus/icons-vue'
+// 引入 sidebar 逻辑
+import { useSidebar } from '@/composables/useSidebar' 
 
-// 预定义的一组和谐的颜色
-const colors = [
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#8b5cf6', // violet
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#06b6d4', // cyan
-  '#ec4899', // pink
-  '#84cc16', // lime
-  '#6366f1', // indigo
-  '#14b8a6', // teal
-]
+import { 
+  Plus, Clock, Edit, Delete, Fold, Expand, // 引入 Fold 和 Expand 图标
+  Monitor, DataBoard, Memo, VideoCamera, Mic, 
+  Trophy, Flag, Reading, Stamp, Briefcase, Calendar,
+  DataAnalysis, Notification, UserFilled, Collection
+} from '@element-plus/icons-vue'
 
+// 获取侧边栏状态
+const { isCollapse, toggleSidebar } = useSidebar()
+
+// ... (以下所有原有的 script 逻辑保持完全不变) ...
+const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#14b8a6']
 const types = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const form = ref({ name: '', description: '' })
-
 const isEdit = computed(() => editingId.value !== null)
-
 const getColor = (index) => colors[index % colors.length]
+
+const getSmartIcon = (name) => {
+  if (!name) return 'DataBoard'
+  const n = name.toLowerCase()
+  if (n.includes('党') || n.includes('政') || n.includes('红')) return 'Flag'
+  if (n.includes('视') || n.includes('频') || n.includes('云')) return 'VideoCamera'
+  if (n.includes('培') || n.includes('训') || n.includes('课')) return 'Reading'
+  if (n.includes('审') || n.includes('评') || n.includes('决')) return 'Stamp'
+  if (n.includes('例') || n.includes('周') || n.includes('月')) return 'Calendar'
+  if (n.includes('办') || n.includes('工') || n.includes('行')) return 'Briefcase'
+  if (n.includes('表') || n.includes('彰') || n.includes('奖')) return 'Trophy'
+  if (n.includes('通') || n.includes('知') || n.includes('宣')) return 'Notification'
+  if (n.includes('人') || n.includes('员') || n.includes('面')) return 'UserFilled'
+  if (n.includes('总') || n.includes('结') || n.includes('汇')) return 'DataAnalysis'
+  return 'Collection'
+}
 
 const fetchTypes = async () => {
   loading.value = true
   try {
     types.value = await request.get('/meeting_types/')
+  } catch (error) {
+    ElMessage.error('获取数据失败')
   } finally {
     loading.value = false
   }
@@ -168,120 +230,202 @@ onMounted(fetchTypes)
 
 <style scoped>
 .type-manage {
-  max-width: 900px;
+  max-width: 1400px;
   margin: 0 auto;
+  padding: 20px;
 }
 
-.main-card {
+/* 头部样式调整 */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  padding: 0 4px;
+}
+
+/* 左侧标题区域样式增强 */
+.header-left {
+  display: flex;
+  align-items: center; /* 垂直居中对齐 */
+  gap: 12px;         /* 按钮和标题之间的间距 */
+}
+
+/* 折叠按钮样式 */
+.collapse-btn {
+  padding: 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  height: auto; /* 重置 element-plus 默认高度 */
+}
+.collapse-btn:hover {
+  background-color: #f1f5f9; /* 鼠标悬停时的浅灰色背景 */
+}
+
+.header-divider {
+  height: 24px;
+  border-color: #cbd5e1;
+  margin: 0 4px;
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+.page-subtitle {
+  color: #64748b;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ... 以下所有其他样式保持不变 ... */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.add-btn {
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+}
+
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+  gap: 24px;
+  animation: fadeIn 0.4s ease-out;
+}
+.loading-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+  gap: 24px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.grid-card {
+  background: #fff;
   border-radius: 16px;
-  border: 1px solid var(--color-slate-200);
-}
-.main-card :deep(.el-card__header) {
-  padding: 24px 28px;
-  border-bottom: 1px solid var(--color-slate-100);
-}
-.main-card :deep(.el-card__body) {
-  padding: 0;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 200px;
 }
 
-.card-header {
+.grid-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08);
+  border-color: var(--theme-color);
+}
+
+.card-deco-line {
+  height: 4px;
+  background: var(--theme-color);
+  width: 100%;
+}
+
+.card-body {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-}
-.header-left h2 {
-  margin: 0 0 4px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-slate-900);
-}
-.subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-slate-500);
+  margin-bottom: 12px;
 }
 
-/* Type List */
-.type-list {
-  min-height: 200px;
-}
-.type-item {
+.type-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background-color: var(--theme-bg);
+  color: var(--theme-color);
   display: flex;
   align-items: center;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-slate-100);
-  transition: background 0.2s;
-  position: relative;
-}
-.type-item:last-child {
-  border-bottom: none;
-}
-.type-item:hover {
-  background-color: #fafafa;
+  justify-content: center;
+  transition: transform 0.3s ease;
 }
 
-.color-bar {
-  width: 4px;
-  height: 40px;
-  border-radius: 2px;
-  background-color: var(--accent-color);
-  margin-right: 16px;
-  flex-shrink: 0;
+.grid-card:hover .type-icon {
+  transform: scale(1.1);
 }
 
-.item-content {
-  flex: 1;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-.item-main {
-  flex: 1;
-}
-.type-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.type-desc {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--color-slate-500);
-  max-width: 400px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.item-meta {
-  flex-shrink: 0;
-}
-.meta-time {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--color-slate-400);
-}
-
-.item-actions {
-  display: flex;
-  gap: 4px;
-  margin-left: 16px;
+.card-actions {
   opacity: 0;
-  transition: opacity 0.2s;
+  transform: translateX(10px);
+  transition: all 0.2s;
+  display: flex;
+  gap: 6px;
 }
-.type-item:hover .item-actions {
+.grid-card:hover .card-actions {
   opacity: 1;
+  transform: translateX(0);
 }
-.item-actions .el-button {
-  padding: 8px;
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 6px 0;
 }
-.item-actions .el-icon {
-  font-size: 16px;
+
+.card-desc {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+  flex: 1; 
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #f1f5f9;
+  display: flex;
+  align-items: center;
+}
+
+.date-tag {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.empty-state {
+  padding: 60px 0;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px dashed #cbd5e1;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 </style>
