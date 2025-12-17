@@ -3,10 +3,6 @@
     <template #header>
       <div class="card-header">
         <h3>今日会议</h3>
-        <el-button type="primary" size="small" @click="$emit('create')">
-          <el-icon class="el-icon--left"><Plus /></el-icon>
-          新建会议
-        </el-button>
       </div>
     </template>
 

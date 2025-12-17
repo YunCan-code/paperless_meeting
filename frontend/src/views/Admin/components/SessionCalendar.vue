@@ -11,6 +11,7 @@
       <div class="calendar-controls">
         <span class="current-month">{{ currentYear }}年 {{ currentMonth + 1 }}月</span>
         <div class="nav-buttons">
+          <el-button type="primary" link size="small" @click="goToday">今</el-button>
           <el-button size="small" circle :icon="ArrowLeft" @click="navigateMonth(-1)" />
           <el-button size="small" circle :icon="ArrowRight" @click="navigateMonth(1)" />
         </div>
@@ -64,6 +65,12 @@ const selectedDate = ref(now.getDate())
 
 const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate())
 const firstDayOfMonth = computed(() => new Date(currentYear.value, currentMonth.value, 1).getDay())
+
+const goToday = () => {
+  currentYear.value = now.getFullYear()
+  currentMonth.value = now.getMonth()
+  selectedDate.value = now.getDate()
+}
 
 const navigateMonth = (step) => {
   let newMonth = currentMonth.value + step

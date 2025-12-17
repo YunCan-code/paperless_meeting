@@ -17,7 +17,7 @@ class User(SQLModel, table=True):
     # 反向关联: 该用户参加的所有会议
     meetings: List["Meeting"] = Relationship(back_populates="attendees", link_model=MeetingAttendeeLink)
 
-# 会议类型模型 (如: 党组会, 办公会)
+# 会议类型模型 (如: 党委会, 办公会)
 class MeetingType(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True) # 类型名称，必须唯一
@@ -41,8 +41,12 @@ class Meeting(SQLModel, table=True):
 # 附件模型
 class Attachment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    filename: str # 原始文件名
+    filename: str # 物理文件名（存储在磁盘上的唯一名称）
+    display_name: str # 显示文件名（用户重命名后的名称）
     file_path: str # 本地存储路径
+    file_size: int = Field(default=0) # 文件大小 (bytes)
+    content_type: str = Field(default="application/octet-stream") # 文件类型
+    sort_order: int = Field(default=0) # 排序权重
     meeting_id: Optional[int] = Field(default=None, foreign_key="meeting.id") # 所属会议
     uploaded_at: datetime = Field(default_factory=datetime.now) # 上传时间
 

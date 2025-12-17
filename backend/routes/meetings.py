@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from sqlmodel import Session, select
+from sqlmodel import Session, select, SQLModel
 from typing import List, Optional
 import shutil
 from pathlib import Path
@@ -21,6 +21,14 @@ def create_meeting(meeting: Meeting, session: Session = Depends(get_session)):
     """
     创建新会议
     """
+    # 修复: Pydantic 有时未能将 ISO 字符串自动转换为 datetime 对象，导致 SQLite 报错
+    if isinstance(meeting.start_time, str):
+        try:
+            # 处理 ISO 格式 (例如 2025-12-16T16:00:00.000Z)
+            meeting.start_time = datetime.fromisoformat(meeting.start_time.replace('Z', '+00:00'))
+        except ValueError:
+            pass # 如果转换失败，留给数据库报错或保留原值
+
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
@@ -57,6 +65,8 @@ def read_meeting(meeting_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
 
+import os
+
 @router.post("/{meeting_id}/upload")
 def upload_file(
     meeting_id: int, 
@@ -70,22 +80,71 @@ def upload_file(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
-    # 生成安全的文件名 (添加时间戳前缀，防止重名)
+    # 生成安全的文件名
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     safe_filename = f"{timestamp}_{file.filename}"
     file_path = UPLOAD_DIR / safe_filename
 
-    # 将上传的文件内容写入本地磁盘
+    # 保存文件
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+    
+    # 获取文件大小
+    file_size = os.path.getsize(file_path)
 
-    # 在数据库中记录附件信息
+    # 记录数据库
     attachment = Attachment(
-        filename=file.filename,
+        filename=safe_filename,
+        display_name=file.filename, # 默认显示原始文件名
         file_path=str(file_path),
+        file_size=file_size,
+        content_type=file.content_type or "application/octet-stream",
         meeting_id=meeting.id
     )
     session.add(attachment)
     session.commit()
     session.refresh(attachment)
     return attachment
+
+class AttachmentUpdate(SQLModel):
+    display_name: Optional[str] = None
+    sort_order: Optional[int] = None
+
+@router.put("/attachments/{attachment_id}", response_model=Attachment)
+def update_attachment(
+    attachment_id: int, 
+    update_data: AttachmentUpdate, 
+    session: Session = Depends(get_session)
+):
+    """更新附件信息 (重命名, 排序)"""
+    attachment = session.get(Attachment, attachment_id)
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    
+    if update_data.display_name is not None:
+        attachment.display_name = update_data.display_name
+    if update_data.sort_order is not None:
+        attachment.sort_order = update_data.sort_order
+        
+    session.add(attachment)
+    session.commit()
+    session.refresh(attachment)
+    return attachment
+
+@router.delete("/attachments/{attachment_id}")
+def delete_attachment(attachment_id: int, session: Session = Depends(get_session)):
+    """删除附件"""
+    attachment = session.get(Attachment, attachment_id)
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+        
+    # 删除物理文件
+    try:
+        if os.path.exists(attachment.file_path):
+            os.remove(attachment.file_path)
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+
+    session.delete(attachment)
+    session.commit()
+    return {"ok": True}
