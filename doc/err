@@ -1,19 +1,12 @@
-09:59:50 [vite] Internal server error: Element is missing end tag.
-  Plugin: vite:vue
-  File: D:/ProgramData/paperless_meeting/frontend/src/views/Admin/MeetingManage.vue:72:7
-  70 |        class="meeting-dialog detail-mode"
-  71 |      >
-  72 |        <div class="dialog-layout" v-if="currentDetail">
-     |         ^
-  73 |          <div class="dialog-left">
-  74 |            <!-- 标题区域 -->
-      at createCompilerError (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:1364:17)
-      at emitError (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:2997:5)
-      at Object.onclosetag (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:2364:13)
-      at Tokenizer.stateInClosingTagName (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:785:16)
-      at Tokenizer.parse (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:1143:16)
-      at Object.baseParse (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:3036:13)
-      at Object.parse (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-dom\dist\compiler-dom.cjs.js:910:23)
-      at Object.parse$1 [as parse] (D:\ProgramData\paperless_meeting\frontend\node_modules\@vue\compiler-sfc\dist\compiler-sfc.cjs.js:1801:24)
-      at createDescriptor (file:///D:/ProgramData/paperless_meeting/frontend/node_modules/@vitejs/plugin-vue/dist/index.mjs:54:42)
-      at handleHotUpdate (file:///D:/ProgramData/paperless_meeting/frontend/node_modules/@vitejs/plugin-vue/dist/index.mjs:1162:25) (x4)
+Starting Gradle Daemon...
+Gradle Daemon started in 1 s 51 ms
+> Task :prepareKotlinBuildScriptModel UP-TO-DATE
+Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.10/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 21s
