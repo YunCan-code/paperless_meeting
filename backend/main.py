@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     with Session(engine) as session:
         if not session.exec(select(MeetingType)).first():
             print("初始化默认会议类型...")
-            session.add(MeetingType(name="党组会", description="默认类型"))
+            session.add(MeetingType(name="党委会", description="默认类型"))
             session.commit()
             
     yield

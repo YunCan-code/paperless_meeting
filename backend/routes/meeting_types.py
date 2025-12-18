@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from database import get_session
-from models import MeetingType
+from models import MeetingType, MeetingTypeRead
 
 # 创建路由器，前缀为 /meeting_types
 router = APIRouter(prefix="/meeting_types", tags=["meeting_types"])
 
-@router.post("/", response_model=MeetingType)
+@router.post("/", response_model=MeetingTypeRead)
 def create_meeting_type(meeting_type: MeetingType, session: Session = Depends(get_session)):
     """
     创建新会议类型
@@ -17,7 +17,7 @@ def create_meeting_type(meeting_type: MeetingType, session: Session = Depends(ge
     session.refresh(meeting_type)
     return meeting_type
 
-@router.get("/", response_model=List[MeetingType])
+@router.get("/", response_model=List[MeetingTypeRead])
 def read_meeting_types(session: Session = Depends(get_session)):
     """
     获取所有会议类型
@@ -37,7 +37,7 @@ def delete_meeting_type(type_id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"ok": True}
 
-@router.put("/{type_id}", response_model=MeetingType)
+@router.put("/{type_id}", response_model=MeetingTypeRead)
 def update_meeting_type(type_id: int, data: MeetingType, session: Session = Depends(get_session)):
     """
     更新会议类型

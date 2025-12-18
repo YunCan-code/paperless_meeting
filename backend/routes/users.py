@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from database import get_session
-from models import User
+from models import User, UserRead
 
 # 创建路由器，前缀为 /users
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.post("/", response_model=User)
+@router.post("/", response_model=UserRead)
 def create_user(user: User, session: Session = Depends(get_session)):
     """
     创建新用户
@@ -17,7 +17,7 @@ def create_user(user: User, session: Session = Depends(get_session)):
     session.refresh(user)
     return user
 
-@router.get("/", response_model=List[User])
+@router.get("/", response_model=List[UserRead])
 def read_users(session: Session = Depends(get_session)):
     """
     获取所有用户列表

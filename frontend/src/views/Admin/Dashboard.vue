@@ -33,6 +33,11 @@
             <el-icon><List /></el-icon>
             <template #title>类型管理</template>
           </el-menu-item>
+          <div class="menu-divider"></div>
+          <el-menu-item index="/admin/settings">
+            <el-icon><Setting /></el-icon>
+            <template #title>系统设置</template>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       <el-main class="custom-main">
@@ -43,7 +48,7 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 
 // 使用全局侧边栏状态，与子页面共享
@@ -134,6 +139,11 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
   border-right: none;
   flex: 1;
   padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+}
+.menu-divider {
+  flex: 1;
 }
 .custom-aside.collapsed .custom-menu {
   padding: 8px 4px;
@@ -161,9 +171,10 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
   color: var(--color-slate-900);
 }
 :deep(.el-menu-item.is-active) {
-  background-color: #eff6ff;
-  color: var(--color-primary);
-  font-weight: 600;
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important; /* Deeper blue */
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 #1d4ed8; /* Left border effect */
 }
 :deep(.el-menu-item .el-icon) {
   margin-right: 10px;

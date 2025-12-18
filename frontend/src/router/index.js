@@ -26,6 +26,11 @@ const router = createRouter({
                     path: 'types',
                     name: 'types',
                     component: () => import('../views/Admin/MeetingTypeManage.vue')
+                },
+                {
+                    path: 'settings',
+                    name: 'settings',
+                    component: () => import('../views/Admin/Settings.vue')
                 }
             ]
         }

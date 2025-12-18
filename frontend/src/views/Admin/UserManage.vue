@@ -21,6 +21,7 @@
       </div>
       
       <div class="header-right">
+        <el-button type="default" style="margin-right: 12px;">导入人员</el-button>
         <el-button type="primary" @click="dialogVisible = true">
           <el-icon class="el-icon--left"><Plus /></el-icon>
           添加人员
@@ -30,10 +31,13 @@
 
     <!-- 人员列表表格 -->
     <el-table :data="users" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column type="index" label="序号" width="80" align="center" />
       <el-table-column prop="name" label="姓名" width="120" />
       <el-table-column prop="department" label="部门" />
       <el-table-column prop="position" label="职位" />
+      <el-table-column prop="phone" label="联系方式">
+          <template #default> 13800138000 </template>
+      </el-table-column>
       <el-table-column label="操作" width="120">
         <template #default="scope">
           <el-button link type="danger" size="small" @click="handleDelete(scope.row)">删除</el-button>

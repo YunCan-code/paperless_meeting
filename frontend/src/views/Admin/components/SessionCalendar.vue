@@ -3,7 +3,7 @@
     <template #header>
       <div class="calendar-header">
         <h3 class="calendar-title">日历</h3>
-        <el-button type="primary" size="small" @click="$emit('create')">
+        <el-button type="primary" @click="$emit('create')" style="padding: 8px 16px; font-weight: 500;">
           <el-icon class="el-icon--left"><Plus /></el-icon>
           新建会议
         </el-button>
@@ -30,11 +30,14 @@
         v-for="day in daysInMonth" 
         :key="day" 
         class="day-cell"
-        :class="{
-          'is-today': isToday(day),
-          'is-selected': isSelected(day),
-          'has-meeting': hasMeeting(day)
-        }"
+        :class="[
+          {
+            'is-today': isToday(day),
+            'is-selected': isSelected(day),
+            'has-meeting': hasMeeting(day)
+          },
+          getHeatClass(day)
+        ]"
         @click="selectDate(day)"
       >
         <span class="day-number">{{ day }}</span>
@@ -55,7 +58,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['create'])
+const emit = defineEmits(['create', 'select-date'])
 
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 const now = new Date()
@@ -70,6 +73,8 @@ const goToday = () => {
   currentYear.value = now.getFullYear()
   currentMonth.value = now.getMonth()
   selectedDate.value = now.getDate()
+  // Emit selection
+  selectDate(now.getDate())
 }
 
 const navigateMonth = (step) => {
@@ -95,21 +100,32 @@ const isSelected = (day) => {
 
 const selectDate = (day) => {
   selectedDate.value = day
+  const dateObj = new Date(currentYear.value, currentMonth.value, day)
+  emit('select-date', dateObj)
 }
 
-const hasMeeting = (day) => {
-  // Check if any meeting exists on this day
-  // Assuming meeting.start_time is ISO string
-  if (!props.meetings) return false
+const getMeetingCount = (day) => {
+  if (!props.meetings) return 0
   const targetDateStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-  
-  return props.meetings.some(m => {
-    if (!m.start_time) return false
+  let count = 0
+  props.meetings.forEach(m => {
+    if (!m.start_time) return
     const mDate = new Date(m.start_time)
     const mDateStr = `${mDate.getFullYear()}-${String(mDate.getMonth() + 1).padStart(2, '0')}-${String(mDate.getDate()).padStart(2, '0')}`
-    return mDateStr === targetDateStr
+    if (mDateStr === targetDateStr) count++
   })
+  return count
 }
+
+const getHeatClass = (day) => {
+  const count = getMeetingCount(day)
+  if (count === 0) return ''
+  if (count <= 1) return 'heat-level-1'
+  if (count <= 3) return 'heat-level-2'
+  return 'heat-level-3'
+}
+
+const hasMeeting = (day) => getMeetingCount(day) > 0
 </script>
 
 <style scoped>
@@ -162,28 +178,62 @@ const hasMeeting = (day) => {
   transition: all 0.2s;
   position: relative;
 }
-.day-cell:hover {
+/* Hover effect only for cells with NO heat/color */
+.day-cell:not(.heat-level-1):not(.heat-level-2):not(.heat-level-3):not(.is-selected):hover {
   background-color: var(--color-slate-100);
 }
+/* Optional: subtle opacity change for heat cells on hover instead of color change, 
+   but user asked for "no change", so we stick to that or just cursor pointer (which is default) */
+.day-cell.heat-level-1:hover,
+.day-cell.heat-level-2:hover,
+.day-cell.heat-level-3:hover {
+  filter: brightness(0.95); /* Subtle reaction without changing hue */
+}
+/* Selected State */
 .day-cell.is-selected {
-  background-color: var(--color-primary);
-  color: white;
+  /* Remove blue border and transparent bg override */
+  font-weight: 800;
+  box-shadow: inset 0 0 0 2px var(--color-primary); /* Use inset shadow instead of border to avoid layout shift, maintain BG */
+  /* Do NOT set background-color here, let heat class control it */
 }
-.day-cell.is-today:not(.is-selected) {
-  background-color: #eff6ff;
-  color: var(--color-primary);
-  font-weight: 600;
+
+/* Today styling */
+.day-cell.is-today {
+  color: #169e8c; /* Teal text for today if no heat */
+  font-weight: 800;
 }
-.meeting-dot {
-  position: absolute;
-  bottom: 4px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background-color: currentColor;
-  opacity: 0.8;
+.day-cell.is-today::after {
+   content: '';
+   position: absolute;
+   bottom: 4px;
+   width: 4px; 
+   height: 4px;
+   border-radius: 50%;
+   background-color: #169e8c; /* Teal dot */
 }
-.day-cell.is-selected .meeting-dot {
-  background-color: white;
+
+/* Heatmap Colors (Orange Scale) */
+.heat-level-1 { background-color: #ffedd5; color: #c2410c; }
+.heat-level-2 { background-color: #fed7aa; color: #c2410c; }
+.heat-level-3 { background-color: #fdba74; color: #9a3412; }
+
+/* Today with Heat: Use Teal Background */
+.day-cell.is-today.heat-level-1,
+.day-cell.is-today.heat-level-2,
+.day-cell.is-today.heat-level-3 {
+    background-color: #169e8c; /* Teal BG override */
+    color: white; /* White text on Teal */
+}
+/* When Today has heat (Teal BG), the "Today" dot should be white */
+.day-cell.is-today.heat-level-1::after,
+.day-cell.is-today.heat-level-2::after,
+.day-cell.is-today.heat-level-3::after {
+   background-color: white; 
+}
+/* When Today has heat (Teal BG), the "Meeting" dot should also be white for visibility */
+.day-cell.is-today.heat-level-1 .meeting-dot,
+.day-cell.is-today.heat-level-2 .meeting-dot,
+.day-cell.is-today.heat-level-3 .meeting-dot {
+   background-color: white;
 }
 </style>

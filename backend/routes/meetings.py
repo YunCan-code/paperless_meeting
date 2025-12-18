@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime
 
 from database import get_session
-from models import Meeting, MeetingType, Attachment, User
+from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase
 
 # 创建路由器，前缀为 /meetings
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -55,15 +55,69 @@ def read_meetings(
     meetings = session.exec(query).all()
     return meetings
 
-@router.get("/{meeting_id}", response_model=Meeting)
+class MeetingWithAttachments(MeetingRead):
+    attachments: List[AttachmentRead] = []
+
+@router.get("/{meeting_id}", response_model=MeetingWithAttachments)
 def read_meeting(meeting_id: int, session: Session = Depends(get_session)):
     """
-    获取单个会议详情
+    获取单个会议详情 (包含附件)
     """
     meeting = session.get(Meeting, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
+
+class MeetingUpdate(SQLModel):
+    title: Optional[str] = None
+    meeting_type_id: Optional[int] = None
+    start_time: Optional[datetime] = None
+    location: Optional[str] = None
+    status: Optional[str] = None
+
+@router.put("/{meeting_id}", response_model=Meeting)
+def update_meeting(
+    meeting_id: int, 
+    meeting_update: MeetingUpdate, 
+    session: Session = Depends(get_session)
+):
+    """更新会议基本信息"""
+    db_meeting = session.get(Meeting, meeting_id)
+    if not db_meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+        
+    meeting_data = meeting_update.model_dump(exclude_unset=True)
+    for key, value in meeting_data.items():
+        if key == 'start_time' and isinstance(value, str):
+             try:
+                # 再次防止 Pydantic 转 datetime 失败的情况
+                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+             except: pass
+        setattr(db_meeting, key, value)
+        
+    session.add(db_meeting)
+    session.commit()
+    session.refresh(db_meeting)
+    return db_meeting
+
+@router.delete("/{meeting_id}")
+def delete_meeting(meeting_id: int, session: Session = Depends(get_session)):
+    """删除会议 (级联删除附件)"""
+    meeting = session.get(Meeting, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # 删除关联的物理文件
+    for attachment in meeting.attachments:
+        try:
+            if os.path.exists(attachment.file_path):
+                os.remove(attachment.file_path)
+        except Exception as e:
+            print(f"Error deleting file {attachment.file_path}: {e}")
+            
+    session.delete(meeting)
+    session.commit()
+    return {"ok": True}
 
 import os
 
@@ -110,7 +164,7 @@ class AttachmentUpdate(SQLModel):
     display_name: Optional[str] = None
     sort_order: Optional[int] = None
 
-@router.put("/attachments/{attachment_id}", response_model=Attachment)
+@router.put("/attachments/{attachment_id}", response_model=AttachmentRead)
 def update_attachment(
     attachment_id: int, 
     update_data: AttachmentUpdate, 

@@ -95,7 +95,7 @@
     >
       <el-form :model="form" label-position="top" size="large">
         <el-form-item label="类型名称" required>
-          <el-input v-model="form.name" placeholder="如：党组会、办公会" maxlength="20" show-word-limit />
+          <el-input v-model="form.name" placeholder="如：党委会、办公会" maxlength="20" show-word-limit />
         </el-form-item>
         <el-form-item label="描述说明">
           <el-input 

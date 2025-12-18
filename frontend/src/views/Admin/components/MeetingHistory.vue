@@ -1,5 +1,5 @@
 <template>
-  <el-card class="meeting-history" shadow="never">
+  <el-card class="meeting-history" shadow="hover">
     <template #header>
       <div class="card-header">
         <h3>会议历史</h3>
@@ -12,48 +12,66 @@
             class="search-input"
             :prefix-icon="Search"
           />
-          <el-select v-model="statusFilter" size="small" placeholder="状态" style="width: 100px;">
-            <el-option label="全部" value="" />
-            <el-option label="计划中" value="scheduled" />
-            <el-option label="进行中" value="active" />
-            <el-option label="已结束" value="finished" />
-          </el-select>
         </div>
       </div>
     </template>
 
-    <el-table :data="filteredMeetings" style="width: 100%" size="default">
-      <el-table-column prop="title" label="会议主题" min-width="180" />
-      <el-table-column label="类型" width="100">
+    <el-table :data="pagedMeetings" style="width: 100%" size="large" :header-cell-style="{ background: '#f8fafc' }">
+      <el-table-column type="index" label="序号" width="80" align="center" />
+      <el-table-column prop="title" label="会议主题" min-width="180">
+         <template #default="{ row }">
+            <span style="font-weight: 500; color: #1e293b;">{{ row.title }}</span>
+         </template>
+      </el-table-column>
+      <el-table-column label="类型" width="120">
         <template #default="{ row }">
-          <el-tag size="small" effect="plain">{{ getTypeName(row.meeting_type_id) }}</el-tag>
+          <el-tag 
+            size="small" 
+            :style="{ 
+               color: getTypeColor(row.meeting_type_id),
+               backgroundColor: getTypeColor(row.meeting_type_id) + '1a',
+               border: 'none'
+            }"
+            effect="plain" 
+            round
+          >
+            {{ getTypeName(row.meeting_type_id) }}
+          </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="时间" width="160">
+      <el-table-column label="开始时间" width="180">
         <template #default="{ row }">
           {{ formatDate(row.start_time) }}
         </template>
       </el-table-column>
-      <el-table-column prop="location" label="地点" width="120" />
-      <el-table-column label="状态" width="100">
+      <el-table-column prop="location" label="地点" width="150">
         <template #default="{ row }">
-          <el-tag :type="getStatusType(row.status)" size="small" effect="dark" round>
-            {{ getStatusText(row.status) }}
-          </el-tag>
+          {{ row.location || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      
+      <el-table-column label="操作" width="100" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="$emit('view', row)">查看</el-button>
-          <el-button link type="primary" size="small" @click="$emit('upload', row)">附件</el-button>
         </template>
       </el-table-column>
     </el-table>
+    
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="totalMeetings"
+        background
+      />
+    </div>
   </el-card>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -64,41 +82,62 @@ const props = defineProps({
 defineEmits(['view', 'upload'])
 
 const searchTerm = ref('')
-const statusFilter = ref('')
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+// Reset page on search
+watch(searchTerm, () => currentPage.value = 1)
+// Reset page on data change
+watch(() => props.meetings.length, () => currentPage.value = 1)
 
 const filteredMeetings = computed(() => {
-  return props.meetings.filter(m => {
-    const matchesSearch = m.title.toLowerCase().includes(searchTerm.value.toLowerCase())
-    const matchesStatus = !statusFilter.value || m.status === statusFilter.value
-    return matchesSearch && matchesStatus
-  })
+  let result = [...props.meetings] 
+  
+  if (searchTerm.value) {
+     const term = searchTerm.value.toLowerCase()
+     result = result.filter(m => m.title.toLowerCase().includes(term))
+  }
+  
+  // Sort by created time (ID desc usually implies creation order, or start_time desc)
+  // User requested "New created on top". Assuming ID is auto-inc.
+  result.sort((a, b) => b.id - a.id)
+  
+  return result
+})
+
+const totalMeetings = computed(() => filteredMeetings.value.length)
+
+const pagedMeetings = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredMeetings.value.slice(start, end)
 })
 
 const getTypeName = (id) => {
   const found = props.meetingTypes.find(t => t.id === id)
-  return found ? found.name : ''
+  return found ? found.name : '-'
+}
+
+const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#14b8a6']
+const getTypeColor = (id) => {
+   if (!props.meetingTypes) return '#3b82f6'
+   const index = props.meetingTypes.findIndex(t => t.id === id)
+   if (index === -1) return '#3b82f6'
+   return colors[index % colors.length]
 }
 
 const formatDate = (iso) => {
   if (!iso) return ''
   return new Date(iso).toLocaleString([], {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit'})
 }
-
-const getStatusType = (status) => {
-  const map = { scheduled: 'info', active: 'success', finished: 'warning' }
-  return map[status] || 'info'
-}
-
-const getStatusText = (status) => {
-  const map = { scheduled: '计划中', active: '进行中', finished: '已结束' }
-  return map[status] || status
-}
 </script>
 
 <style scoped>
 .meeting-history {
-  border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
+  border-radius: 16px;
+  border: none;
+  background-color: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 .card-header {
   display: flex;
@@ -106,18 +145,24 @@ const getStatusText = (status) => {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  padding-bottom: 8px;
 }
 .card-header h3 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-slate-800);
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
 }
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
 .search-input {
-  width: 200px;
+  width: 240px;
+}
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
