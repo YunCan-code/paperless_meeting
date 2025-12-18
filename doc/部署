@@ -1,0 +1,208 @@
+这份教程的目标是实现：
+
+coso.top -> 访问你的 无纸化会议系统 (运行在 Docker 中)。
+
+komari.coso.top -> 访问你的 探针 (运行在 Docker 或直接运行，端口 25774)。
+
+两者互不干扰，支持 HTTPS。
+
+🛠️ 第一阶段：准备项目文件 (在你的电脑上操作)
+我们需要给项目添加 Docker 支持。请在项目根目录（即包含 backend 和 frontend 文件夹的地方）添加以下 4 个文件。
+
+1. 后端构建文件 (backend/Dockerfile)
+在 backend 文件夹内新建文件 Dockerfile：
+
+Dockerfile
+
+# backend/Dockerfile
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# 设置时区为上海
+ENV TZ=Asia/Shanghai
+
+# 安装依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 复制代码
+COPY . .
+
+# 创建静态文件目录
+RUN mkdir -p static
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动命令
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+2. 前端 Nginx 配置 (frontend/nginx.conf)
+在 frontend 文件夹内新建文件 nginx.conf。这是容器内部的 Nginx，负责转发 API 请求：
+
+Nginx
+
+# frontend/nginx.conf
+server {
+    listen 80;
+    server_name localhost;
+
+    # 1. 前端页面
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 2. 后端 API 转发 (转发给 docker 网络内的 backend 服务)
+    location /api/ {
+        proxy_pass http://backend:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        client_max_body_size 500M; # 允许大文件上传
+    }
+
+    # 3. 静态资源转发
+    location /static/ {
+        proxy_pass http://backend:8000/static/;
+    }
+}
+3. 前端构建文件 (frontend/Dockerfile)
+在 frontend 文件夹内新建文件 Dockerfile：
+
+Dockerfile
+
+# frontend/Dockerfile
+# 阶段一：编译
+FROM node:18-alpine as build-stage
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --registry=https://registry.npmmirror.com
+COPY . .
+RUN npm run build
+
+# 阶段二：运行
+FROM nginx:stable-alpine as production-stage
+COPY --from=build-stage /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+4. 总控配置 (docker-compose.yml)
+在项目根目录新建 docker-compose.yml：
+
+YAML
+
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: meeting_backend
+    restart: always
+    volumes:
+      - ./backend/database.db:/app/database.db
+      - ./backend/static:/app/static
+    environment:
+      - TZ=Asia/Shanghai
+
+  frontend:
+    build: ./frontend
+    container_name: meeting_frontend
+    restart: always
+    ports:
+      # 【重要】这里将容器的 80 映射到 VPS 的 5000 端口
+      # 这样 VPS 的 Nginx 就可以把 coso.top 转发到 localhost:5000
+      - "5000:80"
+    depends_on:
+      - backend
+    environment:
+      - TZ=Asia/Shanghai
+🚀 第二阶段：上传与启动 (在 VPS 上操作)
+上传代码： 将整个项目文件夹上传到 VPS，例如上传到 /root/paperless_meeting。
+
+启动项目：
+
+Bash
+
+cd /root/paperless_meeting
+
+# 停止旧容器（如果有）
+docker compose down
+
+# 构建并启动
+docker compose up -d --build
+启动成功后，你的会议系统就在 127.0.0.1:5000 运行了。
+
+🌐 第三阶段：配置 Nginx 网关 (解决域名冲突的核心)
+这是你最关心的部分。我们需要明确告诉 VPS 的 Nginx：
+
+komari.coso.top 给探针 (25774 端口)。
+
+coso.top 给会议系统 (5000 端口)。
+
+1. 确认探针配置 (komari.coso.top)
+你之前已经配置好了，只要确保 /etc/nginx/sites-enabled/ 下有它的配置文件，且 server_name 是 komari.coso.top 即可。不需要动它。
+
+2. 创建会议系统配置 (coso.top)
+新建一个配置文件：
+
+Bash
+
+sudo nano /etc/nginx/sites-available/meeting
+粘贴以下内容（这是专门接管主域名的）：
+
+Nginx
+
+server {
+    # 监听 80 端口
+    listen 80;
+    
+    # 【关键】明确指定主域名，Nginx 看到 coso.top 就会进这个 block
+    server_name coso.top;
+
+    location / {
+        # 转发给 Docker 刚刚映射的 5000 端口
+        proxy_pass http://127.0.0.1:5000;
+        
+        # 必要的头信息
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket 支持
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+3. 启用并生效
+Bash
+
+# 1. 建立软链接
+sudo ln -s /etc/nginx/sites-available/meeting /etc/nginx/sites-enabled/
+
+# 2. 检查配置是否有误
+sudo nginx -t
+# 如果看到 "successful"，继续下一步
+
+# 3. 重启 Nginx
+sudo systemctl reload nginx
+此时，访问 http://coso.top 应该能看到你的会议系统了！
+
+🔒 第四阶段：配置 HTTPS (SSL)
+最后，给你的主域名加上小绿锁。
+
+Bash
+
+sudo certbot --nginx -d coso.top
+如果提示选择，选 coso.top。
+
+Certbot 会自动修改刚才的 meeting 配置文件，加上 SSL 证书路径。
+
+🎉 最终检查
+打开 https://komari.coso.top -> 显示探针。
+
+打开 https://coso.top -> 显示无纸化会议系统。
+
+这样就完美解决了“主域名也显示探针”的问题，因为现在主域名有了明确的归属配置。

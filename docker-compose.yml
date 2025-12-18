@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: meeting_backend
+    restart: always
+    volumes:
+      - ./backend/database.db:/app/database.db
+      - ./backend/uploads:/app/uploads
+    environment:
+      - TZ=Asia/Shanghai
+
+  frontend:
+    build: ./frontend
+    container_name: meeting_frontend
+    restart: always
+    ports:
+      # 【重要】这里将容器的 80 映射到 VPS 的 5000 端口
+      # 这样 VPS 的 Nginx 就可以把 coso.top 转发到 localhost:5000
+      - "5000:80"
+    depends_on:
+      - backend
+    environment:
+      - TZ=Asia/Shanghai

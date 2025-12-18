@@ -2,15 +2,15 @@
   <div class="common-layout">
     <el-container>
       <el-aside :width="isCollapse ? '64px' : '260px'" class="custom-aside" :class="{ 'collapsed': isCollapse }">
-        <div class="sidebar-header">
+        <div class="sidebar-header" @click="$router.push('/')" style="cursor: pointer;">
           <div class="logo-icon">
             <el-icon><Monitor /></el-icon>
           </div>
           <div class="logo-text" v-show="!isCollapse">
-            <h1>Paperless</h1>
-            <p>Meeting System</p>
+            <h1>无纸化</h1>
+            <p>会议系统</p>
           </div>
-          </div>
+        </div>
 
 
         <el-menu
