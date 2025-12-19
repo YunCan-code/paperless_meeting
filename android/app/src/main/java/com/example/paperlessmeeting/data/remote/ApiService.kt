@@ -9,5 +9,8 @@ interface ApiService {
 
     @GET("meetings/{id}")
     suspend fun getMeeting(@retrofit2.http.Path("id") id: Int): Meeting
-    // Note: Backend might need authentication header later, but we skip it for now.
+
+    @retrofit2.http.Streaming
+    @GET
+    suspend fun downloadFile(@retrofit2.http.Url url: String): okhttp3.ResponseBody
 }

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -17,13 +19,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,28 +49,42 @@ fun AdaptiveMeetingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // UI Logic State
-    var selectedTypeFilter by remember { 
-        mutableStateOf(
-            if (meetingTypeName == "ALL") null else try { MeetingType.valueOf(meetingTypeName) } catch(_:Exception){null} 
-        ) 
-    }
-    
-    var selectedMeetingId by remember { mutableStateOf<Int?>(null) }
-    
     // Filter Meetings
     val allMeetings = if (uiState is com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success) {
         (uiState as com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success).meetings
     } else emptyList()
 
+    // UI Logic State
+    // Default filter: If nav param is not "ALL", use it as initial filter
+    var selectedTypeFilter by remember(meetingTypeName) { 
+        mutableStateOf(if (meetingTypeName == "ALL") null else meetingTypeName) 
+    }
+    
+    var selectedMeetingId by remember { mutableStateOf<Int?>(null) }
+    var fullMeeting by remember { mutableStateOf<Meeting?>(null) }
+    
+    // Fetch full details when ID changes
+    LaunchedEffect(selectedMeetingId) {
+        if (selectedMeetingId != null) {
+            fullMeeting = viewModel.getMeetingDetails(selectedMeetingId!!)
+        } else {
+            fullMeeting = null
+        }
+    }
+
+    // Dynamic Types from Data
+    val availableTypes = remember(allMeetings) {
+        allMeetings.mapNotNull { it.meetingTypeName }.filter { it.isNotEmpty() }.distinct().sorted()
+    }
+
     val filteredMeetings = if (selectedTypeFilter == null) {
         allMeetings
     } else {
-        allMeetings.filter { it.getUiType() == selectedTypeFilter }
+        allMeetings.filter { it.meetingTypeName == selectedTypeFilter }
     }
     
     val selectedMeeting = allMeetings.find { it.id == selectedMeetingId } 
-        ?: filteredMeetings.firstOrNull()
+    // Removed auto-select behavior as requested so user sees prompt first
 
     BoxWithConstraints {
         val isTablet = maxWidth > 600.dp
@@ -72,6 +93,7 @@ fun AdaptiveMeetingScreen(
             // === PHONE LAYOUT ===
             Column(modifier = Modifier.fillMaxSize()) {
                 FilterChipsBar(
+                    availableTypes = availableTypes,
                     selectedType = selectedTypeFilter,
                     onTypeSelected = { selectedTypeFilter = it }
                 )
@@ -88,7 +110,7 @@ fun AdaptiveMeetingScreen(
                 // Left Pane: List
                 Surface(
                     modifier = Modifier.width(360.dp),
-                    color = MaterialTheme.colorScheme.surface, // Should be slightly different from Rail?
+                    color = MaterialTheme.colorScheme.surface, 
                     tonalElevation = 1.dp
                 ) {
                     Column {
@@ -102,6 +124,7 @@ fun AdaptiveMeetingScreen(
                         }
                         
                         FilterChipsBar(
+                            availableTypes = availableTypes,
                             selectedType = selectedTypeFilter,
                             onTypeSelected = { selectedTypeFilter = it }
                         )
@@ -117,15 +140,22 @@ fun AdaptiveMeetingScreen(
                 // Right Pane: Detail
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.background // #F5F5F7
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    if (selectedMeeting != null) {
-                        MeetingDetailContent(meeting = selectedMeeting)
+                    // Logic: Show Full Details if loaded, else show List Data (partial), else Empty
+                    val displayMeeting = fullMeeting ?: selectedMeeting
+                    
+                    if (displayMeeting != null) {
+                        MeetingDetailContent(
+                            meeting = displayMeeting,
+                            onAttachmentClick = { url, name ->
+                                 val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+                                 val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
+                                 navController.navigate("reader?url=$encodedUrl&name=$encodedName")
+                            }
+                        )
                     } else {
-                        // Empty State
-                         androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
-                             androidx.compose.material3.Text("Select a meeting", modifier = Modifier.align(androidx.compose.ui.Alignment.Center))
-                         }
+                        EmptyDetailView()
                     }
                 }
             }
@@ -136,8 +166,9 @@ fun AdaptiveMeetingScreen(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FilterChipsBar(
-    selectedType: MeetingType?,
-    onTypeSelected: (MeetingType?) -> Unit
+    availableTypes: List<String>,
+    selectedType: String?,
+    onTypeSelected: (String?) -> Unit
 ) {
     androidx.compose.foundation.lazy.LazyRow(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -150,16 +181,67 @@ fun FilterChipsBar(
                 label = { androidx.compose.material3.Text("全部") }
             )
         }
-        items(MeetingType.values()) { type ->
+        items(availableTypes) { typeName ->
+            val color = com.example.paperlessmeeting.ui.components.generateThemeColor(typeName)
+            
             androidx.compose.material3.FilterChip(
-                selected = selectedType == type,
-                onClick = { onTypeSelected(if (selectedType == type) null else type) },
-                label = { androidx.compose.material3.Text(type.displayName) },
+                selected = selectedType == typeName,
+                onClick = { onTypeSelected(if (selectedType == typeName) null else typeName) },
+                label = { androidx.compose.material3.Text(typeName) },
                 colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = type.color.copy(alpha = 0.2f),
-                    selectedLabelColor = type.color
+                    selectedContainerColor = color.copy(alpha = 0.2f),
+                    selectedLabelColor = color,
+                    labelColor = androidx.compose.ui.graphics.Color.Gray
+                ),
+                border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+                    enabled = true, 
+                    selected = selectedType == typeName,
+                    borderColor = if (selectedType == typeName) color else androidx.compose.ui.graphics.Color.Transparent
                 )
             )
         }
+    }
+}
+
+@Composable
+fun EmptyDetailView() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .size(120.dp)
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    androidx.compose.foundation.shape.CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.DateRange,
+                contentDescription = null,
+                modifier = Modifier.size(56.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+            )
+        }
+        
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(24.dp))
+        
+        Text(
+            text = "暂无选中会议",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "请从左侧列表选择一项以查看详情",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

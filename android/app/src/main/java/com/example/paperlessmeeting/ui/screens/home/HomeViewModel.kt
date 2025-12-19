@@ -35,6 +35,13 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+    suspend fun getMeetingDetails(id: Int): Meeting? {
+        return try {
+            repository.getMeetingById(id)
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
 
 sealed class HomeUiState {

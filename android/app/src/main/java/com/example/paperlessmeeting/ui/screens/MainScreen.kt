@@ -130,6 +130,24 @@ fun MainScreen() {
                 ) {
                    com.example.paperlessmeeting.ui.screens.detail.DetailScreen(navController = navController)
                 }
+                
+                composable(
+                    route = "reader?url={url}&name={name}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("url") { type = androidx.navigation.NavType.StringType },
+                        androidx.navigation.navArgument("name") { type = androidx.navigation.NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val url = backStackEntry.arguments?.getString("url") ?: ""
+                    val name = backStackEntry.arguments?.getString("name") ?: ""
+                    com.example.paperlessmeeting.ui.screens.reader.ReaderScreen(
+                        meetingId = 0,
+                        attachmentId = 0,
+                        downloadUrl = url,
+                        fileName = name,
+                        navController = navController
+                    )
+                }
             }
         }
     }

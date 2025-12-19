@@ -153,18 +153,66 @@ def read_meetings(
         
     return results
 
-class MeetingWithAttachments(MeetingRead):
+class MeetingWithAttachments(MeetingCardResponse):
     attachments: List[AttachmentRead] = []
 
 @router.get("/{meeting_id}", response_model=MeetingWithAttachments)
-def read_meeting(meeting_id: int, session: Session = Depends(get_session)):
+def read_meeting(
+    meeting_id: int, 
+    request: Request,
+    session: Session = Depends(get_session)
+):
     """
-    获取单个会议详情 (包含附件)
+    获取单个会议详情 (包含附件、封面、类型名)
     """
     meeting = session.get(Meeting, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
-    return meeting
+
+    # 构造响应对象
+    resp = MeetingWithAttachments.model_validate(meeting)
+    
+    # 补充 computed fields
+    m_type = session.get(MeetingType, meeting.meeting_type_id) if meeting.meeting_type_id else None
+    resp.meeting_type_name = m_type.name if m_type else "普通会议"
+    
+    # 图片逻辑复用 (简化版)
+    # TODO: Refactor into helper function
+    base_url = str(request.base_url)
+    if not base_url.endswith("/"): base_url += "/"
+    bg_root = UPLOAD_DIR / "meeting_backgrounds"
+    final_url = None
+
+    if m_type and m_type.is_fixed_image and m_type.cover_image:
+         raw_url = m_type.cover_image
+         if raw_url and raw_url.startswith("/"):
+            final_url = f"{base_url.rstrip('/')}{raw_url}"
+         else:
+            final_url = raw_url
+    else:
+        type_name = m_type.name if m_type else "default"
+        type_folder = bg_root / type_name
+        final_url = get_random_image_from_dir(type_folder, base_url)
+        
+        if not final_url:
+            common_folder = bg_root / "common"
+            final_url = get_random_image_from_dir(common_folder, base_url)
+        
+        if not final_url:
+            # Fallback map
+            if "周" in type_name or "例" in type_name:
+                final_url = DEFAULT_IMAGES["weekly"]
+            elif "急" in type_name:
+                final_url = DEFAULT_IMAGES["urgent"]
+            elif "评" in type_name or "审" in type_name:
+                final_url = DEFAULT_IMAGES["review"]
+            elif "启" in type_name:
+                final_url = DEFAULT_IMAGES["kickoff"]
+            else:
+                final_url = DEFAULT_IMAGES["default"]
+
+    resp.card_image_url = final_url
+    return resp
 
 class MeetingUpdate(SQLModel):
     title: Optional[str] = None
