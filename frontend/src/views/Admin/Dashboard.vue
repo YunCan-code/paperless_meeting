@@ -40,17 +40,7 @@
           </el-menu-item>
         </el-menu>
         
-        <!-- Sidebar Footer: Theme Toggle -->
-        <div class="sidebar-footer">
-          <div 
-            class="theme-toggle-btn" 
-            :class="{ 'is-dark': isDark }"
-            @click="toggleDark()"
-          >
-             <el-icon v-if="isDark" size="20"><Moon /></el-icon>
-             <el-icon v-else size="20"><Sunny /></el-icon>
-          </div>
-        </div>
+        <!-- Sidebar Footer Removed -->
       </el-aside>
       <el-main class="custom-main">
         <router-view></router-view>
@@ -60,13 +50,11 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting, Moon, Sunny } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
-import { useTheme } from '@/composables/useTheme'
 
 // 使用全局侧边栏状态，与子页面共享
 const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
-const { isDark, toggleDark } = useTheme()
 </script>
 
 <style scoped>
@@ -168,37 +156,8 @@ const { isDark, toggleDark } = useTheme()
   padding: 16px;
   border-top: 1px solid var(--border-color-layout);
   display: flex;
-  justify-content: center; /* Always center the icon now */
+  justify-content: center; 
 }
-
-/* Minimized Toggle Button */
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: var(--text-secondary);
-  background: transparent;
-}
-
-.theme-toggle-btn:hover {
-  background-color: var(--color-slate-100); /* Slightly visible hover area */
-  color: var(--color-primary);
-}
-
-/* Dark Mode Icon Specifics */
-.theme-toggle-btn.is-dark {
-  color: #fbbf24; /* Amber Moon */
-}
-.theme-toggle-btn.is-dark:hover {
-  background-color: rgba(255,255,255,0.05); /* Subtle dark hover */
-}
-
-/* Logo Text in Dark Mode is handled by var(--text-main) now */
 
 /* Main Content */
 .custom-main {
@@ -234,33 +193,6 @@ const { isDark, toggleDark } = useTheme()
   margin: 0;
 }
 
-/* Main Content */
-.custom-main {
-  background-color: #f8fafc;
-  padding: 24px;
-}
+/* Main Content Styles Removed Duplicate */
 
-/* Dark Mode Overrides for Sidebar */
-:global(html.dark) .custom-aside {
-  background: var(--el-bg-color);
-  border-right-color: var(--el-border-color);
-}
-:global(html.dark) .sidebar-header {
-  border-bottom-color: var(--el-border-color);
-}
-:global(html.dark) .logo-text h1 {
-  color: var(--el-text-color-primary);
-}
-:global(html.dark) .sidebar-footer {
-  border-top-color: var(--el-border-color);
-}
-:global(html.dark) .theme-toggle-btn {
-  background-color: var(--el-fill-color-light);
-  border-color: var(--el-border-color);
-  color: var(--el-text-color-regular);
-}
-:global(html.dark) .theme-toggle-btn:hover {
-  color: var(--el-color-primary);
-  border-color: var(--el-color-primary);
-}
 </style>

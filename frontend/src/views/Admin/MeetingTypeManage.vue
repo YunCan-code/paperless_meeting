@@ -97,11 +97,36 @@
         <el-form-item label="类型名称" required>
           <el-input v-model="form.name" placeholder="如：党委会、办公会" maxlength="20" show-word-limit />
         </el-form-item>
+        <el-form-item label="封面策略">
+          <el-radio-group v-model="form.is_fixed_image">
+            <el-radio :label="false" border>系统随机分配</el-radio>
+            <el-radio :label="true" border>固定封面图片</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="封面设置" v-if="form.is_fixed_image">
+          <el-upload
+            class="cover-uploader"
+            action="/api/meeting_types/upload_cover"
+            :show-file-list="false"
+            :on-success="handleCoverSuccess"
+            :before-upload="beforeCoverUpload"
+          >
+            <img v-if="form.cover_image" :src="form.cover_image" class="cover-image" />
+            <el-icon v-else class="cover-uploader-icon"><Plus /></el-icon>
+            <template #tip>
+              <div class="el-upload__tip">
+                建议尺寸 800x400，支持 JPG/PNG，小于 2MB
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+
         <el-form-item label="描述说明">
           <el-input 
             v-model="form.description" 
             type="textarea" 
-            :rows="4" 
+            :rows="3" 
             placeholder="可选，对该类型的简要说明..." 
             maxlength="100" 
             show-word-limit 
@@ -194,12 +219,35 @@ const fetchTypes = async () => {
 const openDialog = (item = null) => {
   if (item) {
     editingId.value = item.id
-    form.value = { name: item.name, description: item.description || '' }
+    form.value = { 
+      name: item.name, 
+      description: item.description || '',
+      is_fixed_image: item.is_fixed_image || false,
+      cover_image: item.cover_image || ''
+    }
   } else {
     editingId.value = null
-    form.value = { name: '', description: '' }
+    form.value = { 
+      name: '', 
+      description: '',
+      is_fixed_image: false,
+      cover_image: ''
+    }
   }
   dialogVisible.value = true
+}
+
+const handleCoverSuccess = (res) => {
+  form.value.cover_image = res.url
+  ElMessage.success('封面上传成功')
+}
+
+const beforeCoverUpload = (rawFile) => {
+  if (rawFile.size / 1024 / 1024 > 2) {
+    ElMessage.error('图片大小不能超过 2MB!')
+    return false
+  }
+  return true
 }
 
 const handleSave = async () => {
@@ -263,8 +311,8 @@ onMounted(fetchTypes)
 /* 左侧标题区域样式增强 */
 .header-left {
   display: flex;
-  align-items: center; /* 垂直居中对齐 */
-  gap: 12px;         /* 按钮和标题之间的间距 */
+  align-items: center; 
+  gap: 12px;
 }
 
 /* 折叠按钮样式 */
@@ -272,15 +320,15 @@ onMounted(fetchTypes)
   padding: 8px;
   border-radius: 8px;
   transition: background-color 0.2s;
-  height: auto; /* 重置 element-plus 默认高度 */
+  height: auto; 
 }
 .collapse-btn:hover {
-  background-color: #f1f5f9; /* 鼠标悬停时的浅灰色背景 */
+  background-color: var(--bg-main); 
 }
 
 .header-divider {
   height: 24px;
-  border-color: #cbd5e1;
+  border-color: var(--border-color);
   margin: 0 4px;
 }
 
@@ -292,13 +340,13 @@ onMounted(fetchTypes)
 .page-title {
   font-size: 26px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-main);
   margin: 0 0 4px 0;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
 .page-subtitle {
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 0;
   font-size: 14px;
   line-height: 1.4;
@@ -332,9 +380,9 @@ onMounted(fetchTypes)
 }
 
 .grid-card {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -345,7 +393,7 @@ onMounted(fetchTypes)
 
 .grid-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08); /* Dark mode override handled in style.css */
   border-color: var(--theme-color);
 }
 
@@ -373,7 +421,8 @@ onMounted(fetchTypes)
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background-color: var(--theme-bg);
+  background-color: var(--theme-bg); 
+  /* --theme-bg includes alpha, works well on dark */
   color: var(--theme-color);
   display: flex;
   align-items: center;
@@ -400,13 +449,13 @@ onMounted(fetchTypes)
 .card-title {
   font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-main);
   margin: 0 0 6px 0;
 }
 
 .card-desc {
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
   line-height: 1.5;
   margin: 0;
   flex: 1; 
@@ -419,14 +468,14 @@ onMounted(fetchTypes)
 .card-footer {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px dashed #f1f5f9;
+  border-top: 1px dashed var(--border-color);
   display: flex;
   align-items: center;
 }
 
 .date-tag {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -434,14 +483,46 @@ onMounted(fetchTypes)
 
 .empty-state {
   padding: 60px 0;
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 16px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--border-color);
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.cover-uploader .el-upload {
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+
+.cover-uploader .el-upload:hover {
+  border-color: var(--el-color-primary);
+}
+
+.cover-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 100%;
+  height: 120px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-main);
+}
+
+.cover-image {
+  width: 100%;
+  height: 120px;
+  display: block;
+  object-fit: cover;
 }
 </style>

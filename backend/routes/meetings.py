@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlmodel import Session, select, SQLModel
 from typing import List, Optional
 import shutil
@@ -34,26 +34,120 @@ def create_meeting(meeting: Meeting, session: Session = Depends(get_session)):
     session.refresh(meeting)
     return meeting
 
-@router.get("/", response_model=List[Meeting])
+import random
+import os
+
+# Enhanced Response Model
+class MeetingCardResponse(MeetingRead):
+    card_image_url: Optional[str] = None
+
+# Default Image Pool for Random Strategy (Fallback)
+DEFAULT_IMAGES = {
+    "weekly": "https://images.unsplash.com/photo-1431540015161-0bf868a2d407?q=80&w=2070&auto=format&fit=crop",
+    "urgent": "https://images.unsplash.com/photo-1516387938699-a93567ec168e?q=80&w=2071&auto=format&fit=crop",
+    "review": "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070&auto=format&fit=crop",
+    "kickoff": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=2070&auto=format&fit=crop",
+    "default": "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
+}
+
+def get_random_image_from_dir(directory: Path, base_url: str) -> Optional[str]:
+    """Helper to pick random image from directory and return full URL"""
+    if not directory.exists() or not directory.is_dir():
+        return None
+        
+    valid_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
+    images = [
+        f for f in os.listdir(directory) 
+        if os.path.isfile(directory / f) and os.path.splitext(f)[1].lower() in valid_extensions
+    ]
+    
+    if not images:
+        return None
+        
+    selected = random.choice(images)
+    # Convert 'uploads/meeting_backgrounds/...' to '/static/meeting_backgrounds/...'
+    # Assumes directory starts with 'uploads/'
+    # Path('uploads/meeting_backgrounds/common') -> parts: ('uploads', 'meeting_backgrounds', 'common')
+    
+    # Robust relative path calculation
+    # We want route relative to 'uploads' folder, which is mounted at '/static'
+    try:
+        rel_path = directory.relative_to(UPLOAD_DIR) # e.g. meeting_backgrounds/common
+        return f"{base_url}static/{rel_path.as_posix()}/{selected}"
+    except ValueError:
+        return None
+
+@router.get("/", response_model=List[MeetingCardResponse])
 def read_meetings(
+    request: Request,
     skip: int = 0, 
     limit: int = 100, 
     status: Optional[str] = None,
     session: Session = Depends(get_session)
 ):
     """
-    查询会议列表
-    - skip: 跳过前几条 (分页用)
-    - limit: 返回多少条 (分页用)
-    - status: 按状态过滤 (scheduled, active, finished)
+    查询会议列表 (带封面图逻辑)
     """
     query = select(Meeting)
     if status:
         query = query.where(Meeting.status == status)
-    # 按开始时间倒序排列 (最新的在前)
+    
     query = query.offset(skip).limit(limit).order_by(Meeting.start_time.desc())
     meetings = session.exec(query).all()
-    return meetings
+    
+    results = []
+    all_types = {t.id: t for t in session.exec(select(MeetingType)).all()}
+    
+    base_url = str(request.base_url) # http://.../ with trailing slash usually
+    if not base_url.endswith("/"): base_url += "/"
+    
+    bg_root = UPLOAD_DIR / "meeting_backgrounds"
+    
+    for m in meetings:
+        resp = MeetingCardResponse.model_validate(m)
+        m_type = all_types.get(m.meeting_type_id)
+        
+        final_url = None
+        
+        # 1. Fixed Configuration
+        if m_type and m_type.is_fixed_image and m_type.cover_image:
+             raw_url = m_type.cover_image
+             if raw_url and raw_url.startswith("/"):
+                final_url = f"{base_url.rstrip('/')}{raw_url}"
+             else:
+                final_url = raw_url
+        
+        # 2. Random Strategy (Folder based > Common > Fallback)
+        else:
+            type_name = m_type.name if m_type else "default"
+            
+            # A. Try Type Specific Folder
+            # Sanitize minimal bad chars? OS usually handles unicode.
+            type_folder = bg_root / type_name
+            final_url = get_random_image_from_dir(type_folder, base_url)
+            
+            # B. Try Common Folder
+            if not final_url:
+                common_folder = bg_root / "common"
+                final_url = get_random_image_from_dir(common_folder, base_url)
+            
+            # C. Fallback to Hardcoded Unsplash
+            if not final_url:
+                if "周" in type_name or "例" in type_name:
+                    final_url = DEFAULT_IMAGES["weekly"]
+                elif "急" in type_name:
+                    final_url = DEFAULT_IMAGES["urgent"]
+                elif "评" in type_name or "审" in type_name:
+                    final_url = DEFAULT_IMAGES["review"]
+                elif "启" in type_name:
+                    final_url = DEFAULT_IMAGES["kickoff"]
+                else:
+                    final_url = DEFAULT_IMAGES["default"]
+        
+        resp.card_image_url = final_url
+        results.append(resp)
+        
+    return results
 
 class MeetingWithAttachments(MeetingRead):
     attachments: List[AttachmentRead] = []

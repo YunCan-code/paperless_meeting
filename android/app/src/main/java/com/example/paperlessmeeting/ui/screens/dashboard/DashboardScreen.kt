@@ -3,6 +3,8 @@ package com.example.paperlessmeeting.ui.screens.dashboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +31,31 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(
+    viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    when (val state = uiState) {
+        is DashboardUiState.Loading -> {
+             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                 CircularProgressIndicator()
+             }
+        }
+        is DashboardUiState.Error -> {
+             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                 Text("API Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+             }
+        }
+        is DashboardUiState.Success -> {
+            DashboardContent(state)
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun DashboardContent(state: DashboardUiState.Success) {
     val currentHour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = when (currentHour) {
         in 5..11 -> "上午好"
@@ -69,7 +97,65 @@ fun DashboardScreen() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         
-        HeroMeetingCard()
+        if (state.activeMeetings.isNotEmpty()) {
+            val pagerState = rememberPagerState(
+                initialPage = state.initialPageIndex,
+                pageCount = { state.activeMeetings.size }
+            )
+            
+            androidx.compose.runtime.LaunchedEffect(state.initialPageIndex) {
+                if (state.activeMeetings.isNotEmpty()) {
+                    pagerState.scrollToPage(state.initialPageIndex)
+                }
+            }
+            
+            Column {
+                HorizontalPager(
+                    state = pagerState,
+                    pageSpacing = 16.dp,
+                    // If we want peek, we need to adjust padding. For now, full width cards.
+                    modifier = Modifier.fillMaxWidth().height(200.dp) // Implicit height or let it wrap? MeetingCard has height?
+                ) { page ->
+                    com.example.paperlessmeeting.ui.components.MeetingCard(
+                        meeting = state.activeMeetings[page],
+                        onClick = { /* TODO: Navigate */ }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Indicators
+                if (state.activeMeetings.size > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        repeat(state.activeMeetings.size) { iteration ->
+                            val color = if (pagerState.currentPage == iteration) 
+                                MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.surfaceVariant
+                            Box(
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .size(8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+             Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+             ) {
+                 Text("暂无会议安排", color = MaterialTheme.colorScheme.onSurfaceVariant)
+             }
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -95,8 +181,8 @@ fun DashboardScreen() {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(5) {
-                RecentFileCard(index = it)
+            items(state.recentFiles.size) { index ->
+                RecentFileCard(state.recentFiles[index])
             }
         }
         
@@ -106,6 +192,7 @@ fun DashboardScreen() {
 
 @Composable
 fun MeetingStatsCard() {
+    // ... (Stats card implementation remains same for now)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -190,84 +277,10 @@ fun MeetingStatsCard() {
     }
 }
 
-@Composable
-fun HeroMeetingCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop",
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            // Gradient Overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.8f))
-                        )
-                    )
-            )
-            
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(24.dp)
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = "进行中",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "2025年度战略规划复盘会",
-                    style = MaterialTheme.typography.titleLarge, // Slightly smaller than headline for fit
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "14:00 - 16:30 | 101 核心会议室",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.9f)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { /* Check-in or Enter */ },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow, 
-                        contentDescription = null, 
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("立即入会", color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-    }
-}
+
 
 @Composable
-fun RecentFileCard(index: Int) {
+fun RecentFileCard(file: com.example.paperlessmeeting.domain.model.Attachment) {
     Card(
         modifier = Modifier
             .width(150.dp)
@@ -285,8 +298,10 @@ fun RecentFileCard(index: Int) {
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
                  // Logic to show different file types
+                 val ext = if (file.filename.contains(".")) file.filename.substringAfterLast(".").uppercase() else "FILE"
+                 
                  Text(
-                     text = "PDF", 
+                     text = ext, 
                      modifier = Modifier.align(Alignment.Center),
                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                      fontWeight = FontWeight.Bold
@@ -295,14 +310,18 @@ fun RecentFileCard(index: Int) {
             // Metadata
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "财务报告_Q1_v${index+1}.pdf",
+                    text = file.displayName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                
+                // Helper to format bytes
+                val sizeStr = if (file.fileSize > 1024 * 1024) "${file.fileSize / 1024 / 1024} MB" else "${file.fileSize / 1024} KB"
+                
                 Text(
-                    text = "3.2 MB • 昨天",
+                    text = sizeStr,
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )

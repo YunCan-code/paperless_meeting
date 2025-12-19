@@ -103,6 +103,16 @@ fun MainScreen() {
                         navController = navController
                     )
                 }
+                composable(
+                    "meeting_split/{typeName}",
+                    arguments = listOf(androidx.navigation.navArgument("typeName") { type = androidx.navigation.NavType.StringType })
+                ) { backStackEntry ->
+                    val typeName = backStackEntry.arguments?.getString("typeName") ?: "ALL"
+                    com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                        meetingTypeName = typeName,
+                        navController = navController
+                    )
+                }
                 composable(Screen.Settings.route) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         Text("Settings Placeholder", modifier = Modifier.align(Alignment.Center))

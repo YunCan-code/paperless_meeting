@@ -29,7 +29,12 @@ class DetailViewModel @Inject constructor(
 
     private fun loadMeeting() {
         viewModelScope.launch {
-            val meeting = repository.getMeetingById(meetingId)
+            val id = meetingId.toIntOrNull()
+            if (id == null) {
+                _uiState.value = DetailUiState.Error("Invalid Meeting ID")
+                return@launch
+            }
+            val meeting = repository.getMeetingById(id)
             if (meeting != null) {
                 _uiState.value = DetailUiState.Success(meeting)
             } else {

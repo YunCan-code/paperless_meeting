@@ -27,8 +27,11 @@ class HomeViewModel @Inject constructor(
     private fun loadMeetings() {
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
-            repository.getMeetings().collectLatest { meetings ->
+            try {
+                val meetings = repository.getMeetings()
                 _uiState.value = HomeUiState.Success(meetings)
+            } catch (e: Exception) {
+                _uiState.value = HomeUiState.Error(e.message ?: "Unknown Error")
             }
         }
     }

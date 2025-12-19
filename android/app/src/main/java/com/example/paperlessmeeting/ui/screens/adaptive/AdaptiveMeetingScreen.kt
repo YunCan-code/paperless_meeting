@@ -49,7 +49,7 @@ fun AdaptiveMeetingScreen(
         ) 
     }
     
-    var selectedMeetingId by remember { mutableStateOf<String?>(null) }
+    var selectedMeetingId by remember { mutableStateOf<Int?>(null) }
     
     // Filter Meetings
     val allMeetings = if (uiState is com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success) {
@@ -59,7 +59,7 @@ fun AdaptiveMeetingScreen(
     val filteredMeetings = if (selectedTypeFilter == null) {
         allMeetings
     } else {
-        allMeetings.filter { it.type == selectedTypeFilter }
+        allMeetings.filter { it.getUiType() == selectedTypeFilter }
     }
     
     val selectedMeeting = allMeetings.find { it.id == selectedMeetingId } 

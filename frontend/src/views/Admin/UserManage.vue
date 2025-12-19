@@ -152,12 +152,12 @@ onMounted(() => {
   height: auto;
 }
 .collapse-btn:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-main);
 }
 
 .header-divider {
   height: 24px;
-  border-color: #cbd5e1;
+  border-color: var(--border-color);
   margin: 0 4px;
 }
 
@@ -170,12 +170,12 @@ onMounted(() => {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-main);
   line-height: 1.2;
 }
 .page-subtitle {
   margin: 4px 0 0;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.4;
 }

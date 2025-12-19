@@ -86,21 +86,18 @@ fun DetailScreen(
 fun MeetingDetailContent(meeting: Meeting) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Hero Image Area
+        val placeholderImage = "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(280.dp)
         ) {
-            if (meeting.imageUrl != null) {
-                AsyncImage(
-                    model = meeting.imageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer))
-            }
+            AsyncImage(
+                model = placeholderImage,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
             
             // Gradient Overlay for Text Visibility
             Box(
@@ -118,7 +115,7 @@ fun MeetingDetailContent(meeting: Meeting) {
                     .align(Alignment.BottomStart)
                     .padding(24.dp)
             ) {
-                MeetingStatusBadge(status = meeting.status)
+                MeetingStatusBadge(status = meeting.getUiStatus())
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = meeting.title,

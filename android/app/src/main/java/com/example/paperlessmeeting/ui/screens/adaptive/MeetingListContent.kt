@@ -14,8 +14,8 @@ import com.example.paperlessmeeting.ui.components.MeetingCard
 @Composable
 fun MeetingListContent(
     meetings: List<Meeting>,
-    onMeetingClick: (String) -> Unit,
-    selectedId: String? = null // For highlighting in split view
+    onMeetingClick: (Int) -> Unit,
+    selectedId: Int? = null // For highlighting in split view
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

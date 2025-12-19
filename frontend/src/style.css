@@ -35,30 +35,16 @@
 }
 
 /* Dark Mode Semantic Vars */
-html.dark {
-    --bg-color: #020617;
-    --bg-sidebar: #0f172a;
-    --bg-main: #020617;
+/* Dark Mode Removed */
 
-    --text-main: var(--color-slate-100);
-    /* Light Gray for main text */
-    --text-secondary: var(--color-slate-400);
-    /* Muted Gray for secondary */
-
-    --card-bg: var(--color-slate-800);
-    /* Dark Blue-Gray for cards */
-    --border-color: var(--color-slate-700);
-    --border-color-layout: var(--color-slate-700);
-
-    /* Element Plus Overrides */
+/* Element Plus Overrides (Global Default) */
+:root {
     --el-bg-color: var(--bg-color);
     --el-text-color-primary: var(--text-main);
     --el-text-color-regular: var(--text-secondary);
     --el-border-color-light: var(--border-color);
     --el-border-color: var(--border-color);
     --el-fill-color-blank: var(--bg-color);
-
-    color-scheme: dark;
 }
 
 body {
@@ -134,7 +120,7 @@ body {
     --el-table-tr-bg-color: var(--card-bg);
     --el-table-header-bg-color: var(--bg-sidebar);
     /* Slightly distinct header */
-    --el-table-row-hover-bg-color: var(--color-slate-700);
+    --el-table-row-hover-bg-color: var(--color-slate-100);
     --el-table-text-color: var(--text-main);
     --el-table-header-text-color: var(--text-secondary);
     background-color: transparent;
@@ -149,11 +135,51 @@ body {
     border-radius: 12px;
 }
 
-/* Dark Mode Specific Adjustments */
-html.dark .grid-card:hover {
-    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+/* 
+   Utility Color Classes (moved from components) 
+*/
+
+/* Blue */
+.bg-blue-50 {
+    background-color: #eff6ff;
 }
 
-html.dark .card-footer {
-    border-top-color: var(--border-color);
+.text-blue-500 {
+    color: #3b82f6;
+}
+
+/* Green */
+.bg-green-50 {
+    background-color: #f0fdf4;
+}
+
+.text-green-500 {
+    color: #22c55e;
+}
+
+/* Purple */
+.bg-purple-50 {
+    background-color: #faf5ff;
+}
+
+.text-purple-500 {
+    color: #a855f7;
+}
+
+/* Orange */
+.bg-orange-50 {
+    background-color: #fff7ed;
+}
+
+.text-orange-500 {
+    color: #f97316;
+}
+
+/* Teal */
+.bg-teal-50 {
+    background-color: #f0fdfa;
+}
+
+.text-teal-500 {
+    color: #14b8a6;
 }

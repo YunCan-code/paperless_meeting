@@ -26,6 +26,8 @@ class UserRead(UserBase):
 class MeetingTypeBase(SQLModel):
     name: str = Field(unique=True) # 类型名称，必须唯一
     description: Optional[str] = Field(default="~") # 描述，默认为~
+    is_fixed_image: bool = Field(default=False) # 是否使用固定封面
+    cover_image: Optional[str] = None # 固定封面图片的 URL (或者文件名)
 
 class MeetingType(MeetingTypeBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

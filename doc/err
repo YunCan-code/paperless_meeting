@@ -1,10 +1,47 @@
-这是一个非常典型的前端夜间模式适配问题。根据你提供的代码文件，问题主要出在CSS 变量没有针对暗色模式进行重定义，以及 App.vue 中存在硬编码的背景色覆盖了全局设置。
-
-要完美解决这个问题，我们需要按照“定义变量 -> 移除硬编码 -> 引入官方暗黑样式”的步骤进行修改。
-
-以下是具体的解决方案：
-
-第一步：修改 frontend/src/style.css (核心修复)
-目前的 style.css 只定义了默认（亮色）下的颜色变量。我们需要利用 html.dark 选择器（Element Plus 切换暗黑模式的标准方式）来反转这些变量。
-
-请将 style.css 的内容修改为如下（重点关注 html.dark 部分）：
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "D:\Python3.13\Lib\multiprocessing\process.py", line 313, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "D:\Python3.13\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\uvicorn\server.py", line 67, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "D:\Python3.13\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "D:\Python3.13\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "D:\Python3.13\Lib\asyncio\base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\Python3.13\Lib\site-packages\uvicorn\server.py", line 71, in serve
+    await self._serve(sockets)
+  File "D:\Python3.13\Lib\site-packages\uvicorn\server.py", line 78, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "D:\Python3.13\Lib\site-packages\uvicorn\config.py", line 439, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "D:\Python3.13\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "D:\ProgramData\paperless_meeting\backend\main.py", line 9, in <module>
+    from routes import users, meetings, auth, meeting_types
+  File "D:\ProgramData\paperless_meeting\backend\routes\meetings.py", line 53, in <module>
+    request: Request,
+             ^^^^^^^
+NameError: name 'Request' is not defined

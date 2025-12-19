@@ -129,7 +129,7 @@ const getTypeColor = (id) => {
 .today-sessions {
   border-radius: 16px;
   border: none;
-  background: linear-gradient(to bottom, #ffffff, #fcfcfc);
+  background: var(--card-bg); /* Simplified from gradient to solid card background for consistency */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 .card-header {
@@ -142,11 +142,11 @@ const getTypeColor = (id) => {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-main);
 }
 .header-subtitle {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin-top: 2px;
   display: block;
 }
@@ -162,9 +162,9 @@ const getTypeColor = (id) => {
   display: flex;
   align-items: center;
   padding: 16px;
-  background: #ffffff;
+  background: var(--bg-main); /* Slightly distinct from card bg */
   border-radius: 12px;
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--border-color);
   cursor: pointer;
   transition: all 0.3s ease;
   overflow: hidden;
@@ -173,7 +173,7 @@ const getTypeColor = (id) => {
 .session-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
-  border-color: #e2e8f0;
+  border-color: var(--color-slate-400);
 }
 
 .session-left-bar {
@@ -182,7 +182,7 @@ const getTypeColor = (id) => {
   top: 0;
   bottom: 0;
   width: 4px;
-  background: #3b82f6;
+  background: var(--color-primary);
   opacity: 0.8;
 }
 
@@ -201,22 +201,22 @@ const getTypeColor = (id) => {
 .session-time {
   font-size: 20px;
   font-weight: 800;
-  color: #3b82f6;
+  color: var(--color-primary);
   line-height: 1;
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .type-tag {
   border: none;
-  background: #eff6ff;
-  color: #3b82f6;
+  /* background/color are inline styles handled by JS, but we should check if they need opacity adjustment for dark mode. 
+     The JS uses simple opacity '1a' which works on dark too. */
   font-weight: 600;
 }
 
 .session-title {
   font-size: 15px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-main);
   margin-bottom: 4px;
   line-height: 1.4;
 }
@@ -228,19 +228,19 @@ const getTypeColor = (id) => {
 
 .location-text {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
 .session-arrow {
-  color: #cbd5e1;
+  color: var(--text-secondary);
   transition: transform 0.2s;
 }
 
 .session-item:hover .session-arrow {
   transform: translateX(4px);
-  color: #94a3b8;
+  color: var(--text-main);
 }
 </style>

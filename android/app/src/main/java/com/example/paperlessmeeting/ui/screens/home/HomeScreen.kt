@@ -39,7 +39,7 @@ fun HomeScreen(
 @Composable
 fun HomeContent(
     uiState: HomeUiState,
-    onMeetingClick: (String) -> Unit
+    onMeetingClick: (Int) -> Unit
 ) {
     Scaffold(
         topBar = { GlassyTopBar(title = "会议列表") },
@@ -90,10 +90,10 @@ fun HomeScreenPreview() {
             uiState = HomeUiState.Success(
                 listOf(
                     com.example.paperlessmeeting.domain.model.Meeting(
-                        id = "1",
+                        id = 1,
                         title = "演示会议",
-                        type = com.example.paperlessmeeting.domain.model.MeetingType.Weekly,
-                        status = com.example.paperlessmeeting.domain.model.MeetingStatus.Ongoing,
+                        meetingTypeId = 1, // Weekly
+                        status = "ongoing",
                         startTime = "09:00",
                         endTime = "10:00",
                         location = "会议室A",

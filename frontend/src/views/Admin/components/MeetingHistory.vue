@@ -20,7 +20,7 @@
       <el-table-column type="index" label="序号" width="80" align="center" />
       <el-table-column prop="title" label="会议主题" min-width="180">
          <template #default="{ row }">
-            <span style="font-weight: 500; color: #1e293b;">{{ row.title }}</span>
+            <span style="font-weight: 500;">{{ row.title }}</span>
          </template>
       </el-table-column>
       <el-table-column label="类型" width="120">
@@ -136,7 +136,7 @@ const formatDate = (iso) => {
 .meeting-history {
   border-radius: 16px;
   border: none;
-  background-color: #ffffff;
+  background-color: var(--card-bg);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 .card-header {
@@ -151,7 +151,7 @@ const formatDate = (iso) => {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-main);
 }
 .header-actions {
   display: flex;

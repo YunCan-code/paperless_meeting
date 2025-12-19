@@ -137,7 +137,8 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
 <style scoped>
 .session-calendar {
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-color);
+  background-color: var(--card-bg);
 }
 .calendar-header-new {
   display: flex;
@@ -169,7 +170,7 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
 .current-month {
   font-size: 24px;
   font-weight: 600;
-  color: var(--color-slate-800);
+  color: var(--text-main);
   min-width: 140px;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -179,11 +180,11 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
 .today-btn {
   margin-left: 4px;
   font-weight: 500;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 .today-btn:hover {
   color: var(--color-primary);
-  background-color: var(--color-primary-light-9);
+  background-color: var(--bg-main);
 }
 .calendar-grid {
   display: grid;
@@ -194,7 +195,7 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
 .week-day-header {
   text-align: center;
   font-size: 12px;
-  color: var(--color-slate-400);
+  color: var(--text-secondary);
   padding: 4px;
 }
 .day-cell {
@@ -205,32 +206,29 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
   border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--color-slate-700);
+  color: var(--text-main);
   transition: all 0.2s;
   position: relative;
 }
 /* Hover effect only for cells with NO heat/color */
 .day-cell:not(.heat-level-1):not(.heat-level-2):not(.heat-level-3):not(.is-selected):hover {
-  background-color: var(--color-slate-100);
+  background-color: var(--bg-main);
 }
-/* Optional: subtle opacity change for heat cells on hover instead of color change, 
-   but user asked for "no change", so we stick to that or just cursor pointer (which is default) */
+/* Optional: subtle opacity change for heat cells on hover instead of color change */
 .day-cell.heat-level-1:hover,
 .day-cell.heat-level-2:hover,
 .day-cell.heat-level-3:hover {
-  filter: brightness(0.95); /* Subtle reaction without changing hue */
+  filter: brightness(0.95); 
 }
 /* Selected State */
 .day-cell.is-selected {
-  /* Remove blue border and transparent bg override */
   font-weight: 800;
-  box-shadow: inset 0 0 0 2px var(--color-primary); /* Use inset shadow instead of border to avoid layout shift, maintain BG */
-  /* Do NOT set background-color here, let heat class control it */
+  box-shadow: inset 0 0 0 2px var(--color-primary); 
 }
 
 /* Today styling */
 .day-cell.is-today {
-  color: #169e8c; /* Teal text for today if no heat */
+  color: var(--color-primary); 
   font-weight: 800;
 }
 .day-cell.is-today::after {
@@ -240,7 +238,7 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
    width: 4px; 
    height: 4px;
    border-radius: 50%;
-   background-color: #169e8c; /* Teal dot */
+   background-color: var(--color-primary); 
 }
 
 /* Heatmap Colors (Orange Scale) */
@@ -248,20 +246,25 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
 .heat-level-2 { background-color: #fed7aa; color: #c2410c; }
 .heat-level-3 { background-color: #fdba74; color: #9a3412; }
 
+/* Dark Mode Heatmap Overrides */
+:global(html.dark) .heat-level-1 { background-color: rgba(251, 146, 60, 0.2); color: #fdba74; }
+:global(html.dark) .heat-level-2 { background-color: rgba(251, 146, 60, 0.4); color: #fed7aa; }
+:global(html.dark) .heat-level-3 { background-color: rgba(251, 146, 60, 0.6); color: #fff7ed; }
+
 /* Today with Heat: Use Teal Background */
 .day-cell.is-today.heat-level-1,
 .day-cell.is-today.heat-level-2,
 .day-cell.is-today.heat-level-3 {
-    background-color: #169e8c; /* Teal BG override */
-    color: white; /* White text on Teal */
+    background-color: var(--color-primary); /* Teal/Blue BG override */
+    color: white; 
 }
-/* When Today has heat (Teal BG), the "Today" dot should be white */
+/* When Today has heat, the "Today" dot should be white */
 .day-cell.is-today.heat-level-1::after,
 .day-cell.is-today.heat-level-2::after,
 .day-cell.is-today.heat-level-3::after {
    background-color: white; 
 }
-/* When Today has heat (Teal BG), the "Meeting" dot should also be white for visibility */
+/* When Today has heat, the "Meeting" dot should also be white for visibility */
 .day-cell.is-today.heat-level-1 .meeting-dot,
 .day-cell.is-today.heat-level-2 .meeting-dot,
 .day-cell.is-today.heat-level-3 .meeting-dot {
