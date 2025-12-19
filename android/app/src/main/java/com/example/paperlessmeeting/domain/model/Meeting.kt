@@ -4,11 +4,11 @@ import androidx.compose.ui.graphics.Color
 import java.time.LocalDateTime
 
 enum class MeetingType(val displayName: String, val color: Color) {
-    Weekly("周例会", Color(0xFF4CAF50)),       // Green for routine
-    Urgent("紧急会议", Color(0xFFF44336)),      // Red for urgent
-    Review("评审会", Color(0xFFFF9800)),      // Orange for review
-    Kickoff("启动会", Color(0xFF2196F3)),     // Blue for start
-    General("普通会议", Color(0xFF9E9E9E))      // Grey for others
+    Weekly("预设类型1", Color(0xFF4CAF50)),       // Green
+    Urgent("预设类型2", Color(0xFFF44336)),      // Red
+    Review("预设类型3", Color(0xFFFF9800)),      // Orange
+    Kickoff("预设类型4", Color(0xFF2196F3)),     // Blue
+    General("预设类型5", Color(0xFF9E9E9E))      // Grey
 }
 
 enum class MeetingStatus(val displayName: String) {
@@ -42,6 +42,8 @@ data class Meeting(
     val location: String?,
     val host: String?,
     val description: String? = null,
+    @com.google.gson.annotations.SerializedName("meeting_type_name")
+    val meetingTypeName: String? = null,
     @com.google.gson.annotations.SerializedName("card_image_url")
     val cardImageUrl: String? = null,
     val attachments: List<Attachment>? = emptyList()

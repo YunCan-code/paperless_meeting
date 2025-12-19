@@ -40,6 +40,7 @@ import os
 # Enhanced Response Model
 class MeetingCardResponse(MeetingRead):
     card_image_url: Optional[str] = None
+    meeting_type_name: Optional[str] = None
 
 # Default Image Pool for Random Strategy (Fallback)
 DEFAULT_IMAGES = {
@@ -144,7 +145,10 @@ def read_meetings(
                 else:
                     final_url = DEFAULT_IMAGES["default"]
         
+
+        
         resp.card_image_url = final_url
+        resp.meeting_type_name = m_type.name if m_type else "普通会议"
         results.append(resp)
         
     return results

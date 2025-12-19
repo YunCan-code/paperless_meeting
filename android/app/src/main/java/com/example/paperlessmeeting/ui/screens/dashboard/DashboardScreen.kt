@@ -56,6 +56,12 @@ fun DashboardScreen(
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardContent(state: DashboardUiState.Success) {
+    // Debug log
+    android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
+    state.activeMeetings.forEach { 
+        android.util.Log.d("DashboardDebug", "Meeting: ${it.title}, TypeName: ${it.meetingTypeName}")
+    }
+
     val currentHour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = when (currentHour) {
         in 5..11 -> "上午好"

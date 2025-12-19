@@ -34,6 +34,12 @@ fun MeetingCard(
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (isPressed) 0.98f else 1f, label = "cardScale")
     val uiType = meeting.getUiType()
+    
+    // Dynamic Type Logic (Matching Web HSL Algorithm)
+    val typeName = meeting.meetingTypeName ?: uiType.displayName
+    val typeColor = remember(typeName) {
+        generateThemeColor(typeName)
+    }
 
     Card(
         modifier = Modifier
@@ -102,12 +108,12 @@ fun MeetingCard(
                 ) {
                     // Type Tag (Color Coded)
                     Surface(
-                        color = uiType.color,
+                        color = typeColor,
                         shape = RoundedCornerShape(8.dp),
                         shadowElevation = 4.dp
                     ) {
                         Text(
-                            text = uiType.displayName,
+                            text = typeName,
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
@@ -220,4 +226,39 @@ fun MeetingStatusBadge(status: MeetingStatus, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+// Helper: HSL Color Generator (Matches Web Logic)
+fun generateThemeColor(str: String?): Color {
+    if (str.isNullOrEmpty()) return Color(0xFF3B82F6) // default blue
+    var hash = 0
+    str.forEach { char ->
+        hash = char.code + ((hash shl 5) - hash)
+    }
+    
+    val h = kotlin.math.abs(hash) % 360
+    val s = 60 + (kotlin.math.abs(hash) % 20) // 60-80%
+    val l = 45 + (kotlin.math.abs(hash) % 15) // 45-60%
+    
+    return hslToColor(h.toFloat(), s.toFloat(), l.toFloat())
+}
+
+fun hslToColor(h: Float, s: Float, l: Float): Color {
+    val sNorm = s / 100f
+    val lNorm = l / 100f
+    
+    val c = (1 - kotlin.math.abs(2 * lNorm - 1)) * sNorm
+    val x = c * (1 - kotlin.math.abs((h / 60) % 2 - 1))
+    val m = lNorm - c / 2
+
+    val (r, g, b) = when {
+        h < 60 -> Triple(c, x, 0f)
+        h < 120 -> Triple(x, c, 0f)
+        h < 180 -> Triple(0f, c, x)
+        h < 240 -> Triple(0f, x, c)
+        h < 300 -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x) // h < 360
+    }
+    
+    return Color(r + m, g + m, b + m, 1f)
 }

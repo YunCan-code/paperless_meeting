@@ -1,3 +1,5 @@
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [16596] using StatReload
 Process SpawnProcess-1:
 Traceback (most recent call last):
   File "D:\Python3.13\Lib\multiprocessing\process.py", line 313, in _bootstrap
@@ -41,7 +43,7 @@ Traceback (most recent call last):
   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
   File "D:\ProgramData\paperless_meeting\backend\main.py", line 9, in <module>
     from routes import users, meetings, auth, meeting_types
-  File "D:\ProgramData\paperless_meeting\backend\routes\meetings.py", line 53, in <module>
-    request: Request,
-             ^^^^^^^
-NameError: name 'Request' is not defined
+  File "D:\ProgramData\paperless_meeting\backend\routes\meetings.py", line 148
+    else:
+    ^^^^
+SyntaxError: invalid syntax
