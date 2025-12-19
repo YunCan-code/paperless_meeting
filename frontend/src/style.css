@@ -22,6 +22,10 @@
     /* Blue 600 */
 
     --bg-color: var(--color-slate-50);
+    --bg-sidebar: #ffffff;
+    --bg-main: #f8fafc;
+    --border-color-layout: var(--color-slate-200);
+
     --text-main: var(--color-slate-900);
     --text-secondary: var(--color-slate-500);
 
@@ -103,4 +107,103 @@ body {
 /* Dialog rounded corners */
 .el-dialog {
     border-radius: 12px;
+}
+
+/* =========================================
+   Dark Mode Theme - Deep Blue/Gray
+   ========================================= */
+html.dark {
+    /* Re-map Slates for Dark Context */
+    --color-slate-50: #020617;
+    /* Slate 950 */
+    --color-slate-100: #0f172a;
+    /* Slate 900 */
+    --color-slate-200: #1e293b;
+    /* Slate 800 */
+    --color-slate-300: #334155;
+    /* Slate 700 */
+    --color-slate-400: #475569;
+    /* Slate 600 */
+    --color-slate-500: #64748b;
+    /* Slate 500 */
+    --color-slate-600: #94a3b8;
+    /* Slate 400 (Text) */
+    --color-slate-700: #cbd5e1;
+    /* Slate 300 (Text) */
+    --color-slate-800: #e2e8f0;
+    /* Slate 200 (Headings) */
+    --color-slate-900: #f8fafc;
+    /* Slate 50 (Highlights) */
+
+    --bg-color: #020617;
+    /* Deepest Background */
+    --bg-sidebar: #0f172a;
+    /* Dark Sidebar */
+    --bg-main: #020617;
+    /* Dark Main Content */
+
+    --text-main: #e2e8f0;
+    --text-secondary: #94a3b8;
+
+    /* Element Plus CSS Var Overrides */
+    --el-bg-color: #0f172a;
+    /* Card Background */
+    --el-bg-color-page: #020617;
+    /* Body Background */
+    --el-bg-color-overlay: #1e293b;
+    /* Dropdowns */
+
+    --el-text-color-primary: #e2e8f0;
+    --el-text-color-regular: #cbd5e1;
+    --el-text-color-secondary: #94a3b8;
+
+    --el-border-color: #1e293b;
+    --el-border-color-light: #334155;
+    --el-border-color-lighter: #334155;
+
+    --el-fill-color-blank: #0f172a;
+    --el-fill-color-light: #1e293b;
+
+    /* Global Border Color for Layout */
+    --border-color-layout: #1e293b;
+}
+
+html.dark body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+}
+
+/* Component Specific Dark overrides */
+html.dark .el-card {
+    background-color: var(--el-bg-color);
+    border-color: var(--el-border-color);
+    color: var(--el-text-color-primary);
+}
+
+html.dark .el-table th.el-table__cell {
+    background-color: #0f172a;
+    /* Darker header */
+    color: #e2e8f0;
+}
+
+html.dark .grid-card {
+    background: #0f172a;
+    border-color: #1e293b;
+}
+
+html.dark .grid-card:hover {
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+    /* Stronger shadow in dark */
+}
+
+html.dark .card-title {
+    color: #e2e8f0;
+}
+
+html.dark .page-title {
+    color: #f8fafc;
+}
+
+html.dark .card-footer {
+    border-top-color: #1e293b;
 }

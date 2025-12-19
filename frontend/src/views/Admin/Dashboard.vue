@@ -39,6 +39,18 @@
             <template #title>系统设置</template>
           </el-menu-item>
         </el-menu>
+        
+        <!-- Sidebar Footer: Theme Toggle -->
+        <div class="sidebar-footer">
+          <div 
+            class="theme-toggle-btn" 
+            :class="{ 'is-dark': isDark }"
+            @click="toggleDark()"
+          >
+             <el-icon v-if="isDark" size="20"><Moon /></el-icon>
+             <el-icon v-else size="20"><Sunny /></el-icon>
+          </div>
+        </div>
       </el-aside>
       <el-main class="custom-main">
         <router-view></router-view>
@@ -48,11 +60,13 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting, Moon, Sunny } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
+import { useTheme } from '@/composables/useTheme'
 
 // 使用全局侧边栏状态，与子页面共享
 const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
+const { isDark, toggleDark } = useTheme()
 </script>
 
 <style scoped>
@@ -62,8 +76,8 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
 
 /* Sidebar Background */
 .custom-aside {
-  background: white;
-  border-right: 1px solid var(--color-slate-200);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color-layout);
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
@@ -77,7 +91,7 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid var(--color-slate-100);
+  border-bottom: 1px solid var(--border-color-layout);
 }
 .custom-aside.collapsed .sidebar-header {
   justify-content: center;
@@ -105,12 +119,12 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-main);
 }
 .logo-text p {
   margin: 0;
   font-size: 11px;
-  color: var(--color-slate-500);
+  color: var(--text-secondary);
 }
 
 /* Collapse Trigger in Header */
@@ -149,15 +163,51 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
   padding: 8px 4px;
 }
 
-.menu-group-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-slate-400);
-  margin: 16px 12px 8px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
+/* Sidebar Footer */
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border-color-layout);
+  display: flex;
+  justify-content: center; /* Always center the icon now */
 }
+
+/* Minimized Toggle Button */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--color-slate-100); /* Slightly visible hover area */
+  color: var(--color-primary);
+}
+
+/* Dark Mode Icon Specifics */
+.theme-toggle-btn.is-dark {
+  color: #fbbf24; /* Amber Moon */
+}
+.theme-toggle-btn.is-dark:hover {
+  background-color: rgba(255,255,255,0.05); /* Subtle dark hover */
+}
+
+/* Logo Text in Dark Mode is handled by var(--text-main) now */
+
+/* Main Content */
+.custom-main {
+  background-color: var(--bg-main);
+  padding: 24px;
+}
+
+/* Global Manual Overrides (if any remain) */
+/* (Most are now handled by variables above) */
 :deep(.el-menu-item) {
   height: 40px;
   line-height: 40px;
@@ -188,5 +238,29 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
 .custom-main {
   background-color: #f8fafc;
   padding: 24px;
+}
+
+/* Dark Mode Overrides for Sidebar */
+:global(html.dark) .custom-aside {
+  background: var(--el-bg-color);
+  border-right-color: var(--el-border-color);
+}
+:global(html.dark) .sidebar-header {
+  border-bottom-color: var(--el-border-color);
+}
+:global(html.dark) .logo-text h1 {
+  color: var(--el-text-color-primary);
+}
+:global(html.dark) .sidebar-footer {
+  border-top-color: var(--el-border-color);
+}
+:global(html.dark) .theme-toggle-btn {
+  background-color: var(--el-fill-color-light);
+  border-color: var(--el-border-color);
+  color: var(--el-text-color-regular);
+}
+:global(html.dark) .theme-toggle-btn:hover {
+  color: var(--el-color-primary);
+  border-color: var(--el-color-primary);
 }
 </style>

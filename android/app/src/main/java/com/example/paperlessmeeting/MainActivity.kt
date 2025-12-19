@@ -26,20 +26,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navController = rememberNavController()
-                    NavHost(navController = navController, startDestination = "home") {
-                        composable("home") {
-                            HomeScreen(navController = navController)
-                        }
-                        composable(
-                            route = "detail/{meetingId}",
-                            arguments = listOf(
-                                androidx.navigation.navArgument("meetingId") { type = androidx.navigation.NavType.StringType }
-                            )
-                        ) {
-                            com.example.paperlessmeeting.ui.screens.detail.DetailScreen(navController = navController)
-                        }
-                    }
+                   com.example.paperlessmeeting.ui.screens.MainScreen()
                 }
             }
         }

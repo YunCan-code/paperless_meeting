@@ -1,19 +1,25 @@
 <template>
   <el-card class="session-calendar" shadow="never">
     <template #header>
-      <div class="calendar-header">
-        <h3 class="calendar-title">日历</h3>
-        <el-button type="primary" @click="$emit('create')" style="padding: 8px 16px; font-weight: 500;">
-          <el-icon class="el-icon--left"><Plus /></el-icon>
-          新建会议
-        </el-button>
-      </div>
-      <div class="calendar-controls">
-        <span class="current-month">{{ currentYear }}年 {{ currentMonth + 1 }}月</span>
-        <div class="nav-buttons">
-          <el-button type="primary" link size="small" @click="goToday">今</el-button>
-          <el-button size="small" circle :icon="ArrowLeft" @click="navigateMonth(-1)" />
-          <el-button size="small" circle :icon="ArrowRight" @click="navigateMonth(1)" />
+      <div class="calendar-header-new">
+        <!-- Left: Quick Jump -->
+        <div class="header-left">
+          <el-button size="small" @click="goToday">今天</el-button>
+        </div>
+
+        <!-- Center: Navigation -->
+        <div class="header-center date-navigator">
+          <el-button circle text :icon="ArrowLeft" @click="navigateMonth(-1)" />
+          <span class="current-month">{{ currentYear }}年 {{ currentMonth + 1 }}月</span>
+          <el-button circle text :icon="ArrowRight" @click="navigateMonth(1)" />
+        </div>
+
+        <!-- Right: Action -->
+        <div class="header-right">
+          <el-button type="primary" @click="$emit('create')">
+            <el-icon class="el-icon--left"><Plus /></el-icon>
+            新建会议
+          </el-button>
         </div>
       </div>
     </template>
@@ -133,26 +139,51 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
   border-radius: 12px;
   border: 1px solid var(--color-slate-200);
 }
-.calendar-header {
+.calendar-header-new {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+  padding: 4px 0;
 }
-.calendar-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-slate-800);
+
+.header-left, .header-right {
+  flex: 0 0 auto;
+  z-index: 10;
 }
-.calendar-controls {
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
+
+.date-navigator {
+  display: flex;
+  align-items: center;
+}
+
 .current-month {
-  font-size: 14px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-slate-800);
+  min-width: 140px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.today-btn {
+  margin-left: 4px;
   font-weight: 500;
   color: var(--color-slate-600);
+}
+.today-btn:hover {
+  color: var(--color-primary);
+  background-color: var(--color-primary-light-9);
 }
 .calendar-grid {
   display: grid;

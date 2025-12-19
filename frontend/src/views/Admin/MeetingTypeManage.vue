@@ -42,8 +42,8 @@
         :key="item.id" 
         class="grid-card"
         :style="{ 
-          '--theme-color': getColor(index),
-          '--theme-bg': getColor(index) + '15' 
+          '--theme-color': getColor(item.name),
+          '--theme-bg': getColor(item.name) + '15' 
         }"
       >
         <div class="card-deco-line"></div>
@@ -138,7 +138,6 @@ import {
 const { isCollapse, toggleSidebar } = useSidebar()
 
 // ... (以下所有原有的 script 逻辑保持完全不变) ...
-const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#14b8a6']
 const types = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -146,7 +145,24 @@ const dialogVisible = ref(false)
 const editingId = ref(null)
 const form = ref({ name: '', description: '' })
 const isEdit = computed(() => editingId.value !== null)
-const getColor = (index) => colors[index % colors.length]
+
+// HSL Color Generator: Generates a unique HSL color for any string
+const getColor = (str) => {
+  if (!str) return '#3b82f6'
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  
+  // H: 0-360 (Full spectrum)
+  // S: 60-80% (Vibrant but not neon)
+  // L: 45-60% (Readable on white, not too dark)
+  const h = Math.abs(hash) % 360
+  const s = 60 + (Math.abs(hash) % 20) 
+  const l = 45 + (Math.abs(hash) % 15)
+  
+  return `hsl(${h}, ${s}%, ${l}%)`
+}
 
 const getSmartIcon = (name) => {
   if (!name) return 'DataBoard'

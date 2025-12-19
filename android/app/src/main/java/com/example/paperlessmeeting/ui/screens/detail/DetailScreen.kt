@@ -3,13 +3,16 @@ package com.example.paperlessmeeting.ui.screens.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -127,7 +131,7 @@ fun MeetingDetailContent(meeting: Meeting) {
         // Content Body
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
-                "议程安排 (Agenda)",
+                "会议议程",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -141,7 +145,7 @@ fun MeetingDetailContent(meeting: Meeting) {
             Spacer(modifier = Modifier.height(32.dp))
             
             Text(
-                "参会人员 (Attendees)",
+                "参会人员",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -151,7 +155,7 @@ fun MeetingDetailContent(meeting: Meeting) {
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                "会议文件 (Files)",
+                "会议资料",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -164,7 +168,7 @@ fun MeetingDetailContent(meeting: Meeting) {
 
 @Composable
 fun FileItem(name: String, size: String) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
@@ -173,7 +177,7 @@ fun FileItem(name: String, size: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.Menu, // Placeholder for File icon
+            imageVector = Icons.Filled.Menu, // Placeholder for File icon
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary
         )
@@ -193,7 +197,7 @@ fun FileItem(name: String, size: String) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack, // Placeholder for Download icon (rotated)
             contentDescription = "Download",
-            modifier = Modifier.androidx.compose.ui.draw.rotate(-90f),
+            modifier = Modifier.rotate(-90f),
             tint = MaterialTheme.colorScheme.outline
         )
     }
@@ -201,7 +205,7 @@ fun FileItem(name: String, size: String) {
 
 @Composable
 fun AgendaItem(time: String, content: String) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
