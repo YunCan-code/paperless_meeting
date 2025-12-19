@@ -11,19 +11,7 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 </script>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background-color: #f8fafc;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-#app {
-  height: 100%;
-}
-
-/* 简单的过渡动画 */
+/* Global styles are handled in style.css */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;

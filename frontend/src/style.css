@@ -4,7 +4,7 @@
 :root {
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-    /* Reference Colors (Zinc/Slate Theme approximation) */
+    /* Base Colors (Unchanged) */
     --color-slate-50: #f8fafc;
     --color-slate-100: #f1f5f9;
     --color-slate-200: #e2e8f0;
@@ -17,19 +17,48 @@
     --color-slate-900: #0f172a;
 
     --color-primary: #3b82f6;
-    /* Blue 500 */
     --color-primary-dark: #2563eb;
-    /* Blue 600 */
 
+    /* Light Mode Semantic Vars */
     --bg-color: var(--color-slate-50);
     --bg-sidebar: #ffffff;
     --bg-main: #f8fafc;
-    --border-color-layout: var(--color-slate-200);
 
     --text-main: var(--color-slate-900);
     --text-secondary: var(--color-slate-500);
 
+    --card-bg: #ffffff;
+    --border-color: var(--color-slate-200);
+    --border-color-layout: var(--color-slate-200);
+
     color-scheme: light;
+}
+
+/* Dark Mode Semantic Vars */
+html.dark {
+    --bg-color: #020617;
+    --bg-sidebar: #0f172a;
+    --bg-main: #020617;
+
+    --text-main: var(--color-slate-100);
+    /* Light Gray for main text */
+    --text-secondary: var(--color-slate-400);
+    /* Muted Gray for secondary */
+
+    --card-bg: var(--color-slate-800);
+    /* Dark Blue-Gray for cards */
+    --border-color: var(--color-slate-700);
+    --border-color-layout: var(--color-slate-700);
+
+    /* Element Plus Overrides */
+    --el-bg-color: var(--bg-color);
+    --el-text-color-primary: var(--text-main);
+    --el-text-color-regular: var(--text-secondary);
+    --el-border-color-light: var(--border-color);
+    --el-border-color: var(--border-color);
+    --el-fill-color-blank: var(--bg-color);
+
+    color-scheme: dark;
 }
 
 body {
@@ -38,8 +67,7 @@ body {
     font-family: var(--font-family);
     background-color: var(--bg-color);
     color: var(--text-main);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 #app {
@@ -47,7 +75,7 @@ body {
     height: 100vh;
 }
 
-/* Common Utility Classes mimic */
+/* ... Utilities ... */
 .text-main {
     color: var(--text-main);
 }
@@ -68,7 +96,7 @@ body {
     font-weight: 700;
 }
 
-/* Element Plus Overrides for "Premium" look */
+/* ... Element Plus Styles ... */
 .el-button {
     font-weight: 500;
     border-radius: 6px;
@@ -81,129 +109,51 @@ body {
     --el-button-hover-border-color: var(--color-primary-dark);
 }
 
+/* Card Styling */
 .el-card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-main);
     border-radius: 12px;
-    border: 1px solid var(--color-slate-200);
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .el-card__header {
+    border-bottom-color: var(--border-color);
     padding: 16px 20px;
-    border-bottom: 1px solid var(--color-slate-100);
     font-weight: 600;
 }
 
+.grid-card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+/* Table Styling */
 .el-table {
-    --el-table-header-bg-color: #f8fafc;
-    --el-table-row-hover-bg-color: #f1f5f9;
-    font-size: 14px;
+    --el-table-bg-color: var(--card-bg);
+    --el-table-tr-bg-color: var(--card-bg);
+    --el-table-header-bg-color: var(--bg-sidebar);
+    /* Slightly distinct header */
+    --el-table-row-hover-bg-color: var(--color-slate-700);
+    --el-table-text-color: var(--text-main);
+    --el-table-header-text-color: var(--text-secondary);
+    background-color: transparent;
 }
 
 .el-table th.el-table__cell {
     font-weight: 600;
-    color: var(--color-slate-600);
 }
 
-/* Dialog rounded corners */
+/* Dialog */
 .el-dialog {
     border-radius: 12px;
 }
 
-/* =========================================
-   Dark Mode Theme - Deep Blue/Gray
-   ========================================= */
-html.dark {
-    /* Re-map Slates for Dark Context */
-    --color-slate-50: #020617;
-    /* Slate 950 */
-    --color-slate-100: #0f172a;
-    /* Slate 900 */
-    --color-slate-200: #1e293b;
-    /* Slate 800 */
-    --color-slate-300: #334155;
-    /* Slate 700 */
-    --color-slate-400: #475569;
-    /* Slate 600 */
-    --color-slate-500: #64748b;
-    /* Slate 500 */
-    --color-slate-600: #94a3b8;
-    /* Slate 400 (Text) */
-    --color-slate-700: #cbd5e1;
-    /* Slate 300 (Text) */
-    --color-slate-800: #e2e8f0;
-    /* Slate 200 (Headings) */
-    --color-slate-900: #f8fafc;
-    /* Slate 50 (Highlights) */
-
-    --bg-color: #020617;
-    /* Deepest Background */
-    --bg-sidebar: #0f172a;
-    /* Dark Sidebar */
-    --bg-main: #020617;
-    /* Dark Main Content */
-
-    --text-main: #e2e8f0;
-    --text-secondary: #94a3b8;
-
-    /* Element Plus CSS Var Overrides */
-    --el-bg-color: #0f172a;
-    /* Card Background */
-    --el-bg-color-page: #020617;
-    /* Body Background */
-    --el-bg-color-overlay: #1e293b;
-    /* Dropdowns */
-
-    --el-text-color-primary: #e2e8f0;
-    --el-text-color-regular: #cbd5e1;
-    --el-text-color-secondary: #94a3b8;
-
-    --el-border-color: #1e293b;
-    --el-border-color-light: #334155;
-    --el-border-color-lighter: #334155;
-
-    --el-fill-color-blank: #0f172a;
-    --el-fill-color-light: #1e293b;
-
-    /* Global Border Color for Layout */
-    --border-color-layout: #1e293b;
-}
-
-html.dark body {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-}
-
-/* Component Specific Dark overrides */
-html.dark .el-card {
-    background-color: var(--el-bg-color);
-    border-color: var(--el-border-color);
-    color: var(--el-text-color-primary);
-}
-
-html.dark .el-table th.el-table__cell {
-    background-color: #0f172a;
-    /* Darker header */
-    color: #e2e8f0;
-}
-
-html.dark .grid-card {
-    background: #0f172a;
-    border-color: #1e293b;
-}
-
+/* Dark Mode Specific Adjustments */
 html.dark .grid-card:hover {
     box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.5);
-    /* Stronger shadow in dark */
-}
-
-html.dark .card-title {
-    color: #e2e8f0;
-}
-
-html.dark .page-title {
-    color: #f8fafc;
 }
 
 html.dark .card-footer {
-    border-top-color: #1e293b;
+    border-top-color: var(--border-color);
 }
