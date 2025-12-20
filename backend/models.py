@@ -9,9 +9,17 @@ class MeetingAttendeeLink(SQLModel, table=True):
 
 # 用户 (参会人员) 模型
 class UserBase(SQLModel):
-    name: str # 姓名
+    name: str # 姓名 (Real Name)
+
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    district: Optional[str] = None # 区县
     department: Optional[str] = None # 部门
     position: Optional[str] = None # 职位
+    role: str = Field(default="参会人员") # 角色: 主讲人/参会人员
+    is_active: bool = Field(default=True) # 状态
+    password: Optional[str] = None # 密码 (Demo purposes: stored plain text for 'click to show')
+    last_login: Optional[datetime] = None
 
 class User(UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

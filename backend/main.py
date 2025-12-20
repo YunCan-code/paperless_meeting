@@ -43,14 +43,12 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"message": "Internal Server Error", "detail": str(exc), "trace": error_msg},
     )
 
-# 配置 CORS (跨域资源共享)
-# 允许局域网内所有设备访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # 允许所有来源
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "*"], 
     allow_credentials=True,
-    allow_methods=["*"], # 允许所有 HTTP 方法
-    allow_headers=["*"], # 允许所有 HTTP 头
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
 # 挂载静态文件目录

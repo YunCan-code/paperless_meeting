@@ -1,0 +1,687 @@
+这是一个非常激动人心的重构任务。为了将普通的表格页面提升为“仪表盘级”的管理界面，我们将采用**“卡片化”、“视觉分层”和“微交互”**的设计策略。
+
+以下是为你重新设计的 UserManage.vue。这个版本不仅适配了你之前的暗黑模式变量，还引入了多彩的统计卡片、智能头像生成算法以及极具质感的交互细节。
+
+🎨 设计亮点预览
+智能多彩头像：没有头像的用户，系统会根据其姓氏自动计算一个柔和的背景色，显示首字母。
+
+沉浸式统计栏：顶部采用微渐变毛玻璃风格的统计卡片，瞬间提升科技感。
+
+Pro 级表格：
+
+双行合一：姓名加粗，邮箱变灰，大幅提升阅读效率。
+
+悬浮操作：操作按钮默认半透明，鼠标悬停行时高亮，保持界面清爽。
+
+呼吸灯状态：状态不再是死板的文字，而是带光晕的圆点。
+
+骨架屏加载：拒绝生硬的 Loading 转圈，使用流畅的骨架屏过渡。
+
+💻 UserManage.vue 代码实现
+代码段
+
+<template>
+  <div class="user-manage-container">
+    
+    <div class="stats-row">
+      <el-row :gutter="20">
+        <el-col :span="6" v-for="(stat, index) in statsData" :key="index">
+          <div class="stat-card" :class="`stat-card-${index}`">
+            <div class="stat-icon-wrapper">
+              <el-icon :size="24" :class="`text-${stat.color}`"><component :is="stat.icon" /></el-icon>
+            </div>
+            <div class="stat-info">
+              <div class="stat-label">{{ stat.label }}</div>
+              <div class="stat-value">
+                {{ stat.value }}
+                <span class="stat-trend" :class="stat.trend > 0 ? 'up' : 'down'">
+                  <el-icon><component :is="stat.trend > 0 ? 'Top' : 'Bottom'" /></el-icon>
+                  {{ Math.abs(stat.trend) }}%
+                </span>
+              </div>
+            </div>
+            <div class="stat-bg-decoration"></div>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+
+    <div class="main-card">
+      
+      <div class="toolbar-header">
+        <div class="toolbar-left">
+          <el-input
+            v-model="searchQuery"
+            placeholder="搜索姓名、手机号或邮箱..."
+            class="search-input"
+            clearable
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+
+          <el-select v-model="roleFilter" placeholder="所有角色" class="role-select" clearable>
+            <el-option label="超级管理员" value="admin" />
+            <el-option label="部门领导" value="leader" />
+            <el-option label="普通用户" value="user" />
+          </el-select>
+
+          <div class="status-tabs">
+            <span 
+              v-for="tab in ['全部', '启用', '禁用']" 
+              :key="tab"
+              :class="{ active: statusFilter === tab }"
+              @click="statusFilter = tab"
+            >
+              {{ tab }}
+            </span>
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <el-button class="btn-secondary">
+            <template #icon><Upload /></template> 导入
+          </el-button>
+          <el-button class="btn-secondary">
+            <template #icon><Download /></template> 导出
+          </el-button>
+          <el-button type="primary" class="btn-primary" @click="openDialog('create')">
+            <template #icon><Plus /></template> 新增用户
+          </el-button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <el-skeleton :rows="5" animated v-if="loading" />
+        
+        <el-table
+          v-else
+          :data="userList"
+          style="width: 100%"
+          :header-cell-style="{ background: 'transparent', color: 'var(--text-secondary)', fontWeight: '600' }"
+          row-class-name="user-row"
+        >
+          <el-table-column label="用户 / User" min-width="200">
+            <template #default="{ row }">
+              <div class="user-info-cell">
+                <el-avatar 
+                  :size="44" 
+                  :src="row.avatar" 
+                  :style="{ background: !row.avatar ? getAvatarColor(row.name) : '' }"
+                  class="user-avatar"
+                >
+                  {{ row.name.charAt(0) }}
+                </el-avatar>
+                <div class="user-details">
+                  <div class="user-name">{{ row.name }}</div>
+                  <div class="user-sub">{{ row.email }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="部门职位" min-width="150">
+            <template #default="{ row }">
+              <div class="dept-info">
+                <span class="dept-name">{{ row.department }}</span>
+                <span class="job-divider">/</span>
+                <span class="job-title">{{ row.job }}</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="角色" min-width="120">
+            <template #default="{ row }">
+              <el-tag :type="getRoleTagType(row.role)" effect="plain" round class="role-tag">
+                {{ row.roleName }}
+              </el-tag>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <div class="status-indicator" :class="row.status === 'active' ? 'status-active' : 'status-inactive'">
+                <span class="status-dot"></span>
+                {{ row.status === 'active' ? '启用' : '禁用' }}
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="最后登录" prop="lastLogin" width="160" class-name="text-secondary-col" />
+
+          <el-table-column label="操作" width="180" fixed="right" align="right">
+            <template #default="{ row }">
+              <div class="action-buttons">
+                <el-tooltip content="编辑" placement="top" :show-after="500">
+                  <el-button circle size="small" @click="openDialog('edit', row)">
+                    <el-icon><EditPen /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip content="重置密码" placement="top" :show-after="500">
+                  <el-button circle size="small" >
+                    <el-icon><Key /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip content="删除" placement="top" :show-after="500">
+                  <el-button circle size="small" type="danger" plain>
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-wrapper">
+          <el-pagination
+            background
+            layout="total, prev, pager, next, jumper"
+            :total="100"
+          />
+        </div>
+      </div>
+    </div>
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogType === 'create' ? '新增用户' : '编辑用户'"
+      width="650px"
+      class="custom-dialog"
+      align-center
+    >
+      <div class="dialog-content">
+        <el-form :model="form" label-position="top" class="custom-form">
+          <el-row :gutter="24">
+            <el-col :span="24" class="avatar-upload-col">
+              <el-upload
+                class="avatar-uploader"
+                action="#"
+                :show-file-list="false"
+              >
+                <div v-if="form.avatar" class="avatar-preview" :style="{ backgroundImage: `url(${form.avatar})` }"></div>
+                <div v-else class="avatar-uploader-icon">
+                  <el-icon><Camera /></el-icon>
+                  <span>上传头像</span>
+                </div>
+              </el-upload>
+              <div class="upload-tip">建议尺寸 200x200，支持 JPG/PNG</div>
+            </el-col>
+
+            <el-col :span="12">
+              <el-form-item label="姓名">
+                <el-input v-model="form.name" placeholder="请输入真实姓名" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="手机号码">
+                <el-input v-model="form.phone" placeholder="11位手机号" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="电子邮箱">
+                <el-input v-model="form.email" placeholder="工作邮箱" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="所属部门">
+                <el-select v-model="form.department" placeholder="选择部门" style="width: 100%">
+                  <el-option label="研发部" value="dev" />
+                  <el-option label="市场部" value="market" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="系统角色">
+                <el-select v-model="form.role" placeholder="分配角色" style="width: 100%">
+                  <el-option label="普通用户" value="user" />
+                  <el-option label="管理员" value="admin" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="账户状态">
+                <el-switch
+                  v-model="form.status"
+                  active-value="active"
+                  inactive-value="inactive"
+                  active-text="启用"
+                  inactive-text="禁用"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="dialogVisible = false">确认保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { 
+  User, UserFilled, DataLine, Trophy, 
+  Search, Upload, Download, Plus, 
+  Top, Bottom, EditPen, Key, Delete, Camera
+} from '@element-plus/icons-vue'
+
+// --- Mock Data ---
+const loading = ref(true)
+const searchQuery = ref('')
+const roleFilter = ref('')
+const statusFilter = ref('全部')
+const dialogVisible = ref(false)
+const dialogType = ref('create')
+
+// 模拟表单数据
+const form = reactive({
+  name: '',
+  phone: '',
+  email: '',
+  department: '',
+  role: '',
+  status: 'active',
+  avatar: ''
+})
+
+// 顶部统计数据
+const statsData = [
+  { label: '总用户数', value: '2,845', trend: 12, icon: 'User', color: 'blue' },
+  { label: '今日活跃', value: '1,230', trend: 5.4, icon: 'DataLine', color: 'green' },
+  { label: '管理员', value: '18', trend: 0, icon: 'UserFilled', color: 'purple' },
+  { label: '本周新增', value: '124', trend: -2.1, icon: 'Trophy', color: 'orange' },
+]
+
+// 模拟用户列表
+const userList = ref([])
+
+onMounted(() => {
+  // 模拟 API 请求延迟
+  setTimeout(() => {
+    userList.value = [
+      { id: 1, name: '张伟', email: 'zhangwei@company.com', avatar: '', department: '研发中心', job: '后端主管', role: 'admin', roleName: '超级管理员', status: 'active', lastLogin: '2025-12-20 09:30' },
+      { id: 2, name: 'Linda Johnson', email: 'linda.j@company.com', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026024d', department: '设计部', job: 'UI设计师', role: 'user', roleName: '普通用户', status: 'active', lastLogin: '2025-12-19 18:20' },
+      { id: 3, name: '陈思思', email: 'chen.sisi@company.com', avatar: '', department: '市场部', job: '运营经理', role: 'leader', roleName: '部门领导', status: 'active', lastLogin: '2025-12-20 08:45' },
+      { id: 4, name: 'Michael Wang', email: 'm.wang@company.com', avatar: '', department: '测试部', job: '测试工程师', role: 'user', roleName: '普通用户', status: 'inactive', lastLogin: '2025-11-15 10:00' },
+      { id: 5, name: '刘强', email: 'liu.qiang@company.com', avatar: '', department: '运维部', job: 'SRE', role: 'user', roleName: '普通用户', status: 'active', lastLogin: '2025-12-20 01:12' },
+    ]
+    loading.value = false
+  }, 800)
+})
+
+// --- Logic ---
+
+// 根据姓名生成头像背景色 (让它看起来随机但固定)
+const getAvatarColor = (name) => {
+  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1']
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return colors[Math.abs(hash) % colors.length]
+}
+
+const getRoleTagType = (role) => {
+  const map = { admin: 'danger', leader: 'warning', user: 'info' }
+  return map[role] || 'info'
+}
+
+const openDialog = (type, row = null) => {
+  dialogType.value = type
+  if (type === 'edit' && row) {
+    Object.assign(form, row)
+  } else {
+    // reset form
+    form.name = ''
+    form.avatar = ''
+    form.status = 'active'
+  }
+  dialogVisible.value = true
+}
+</script>
+
+<style scoped>
+/* CSS 变量映射 (假设你之前的 style.css 已经定义了基础变量)
+  如果没有，这里提供了 fallback
+*/
+.user-manage-container {
+  /* 定义局部变量以便调整 */
+  --card-radius: 12px;
+  --transition-speed: 0.3s;
+  padding: 24px;
+  min-height: 100vh;
+  /* 适配暗黑模式的背景色逻辑需在全局样式处理，这里默认透明或使用全局背景 */
+}
+
+/* --- 1. Stats Header Styles --- */
+.stats-row {
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--card-bg, #ffffff);
+  border-radius: var(--card-radius);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* 不同的卡片渐变背景 - 极轻微的色彩 */
+.stat-card-0 { background: linear-gradient(135deg, var(--card-bg, #fff) 0%, rgba(59, 130, 246, 0.05) 100%); }
+.stat-card-1 { background: linear-gradient(135deg, var(--card-bg, #fff) 0%, rgba(16, 185, 129, 0.05) 100%); }
+.stat-card-2 { background: linear-gradient(135deg, var(--card-bg, #fff) 0%, rgba(139, 92, 246, 0.05) 100%); }
+.stat-card-3 { background: linear-gradient(135deg, var(--card-bg, #fff) 0%, rgba(245, 158, 11, 0.05) 100%); }
+
+.stat-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+  background: rgba(0,0,0,0.03);
+}
+
+.text-blue { color: #3b82f6; }
+.text-green { color: #10b981; }
+.text-purple { color: #8b5cf6; }
+.text-orange { color: #f59e0b; }
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  line-height: 1;
+}
+
+.stat-trend {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+.stat-trend.up { color: #10b981; }
+.stat-trend.down { color: #ef4444; }
+
+/* --- 2. Main Card & Toolbar --- */
+.main-card {
+  background: var(--card-bg, #ffffff);
+  border-radius: var(--card-radius);
+  padding: 24px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.toolbar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  width: 240px;
+}
+
+.role-select {
+  width: 140px;
+}
+
+/* 自定义 Tab 切换样式 */
+.status-tabs {
+  background: var(--color-slate-100, #f1f5f9);
+  padding: 4px;
+  border-radius: 8px;
+  display: flex;
+  gap: 4px;
+}
+
+.status-tabs span {
+  padding: 4px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.status-tabs span.active {
+  background: white;
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 12px;
+}
+
+/* --- 3. Pro Table Styles --- */
+.user-info-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.user-avatar {
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid white; /* 增加一点白边增加层次 */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+.user-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.dept-info {
+  font-size: 13px;
+  color: var(--text-main);
+}
+.job-divider {
+  margin: 0 6px;
+  color: var(--border-color);
+}
+.job-title {
+  color: var(--text-secondary);
+}
+
+/* 状态呼吸灯 */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+}
+/* 绿色呼吸效果 */
+.status-active .status-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+.status-active .status-dot::after {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.4;
+  animation: pulse 2s infinite;
+}
+.status-active { color: #10b981; font-weight: 500; }
+
+.status-inactive .status-dot { background: #cbd5e1; }
+.status-inactive { color: #64748b; }
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.4; }
+  70% { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* 表格悬停行效果 */
+:deep(.el-table__row) {
+  transition: all 0.2s;
+}
+:deep(.el-table__row:hover) {
+  /* 使用 transform 和 shadow 实现浮起效果，需要去除 el-table 默认的 hover 背景色 */
+  background-color: var(--color-slate-50, #f8fafc) !important; 
+  transform: scale(1.002);
+  z-index: 2;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* 操作按钮默认淡化，悬停高亮 */
+.action-buttons {
+  opacity: 0.4;
+  transition: opacity 0.2s;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+:deep(.el-table__row:hover) .action-buttons {
+  opacity: 1;
+}
+
+.pagination-wrapper {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* --- 4. Dialog Styles --- */
+.avatar-upload-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.avatar-uploader {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 2px dashed var(--border-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+.avatar-uploader:hover {
+  border-color: var(--color-primary);
+}
+.avatar-preview {
+  width: 100%; height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+.avatar-uploader-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.upload-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 暗黑模式适配 (依赖你之前的 style.css html.dark) */
+:global(html.dark) .stat-card {
+  border-color: var(--border-color);
+  background: var(--card-bg); /* 深色背景 */
+}
+:global(html.dark) .status-tabs {
+  background: #1e293b;
+}
+:global(html.dark) .status-tabs span.active {
+  background: #334155;
+  color: white;
+}
+</style>
+🔨 如何集成
+文件位置：将上述代码直接复制并覆盖你的 frontend/src/views/UserManage.vue（或者你存放该文件的位置）。
+
+样式依赖：我使用了 CSS 变量（如 var(--card-bg), var(--text-main)）来确保和之前的页面风格一致。如果你之前的 style.css 已经配置好了（我们在之前的对话中处理过这个），那么暗黑模式会自动生效。
+
+图标引入：我在 <script setup> 中引入了所有用到的 Element Plus 图标，确保你安装了图标库（npm install @element-plus/icons-vue）。
+
+✨ 核心提升点详解
+视觉分层 (Hierarchy)：
+
+Level 1: 统计卡片使用微妙的渐变色，是最吸引眼球的地方。
+
+Level 2: 表格区域使用白色卡片，提供干净的阅读环境。
+
+Level 3: 搜索栏和筛选器在视觉上做到了“既突出又和谐”。
+
+微交互 (Micro-interactions)：
+
+行悬浮: 当鼠标滑过表格某一行时，这一行会轻微放大并出现阴影（transform: scale(1.002)），这是一种非常高级的交互感，比简单的背景变灰要好得多。
+
+操作按钮: 默认是半透明的（opacity: 0.4），减少了视觉噪音；只有当你关注某一行时，按钮才会变清晰。
+
+数据呈现:
+
+Avatar: 即使没有头像，彩色的首字母也比灰色的默认头像要生动得多。
+
+呼吸灯状态: 绿色的呼吸灯效果（animation: pulse）直观地传达了“系统正在运行”的生命力。
