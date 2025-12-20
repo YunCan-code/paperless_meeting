@@ -51,29 +51,33 @@ DEFAULT_IMAGES = {
     "default": "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
 }
 
-def get_random_image_from_dir(directory: Path, base_url: str) -> Optional[str]:
-    """Helper to pick random image from directory and return full URL"""
+from functools import lru_cache
+import os
+
+@lru_cache(maxsize=32)
+def get_images_in_dir_cached(directory: Path) -> List[str]:
+    """Cached directory listing to reduce Disk I/O"""
     if not directory.exists() or not directory.is_dir():
-        return None
-        
+        return []
     valid_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
-    images = [
-        f for f in os.listdir(directory) 
-        if os.path.isfile(directory / f) and os.path.splitext(f)[1].lower() in valid_extensions
-    ]
+    try:
+        return [
+            f for f in os.listdir(directory)
+            if os.path.isfile(directory / f) and os.path.splitext(f)[1].lower() in valid_extensions
+        ]
+    except OSError:
+        return []
+
+def get_random_image_from_dir(directory: Path, base_url: str) -> Optional[str]:
+    """Helper to pick random image with caching"""
+    images = get_images_in_dir_cached(directory)
     
     if not images:
         return None
         
     selected = random.choice(images)
-    # Convert 'uploads/meeting_backgrounds/...' to '/static/meeting_backgrounds/...'
-    # Assumes directory starts with 'uploads/'
-    # Path('uploads/meeting_backgrounds/common') -> parts: ('uploads', 'meeting_backgrounds', 'common')
-    
-    # Robust relative path calculation
-    # We want route relative to 'uploads' folder, which is mounted at '/static'
     try:
-        rel_path = directory.relative_to(UPLOAD_DIR) # e.g. meeting_backgrounds/common
+        rel_path = directory.relative_to(UPLOAD_DIR)
         return f"{base_url}static/{rel_path.as_posix()}/{selected}"
     except ValueError:
         return None

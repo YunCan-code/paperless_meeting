@@ -404,7 +404,7 @@ const statsData = computed(() => {
     { 
       title: '本月会议数', 
       value: monthlyCount, 
-      subtitle: '本月累计', 
+      // subtitle: '本月累计', 
       icon: 'Calendar', 
       bgClass: 'bg-blue-50', 
       textClass: 'text-blue-500' 
@@ -412,7 +412,7 @@ const statsData = computed(() => {
     { 
       title: '本周会议数', 
       value: weeklyCount, 
-      subtitle: '本周安排', 
+      // subtitle: '本周安排', 
       icon: 'CollectionTag', 
       bgClass: 'bg-orange-50', 
       textClass: 'text-orange-500' 
@@ -420,7 +420,7 @@ const statsData = computed(() => {
     { 
       title: '文件存储', 
       value: storageStr, 
-      subtitle: '已用空间', 
+      // subtitle: '已用空间', 
       icon: 'FolderOpened', 
       bgClass: 'bg-green-50', 
       textClass: 'text-green-500' 
@@ -428,7 +428,7 @@ const statsData = computed(() => {
     { 
       title: '用户在线数', 
       value: onlineUsers, 
-      subtitle: '实时在线', 
+      // subtitle: '实时在线', 
       icon: 'User', 
       bgClass: 'bg-purple-50', 
       textClass: 'text-purple-500' 

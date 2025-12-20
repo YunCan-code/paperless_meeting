@@ -140,31 +140,29 @@ def read_users(
     """
     Get Users List with Pagination and Filtering
     """
-    query = select(User)
     
-    # Filter: Search (Phone or Name)
+    # Efficient Count
+    # We clone the query conditions for counting
+    count_query = select(func.count()).select_from(User)
     if q:
-        query = query.where(
-            (User.phone.contains(q)) | 
-            (User.name.contains(q))
-        )
+        count_query = count_query.where((User.phone.contains(q)) | (User.name.contains(q)))
+    if role:
+        count_query = count_query.where(User.role == role)
+    if is_active is not None:
+        count_query = count_query.where(User.is_active == is_active)
+        
+    total = session.exec(count_query).one()
     
-    # Filter: Role
+    # Build Result Query
+    query = select(User)
+    if q:
+        query = query.where((User.phone.contains(q)) | (User.name.contains(q)))
     if role:
         query = query.where(User.role == role)
-        
-    # Filter: Active Status
     if is_active is not None:
         query = query.where(User.is_active == is_active)
-    
-    # Total Count
-    # Efficient count requires separate query or counting results
-    total = len(session.exec(query).all())
-    
-    # Pagination
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(User.id.desc())
-    
+        
+    query = query.offset((page - 1) * page_size).limit(page_size).order_by(User.id.desc())
     items = session.exec(query).all()
     
     return {
