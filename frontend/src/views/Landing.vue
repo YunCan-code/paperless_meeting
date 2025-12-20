@@ -36,24 +36,29 @@
       </div>
     </main>
 
-    <!-- Features Section -->
-    <!-- <section class="features-section">
-      <div class="feature-card">
-        <div class="icon-box"><el-icon><Monitor /></el-icon></div>
-        <h3>即时同步</h3>
-        <p>多终端实时同屏，会议资料秒级分发，提升决策效率。</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon-box"><el-icon><Lock /></el-icon></div>
-        <h3>安全合规</h3>
-        <p>国密算法加密传输，细粒度权限管控，保障数据安全。</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon-box"><el-icon><Leaf /></el-icon></div>
-        <h3>绿色低碳</h3>
-        <p>全流程无纸化，每年节约纸张数万张，助力双碳目标。</p>
-      </div>
-    </section> -->
+    <!-- Showcase Sections -->
+    <div class="sections-container" id="showcase">
+      
+      <!-- Android Platform Section (Simplified) -->
+      <section class="showcase-section android-focus">
+        <div class="header-group">
+            <div class="showcase-tag">移动端</div>
+        </div>
+        
+        <div class="showcase-visual full-width">
+          <div class="tablet-mockup tilt-idle">
+            <div class="tablet-screen">
+               <el-carousel trigger="click" height="100%" arrow="always" :interval="4000" autoplay style="width: 100%">
+                 <el-carousel-item v-for="(img, key) in androidImages" :key="key" style="text-align: center; background: #000;">
+                   <img :src="img" class="tablet-screenshot" alt="App Screenshot" />
+                 </el-carousel-item>
+               </el-carousel>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -64,16 +69,62 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { Lightning, ArrowRight, Monitor, Lock, SwitchButton as Leaf } from '@element-plus/icons-vue'
+import { Lightning, ArrowRight, ArrowDown, Monitor, DataBoard, Files, Setting, Reading, Connection, EditPen } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
 const enterSystem = () => {
   router.push('/admin/meetings')
 }
+
+const scrollToContent = () => {
+  document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth' })
+}
+
+const androidImages = [
+  '/landingPic/android_home.png',
+  '/landingPic/android_meetings.png',
+  '/landingPic/android_detail.png'
+]
 </script>
 
 <style scoped>
+/* ... */
+/* Tablet Mockup Styling */
+
+.tablet-mockup {
+  width: 500px;
+  height: 380px; /* Landscape */
+  background: #0f172a;
+  border: 10px solid #334155;
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.tablet-screen {
+  padding: 0;
+  height: 100%;
+  background: black;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.tablet-screenshot {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+
+:deep(.el-carousel), :deep(.el-carousel__container) {
+  height: 100%;
+}
+
+/* ... Existing Styles ... */
+
 .landing-page {
   min-height: 100vh;
   background-color: #0f172a;
@@ -211,52 +262,166 @@ const enterSystem = () => {
   mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
 }
 
-/* Features */
-.features-section {
-  display: flex;
-  justify-content: center;
-  gap: 32px;
-  padding: 0 48px 64px;
-  z-index: 2;
+/* Showcase Sections */
+.sections-container {
   position: relative;
+  z-index: 2;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.8) 100%);
 }
-.feature-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 32px;
-  border-radius: 16px;
-  width: 300px;
-  text-align: left;
-  transition: all 0.3s;
-}
-.feature-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateY(-5px);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-.icon-box {
-  background: rgba(34, 211, 238, 0.1);
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+
+.showcase-section {
+  min-height: 80vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 80px 48px;
+  gap: 80px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.showcase-section.reverse {
+  flex-direction: row-reverse;
+}
+
+.showcase-content {
+  flex: 1;
+  max-width: 500px;
+}
+
+.showcase-tag {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(34, 211, 238, 0.1);
   color: #22d3ee;
-  font-size: 24px;
-  margin-bottom: 16px;
-}
-.feature-card h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  font-weight: 600;
-}
-.feature-card p {
-  margin: 0;
   font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+.section-title {
+  font-size: 40px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  line-height: 1.2;
+}
+
+.section-desc {
+  font-size: 18px;
   color: #94a3b8;
-  line-height: 1.5;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+}
+
+.feature-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  color: #e2e8f0;
+}
+
+.feature-list li .el-icon {
+  color: #818cf8;
+  background: rgba(129, 140, 248, 0.1);
+  padding: 8px;
+  border-radius: 8px;
+  box-sizing: content-box;
+}
+
+/* MOCKUPS */
+.showcase-visual {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+/* Browser Mockup */
+.browser-mockup {
+  width: 500px;
+  height: 350px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  position: relative;
+}
+
+.showcase-visual.full-width {
+    width: 100%;
+}
+
+.showcase-section.android-focus {
+  flex-direction: column !important;
+  padding-top: 40px;
+  gap: 60px;
+  min-height: 90vh;
+}
+
+.header-group {
+    text-align: center;
+    width: 100%;
+}
+.header-group .showcase-tag {
+    font-size: 18px; 
+    padding: 10px 32px;
+    margin-bottom: 0;
+}
+
+/* Tablet Mockup Styling */
+.tablet-mockup {
+  width: 100%;
+  max-width: 1200px; /* Allow wider */
+  height: 800px; /* Fixed large height to accommodate original size */
+  background: #0f172a;
+  border: 12px solid #334155;
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.1);
+  margin: 0 auto;
+}
+
+.tablet-screen {
+  padding: 0;
+  height: 100%;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  display: flex;       /* Center the image if aspect ratio differs */
+  align-items: center;
+  justify-content: center;
+}
+
+.tablet-screenshot {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Critical Fix: Maintain aspect ratio */
+  display: block;
+}
+
+:deep(.el-carousel), :deep(.el-carousel__container) {
+  height: 100%;
+}
+
+/* Tilts */
+.tilt-idle {
+  transform: perspective(2000px) rotateX(5deg);
+  transition: transform 0.6s ease-out;
+}
+.showcase-visual:hover .tilt-idle {
+  transform: perspective(2000px) rotateX(0) scale(1.02);
 }
 
 /* Footer */
@@ -268,5 +433,83 @@ const enterSystem = () => {
   position: absolute;
   bottom: 0;
   width: 100%;
+}
+/* Mobile Adaptation */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 16px 24px;
+  }
+  
+  .logo-text {
+    font-size: 16px;
+  }
+
+  .hero-section {
+    padding: 0 24px;
+    min-height: 70vh;
+  }
+  
+  .main-title {
+    font-size: 36px;
+    line-height: 1.2;
+    margin-bottom: 24px;
+  }
+  
+  .subtitle {
+    font-size: 16px;
+    margin-bottom: 32px;
+  }
+  
+  .features-section {
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding-bottom: 48px;
+  }
+  
+  .feature-card {
+    width: 100%;
+    max-width: 340px;
+  }
+  
+  .enter-btn {
+    padding: 12px 32px;
+    font-size: 16px;
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  /* Showcase Responsive */
+  .showcase-section,
+  .showcase-section.reverse {
+    flex-direction: column;
+    padding: 64px 24px;
+    gap: 48px;
+    text-align: center;
+  }
+  
+  .showcase-content {
+    max-width: 100%;
+  }
+  
+  .section-title {
+    font-size: 28px;
+  }
+  
+  .feature-list {
+    display: inline-block;
+    text-align: left;
+  }
+
+  .browser-mockup {
+    width: 100%;
+    height: 250px;
+  }
+  
+  .tablet-mockup {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/10;
+  }
 }
 </style>

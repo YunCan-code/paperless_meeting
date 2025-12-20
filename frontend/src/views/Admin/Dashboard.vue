@@ -1,5 +1,12 @@
 <template>
   <div class="common-layout">
+    <!-- Mobile Backdrop -->
+    <div 
+      class="mobile-backdrop" 
+      v-if="!isCollapse && isMobile" 
+      @click="toggleCollapse"
+    ></div>
+
     <el-container>
       <el-aside :width="isCollapse ? '64px' : '260px'" class="custom-aside" :class="{ 'collapsed': isCollapse }">
         <div class="sidebar-header" @click="$router.push('/')" style="cursor: pointer;">
@@ -52,9 +59,32 @@
 <script setup>
 import { Calendar, User, List, Monitor, Fold, Expand, Setting } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 // 使用全局侧边栏状态，与子页面共享
 const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
+
+const isMobile = ref(false)
+
+const checkMobile = () => {
+  const mobile = window.innerWidth <= 768
+  if (mobile !== isMobile.value) {
+    isMobile.value = mobile
+    // If switching to mobile, collapse automatically
+    if (mobile) {
+        if (!isCollapse.value) toggleCollapse()
+    }
+  }
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
 </script>
 
 <style scoped>
@@ -68,9 +98,52 @@ const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
   border-right: 1px solid var(--border-color-layout);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, transform 0.3s ease;
   overflow: hidden;
+  z-index: 100;
 }
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .custom-aside {
+    position: fixed;
+    z-index: 1001;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    /* Force fixed width on mobile for proper drawer usage */
+    width: 260px !important; 
+    transform: translateX(0);
+    box-shadow: 4px 0 16px rgba(0,0,0,0.1);
+  }
+
+  .custom-aside.collapsed {
+    width: 260px !important;
+    transform: translateX(-100%);
+  }
+
+  /* When collapsed on mobile, the main logo should be hidden in header if it relies on width, 
+     but since we translate out, it doesn't matter. */
+  
+  .mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .custom-main {
+    padding: 16px;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 
 /* Header */
 .sidebar-header {

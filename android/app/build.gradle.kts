@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.paperlessmeeting"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.paperlessmeeting"
@@ -74,7 +74,8 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.coil.compose)
 
-
+    // PDF Viewer
+    implementation("com.github.asadwaheed1:AndroidPdfViewer:v3.2.0-beta06")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

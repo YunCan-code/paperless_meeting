@@ -1,23 +1,16 @@
 package com.example.paperlessmeeting.ui.screens.reader
 
-import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -34,24 +27,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.github.barteksc.pdfviewer.PDFView
+import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
-    meetingId: Int, // Just for context if needed
+    meetingId: Int, // Context parameters
     attachmentId: Int,
     downloadUrl: String,
     fileName: String,
@@ -64,6 +57,10 @@ fun ReaderScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     var showOverlay by remember { mutableStateOf(true) }
+    
+    // Page state for UI display
+    var currentPage by remember { mutableIntStateOf(0) }
+    var totalPages by remember { mutableIntStateOf(0) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -101,7 +98,10 @@ fun ReaderScreen(
         ) {
             when (val state = uiState) {
                 is ReaderUiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color.White
+                    )
                 }
                 is ReaderUiState.Error -> {
                     Text(
@@ -111,31 +111,33 @@ fun ReaderScreen(
                     )
                 }
                 is ReaderUiState.Ready -> {
-                    val pagerState = rememberPagerState(pageCount = { state.pageCount })
+                    AndroidView(
+                         factory = { context ->
+                             PDFView(context, null).apply {
+                                 // Basic initialization
+                             }
+                         },
+                         modifier = Modifier.fillMaxSize(),
+                         update = { pdfView ->
+                             pdfView.fromFile(state.file)
+                                 .defaultPage(currentPage)
+                                 .enableSwipe(true)
+                                 .swipeHorizontal(true)
+                                 .enableDoubletap(true)
+                                 .onPageChange { page: Int, pageCount: Int ->
+                                     currentPage = page
+                                     totalPages = pageCount
+                                 }
+                                 .onTap { e -> 
+                                     showOverlay = !showOverlay
+                                     true 
+                                 }
+                                 .scrollHandle(DefaultScrollHandle(pdfView.context))
+                                 .load()
+                         }
+                    )
 
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        val widthFn = constraints.maxWidth
-                        val heightFn = constraints.maxHeight
-
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) { showOverlay = !showOverlay }
-                        ) { pageIndex ->
-                            PdfPage(
-                                pageIndex = pageIndex,
-                                viewModel = viewModel,
-                                width = widthFn,
-                                height = heightFn
-                            )
-                        }
-                    }
-
-                    // Overlay Bottom Bar (Page Indicator)
+                    // Overlay Bottom Bar
                     AnimatedVisibility(
                         visible = showOverlay,
                         modifier = Modifier
@@ -145,7 +147,7 @@ fun ReaderScreen(
                          exit = slideOutVertically { it } + fadeOut()
                     ) {
                         Text(
-                            text = "${pagerState.currentPage + 1} / ${state.pageCount}",
+                            text = "${currentPage + 1} / $totalPages",
                             color = Color.White,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier
@@ -156,33 +158,6 @@ fun ReaderScreen(
                 }
                 else -> {}
             }
-        }
-    }
-}
-
-@Composable
-fun PdfPage(
-    pageIndex: Int,
-    viewModel: ReaderViewModel,
-    width: Int,
-    height: Int
-) {
-    val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = pageIndex) {
-        val bmp = withContext(Dispatchers.Default) {
-             viewModel.renderPage(pageIndex, width, height)
-        }
-        value = bmp
-    }
-
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (bitmapState.value != null) {
-            Image(
-                bitmap = bitmapState.value!!.asImageBitmap(),
-                contentDescription = "Page ${pageIndex + 1}",
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            CircularProgressIndicator(color = Color.Gray)
         }
     }
 }

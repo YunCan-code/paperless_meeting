@@ -24,7 +24,7 @@
 
     <!-- 顶部统计卡片 (Sessions Overview) -->
     <el-row :gutter="20" class="stats-row">
-      <el-col :span="6" v-for="(stat, index) in statsData" :key="index">
+      <el-col :xs="12" :sm="12" :md="6" :span="6" v-for="(stat, index) in statsData" :key="index">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-icon" :class="stat.bgClass">
@@ -44,14 +44,14 @@
 
     <!-- 主体区域: 日历 (2/3) + 今日会议 (1/3) -->
     <el-row :gutter="24" class="main-content-row">
-      <el-col :span="16">
+      <el-col :xs="24" :sm="24" :md="16" :span="16">
         <SessionCalendar 
            :meetings="meetings" 
            @create="openCreate" 
            @select-date="(val) => currentSelectedDate = val"
         />
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :sm="24" :md="8" :span="8">
         <TodayMeetings 
            :meetings="meetings" 
            :meeting-types="meetingTypes" 

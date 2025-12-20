@@ -82,7 +82,7 @@ fun DashboardContent(state: DashboardUiState.Success) {
     ) {
         // 1. Header
         Text(
-            text = "$greeting, 张总",
+            text = "$greeting, XX",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
