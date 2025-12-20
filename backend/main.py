@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 
 # 导入数据库初始化函数和路由模块
 from database import create_db_and_tables
-from routes import users, meetings, auth, meeting_types
+from routes import users, meetings, auth, meeting_types, notes
+
+
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -60,6 +62,7 @@ app.include_router(users.router)
 app.include_router(meetings.router)
 app.include_router(auth.router)
 app.include_router(meeting_types.router)
+app.include_router(notes.router)
 
 @app.get("/")
 def read_root():

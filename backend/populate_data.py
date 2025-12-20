@@ -1,103 +1,114 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func, delete
 from database import engine, create_db_and_tables
-from models import Meeting, MeetingType, User, MeetingAttendeeLink
+from models import Meeting, MeetingType, User
 import random
+import json
 from datetime import datetime, timedelta
 
-# Create tables if new fields added
-create_db_and_tables()
-
 def populate():
+    # Ensure tables exist
+    create_db_and_tables()
+
     with Session(engine) as session:
-        print("Cleaning up existing data...")
-        # Optional: Clear tables to avoid duplication or conflicts with new schema
-        # session.exec("DELETE FROM user") # SQLModel doesn't support raw SQL easily this way in all versions, skipping clear for safety or assume fresh start
-        
-        # 1. Create Meeting Types
-        types = ["党委会", "办公会", "部门例会", "战略研讨会", "临时紧急会议", "全员大会", "技术评审会", "安全生产会", "供应链协调会", "财务分析会"]
-        type_objs = []
-        print("Creating Meeting Types...")
+        print("Starting data population...")
+
+        # 1. Meeting Types
+        types = ["党委会", "办公会", "部门例会", "战略研讨会", "临时紧急会议", 
+                 "全员大会", "技术评审会", "安全生产会", "供应链协调会", "财务分析会"]
+        db_types = []
         for t_name in types:
-            existing = session.exec(select(MeetingType).where(MeetingType.name == t_name)).first()
-            if not existing:
+            mt = session.exec(select(MeetingType).where(MeetingType.name == t_name)).first()
+            if not mt:
                 mt = MeetingType(name=t_name, description=f"随机生成的{t_name}")
                 session.add(mt)
                 session.commit()
                 session.refresh(mt)
-                type_objs.append(mt)
-            else:
-                type_objs.append(existing)
+            db_types.append(mt)
         
-        # 2. Create Users (NEW)
-        print("Creating Users...")
-        # Real-ish data
+        # 2. Users
         last_names = "赵钱孙李周吴郑王冯陈"
         first_names = "伟芳娜敏静秀英丽强磊军洋勇平刚杰"
         depts = ["研发部", "市场部", "行政部", "销售部", "运维部", "财务部"]
         roles = ["主讲人", "参会人员"]
         districts = ['市辖区', '高新区', '呈贡区', '盘龙区', '官渡区', '西山区', '五华区']
         
-        user_objs = []
-        # Create 25 users
-        for i in range(25):
-            name = random.choice(last_names) + random.choice(first_names) + (random.choice(first_names) if random.random()>0.5 else "")
+        db_users = []
+        # Create or Get 50 users
+        for i in range(50):
+            # Deterministic name generation for stability or just random
+            name = random.choice(last_names) + random.choice(first_names) + (random.choice(first_names) if random.random() > 0.5 else "")
             
-            # Check exist (by phone to be realistic, or just skip)
-            # existing_user = session.exec(select(User).where(User.username == username)).first()
-            
-            u = User(
-                name=name,
-                # username removed
-                email=f"user{i+100}@soe-meeting.com",
-                phone=f"138{random.randint(10000000, 99999999)}",
-                district=random.choice(districts),
-                department=random.choice(depts),
-                position="员工",
-                role=random.choice(roles),
-                is_active=True,
-                password="password123", # Default pwd
-                last_login=datetime.now() - timedelta(days=random.randint(0, 30))
-            )
-            session.add(u)
-            user_objs.append(u)
-        session.commit()
-        for u in user_objs: session.refresh(u)
+            u = session.exec(select(User).where(User.name == name)).first()
+            if not u:
+                u = User(
+                    name=name,
+                    district=random.choice(districts),
+                    department=random.choice(depts),
+                    role=random.choice(roles),
+                    phone=f"138{random.randint(1000,9999)}{random.randint(1000,9999)}",
+                    remark="自动生成",
+                    is_active=True,
+                    last_login=datetime.now() - timedelta(days=random.randint(0, 30))
+                )
+                session.add(u)
+                session.commit()
+                session.refresh(u)
+            db_users.append(u)
 
-        # 3. Generate Meetings
-        print("Generating Meetings...")
-        start_date = datetime(2025, 12, 1)
+        # 3. Meetings
+        # Clear existing meetings to ensure we regenerate fresh demo data
+        # Note: Delete strictly implies we want fresh meeting data.
+        print("Clearing old meetings...")
+        session.exec(delete(Meeting))
+        session.commit()
+
+        print("Generating new meetings...")
         locations = ["第一会议室", "第二会议室", "大会议厅", "远程视频", "VIP接待室"]
         
-        total_meetings = 0
-        for i in range(31):
-            current_date = start_date + timedelta(days=i)
-            count = random.randint(0, 5) # Few meetings per day
-            
-            for _ in range(count):
-                hour = random.randint(8, 18)
-                mt = random.choice(type_objs)
-                topic_suffix = random.choice(["进度汇报", "问题讨论", "年终总结", "二期规划"])
-                meeting_time = current_date.replace(hour=hour, minute=0)
+        # Create about 30-50 meetings
+        total_created = 0
+        for mt in db_types:
+            for _ in range(random.randint(3, 6)):
+                # Agenda
+                agenda_items = [
+                    {"time": "09:00", "content": "签到入场"},
+                    {"time": "09:30", "content": "领导致辞"},
+                    {"time": "10:00", "content": "主题汇报"},
+                    {"time": "11:30", "content": "自由讨论"}
+                ]
                 
+                # Time: some past, some future
+                days_offset = random.randint(-15, 30)
+                meeting_time = datetime.now() + timedelta(days=days_offset, hours=random.randint(9, 16))
+                
+                # Status logic
                 status = "finished" if meeting_time < datetime.now() else "scheduled"
                 
+                # Speaker
+                potential_speakers = [u for u in db_users if u.role == "主讲人"]
+                speaker_name = random.choice(potential_speakers).name if potential_speakers else "未知主讲人"
+
                 meeting = Meeting(
-                    title=f"{mt.name}-{topic_suffix}",
-                    meeting_type_id=mt.id,
+                    title=f"{mt.name} - 第{random.randint(1,20)}期",
+                    description="本次会议旨在讨论...",
                     start_time=meeting_time,
                     location=random.choice(locations),
+                    speaker=speaker_name,
+                    agenda=json.dumps(agenda_items, ensure_ascii=False),
+                    meeting_type_id=mt.id,
+                    is_active=True,
                     status=status
                 )
                 
-                # Random attendees
-                attendees = random.sample(user_objs, k=random.randint(3, 10))
-                meeting.attendees = attendees
+                # Attendees (simple list assignment if model supports it, 
+                # but for simplicity we rely on SQLModel relationship or skip explicit link if complex)
+                # meeting.attendees = random.sample(db_users, k=5) 
                 
                 session.add(meeting)
-                total_meetings += 1
-            
+                total_created += 1
+        
         session.commit()
-        print(f"Done! {len(user_objs)} Users, {total_meetings} Meetings created.")
+        print(f"Done! {total_created} meetings generated.")
 
 if __name__ == "__main__":
     populate()

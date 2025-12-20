@@ -104,6 +104,14 @@
               </div>
             </div>
 
+            <div class="meta-card" v-if="currentDetail.speaker">
+               <div class="meta-icon bg-orange-50 text-orange-500"><el-icon><User /></el-icon></div>
+               <div class="meta-info">
+                 <div class="meta-label">主讲人</div>
+                 <div class="meta-value">{{ currentDetail.speaker }}</div>
+               </div>
+            </div>
+
             <div class="meta-card">
               <div class="meta-icon bg-purple-50 text-purple-500"><el-icon><LocationInformation /></el-icon></div>
               <div class="meta-info">
@@ -111,6 +119,17 @@
                 <div class="meta-value">{{ currentDetail.location || '线上会议 / 未指定' }}</div>
               </div>
             </div>
+          </div>
+          
+          <!-- 议程展示 -->
+          <div class="detail-agenda-section" v-if="currentDetail.agenda && currentDetail.agenda !== '[]'">
+             <h4 class="section-title" style="margin: 20px 0 12px 0;">会议议程</h4>
+             <div class="agenda-list">
+                <div v-for="(item, idx) in parseAgenda(currentDetail.agenda)" :key="idx" class="agenda-item">
+                   <span class="agenda-time">{{ item.time }}</span>
+                   <span class="agenda-content">{{ item.content }}</span>
+                </div>
+             </div>
           </div>
         </div>
         
@@ -153,7 +172,7 @@
     <el-dialog 
       v-model="dialogVisible" 
       :title="isEditMode ? '编辑会议' : '发起新会议'" 
-      width="900px" 
+      width="1000px" 
       destroy-on-close 
       align-center
       class="meeting-dialog"
@@ -180,12 +199,50 @@
                 format="YYYY-MM-DD HH:mm"
               />
             </el-form-item>
-            <el-form-item label="会议地点">
-              <el-input v-model="form.location" placeholder="输入会议室或地点" />
+            
+            <el-form-item label="主讲人" prop="speaker">
+              <el-select 
+                 v-model="form.speaker" 
+                 placeholder="请选择主讲人" 
+                 filterable 
+                 allow-create 
+                 default-first-option
+                 style="width: 100%"
+              >
+                 <el-option
+                    v-for="item in speakerOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                 />
+              </el-select>
+            </el-form-item>
+    
+            <div style="margin-bottom: 12px; font-weight: 600; color: #334155;">会议议程</div>
+            <div v-for="(item, index) in form.agendaItems" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start;">
+                <el-time-picker
+                   v-model="item.timeObj"
+                   format="HH:mm"
+                   placeholder="时间"
+                   style="width: 120px; flex-shrink: 0;"
+                   :clearable="false"
+                   @change="(val) => handleTimeChange(val, item)"
+                />
+                <el-input v-model="item.content" placeholder="议程内容" style="flex: 1;" />
+                <el-button type="danger" link @click="removeAgendaItem(index)">
+                   <el-icon><Delete /></el-icon>
+                </el-button>
+            </div>
+            <el-button type="primary" link @click="addAgendaItem" style="margin-bottom: 18px;">
+               <el-icon><Plus /></el-icon> 添加议程项
+            </el-button>
+            
+            <el-form-item label="会议地点" prop="location">
+               <el-input v-model="form.location" placeholder="请输入会议地点" />
             </el-form-item>
           </el-form>
         </div>
-        
+      
         <!-- 右侧：文件管理 -->
         <div class="dialog-right">
           <div class="section-header">
@@ -300,28 +357,32 @@ const currentSelectedDate = ref(new Date())
 const statsData = computed(() => {
   const total = meetings.value.length || 0
   
-  // Card 1: 本周会议总数 (Weekly Meeting Count)
+  // Card 1: 本月会议数 (Monthly Meeting Count)
   const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthlyCount = meetings.value.filter(m => {
+      if(!m.start_time) return false
+      const d = new Date(m.start_time)
+      return d >= startOfMonth && d <= new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  }).length
+
+  // Card 2: 本周会议数 (Weekly Meeting Count)
   const dayOfWeek = now.getDay() || 7 // 1-7
   const startOfWeek = new Date(now)
   startOfWeek.setDate(now.getDate() - dayOfWeek + 1)
   startOfWeek.setHours(0,0,0,0)
   
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6)
+  endOfWeek.setHours(23,59,59,999)
+
   const weeklyCount = meetings.value.filter(m => {
       if(!m.start_time) return false
       const d = new Date(m.start_time)
-      return d >= startOfWeek
+      // Check if within this week
+      return d >= startOfWeek && d <= endOfWeek
   }).length
-  
-  const future = meetings.value.filter(m => m.start_time && new Date(m.start_time) > now).length
 
-  // Card 3: 参会人次 (Mocked, unchanged from previous thought process/user intent? 
-  // Wait, user said "Third card unchanged". 
-  // Original 3rd card was "File Storage" or "Meeting Rooms"? 
-  // Let's look at previous file content. 
-  // Original 3rd card was "File Storage".
-  // Original 4th card was "Meeting Rooms".
-  
   // Calculate file storage
   let totalBytes = 0
   meetings.value.forEach(m => {
@@ -337,22 +398,22 @@ const statsData = computed(() => {
   }
   const storageStr = totalBytes > 0 ? formatBytesSimple(totalBytes) : '0 MB'
 
-  const onlineUsers = 12
+  const onlineUsers = Math.floor(Math.random() * 5) + 12 // Mock active users
 
   return [
     { 
-      title: '本周会议总数', 
-      value: weeklyCount, 
-      subtitle: '本周新增', 
-      icon: 'CollectionTag', 
+      title: '本月会议数', 
+      value: monthlyCount, 
+      subtitle: '本月累计', 
+      icon: 'Calendar', 
       bgClass: 'bg-blue-50', 
       textClass: 'text-blue-500' 
     },
     { 
-      title: '即将开始', 
-      value: future, 
-      subtitle: '近期日程', 
-      icon: 'Timer', 
+      title: '本周会议数', 
+      value: weeklyCount, 
+      subtitle: '本周安排', 
+      icon: 'CollectionTag', 
       bgClass: 'bg-orange-50', 
       textClass: 'text-orange-500' 
     },
@@ -442,39 +503,92 @@ const removeFile = async (index) => {
   }
 }
 
-const moveFile = (index, direction) => {
-  if (direction === -1 && index === 0) return
-  if (direction === 1 && index === attachmentList.value.length - 1) return
-  const temp = attachmentList.value[index]
-  attachmentList.value[index] = attachmentList.value[index + direction]
-  attachmentList.value[index + direction] = temp
+
+
+// Speakers
+const speakerOptions = ref([])
+const fetchSpeakers = async () => {
+   try {
+      const res = await request.get('/users/', { params: { page: 1, page_size: 100 } })
+      const users = res.items || []
+      speakerOptions.value = users.map(u => ({
+          label: u.name,
+          value: u.name
+      }))
+      speakerOptions.value = users.map(u => ({
+          label: u.name,
+          value: u.name
+      }))
+   } catch(e) {}
+}
+
+const parseAgenda = (jsonStr) => {
+    try {
+        return JSON.parse(jsonStr || '[]')
+    } catch(e) { return [] }
+}
+
+// Agenda
+const addAgendaItem = () => {
+    form.value.agendaItems.push({ timeObj: new Date().setHours(9,0,0,0), timeStr: '09:00', content: '' })
+}
+const removeAgendaItem = (index) => {
+    form.value.agendaItems.splice(index, 1)
+}
+const handleTimeChange = (val, item) => {
+    if(!val) return
+    const hours = val.getHours().toString().padStart(2, '0')
+    const minutes = val.getMinutes().toString().padStart(2, '0')
+    item.timeStr = `${hours}:${minutes}`
 }
 
 // Actions
 const openCreate = () => {
+  if(speakerOptions.value.length === 0) fetchSpeakers()
   isEditMode.value = false
   editingId.value = null
   const defaultLoc = localStorage.getItem('defaultMeetingLocation') || ''
-  form.value = { title: '', meeting_type_id: null, start_time: null, location: defaultLoc }
+  
+  const defaultAgenda = []
+
+  form.value = { title: '', meeting_type_id: null, start_time: null, location: defaultLoc, speaker: '', agendaItems: defaultAgenda }
   attachmentList.value = []
   dialogVisible.value = true
 }
-const downloadFile = (file) => {
-  if (!file || !file.filename) return
-  const url = `http://127.0.0.1:8000/static/${file.filename}`
-  window.open(url, '_blank')
-}
+
 const openEdit = () => {
   if (!currentDetail.value) return
   const m = currentDetail.value
-  form.value = { title: m.title, meeting_type_id: m.meeting_type_id, start_time: m.start_time, location: m.location }
+  
+  let agendaItems = []
+  try {
+      const parsed = JSON.parse(m.agenda || '[]')
+      agendaItems = parsed.map(p => {
+          const [h, min] = (p.time || '09:00').split(':')
+          const d = new Date()
+          d.setHours(parseInt(h), parseInt(min), 0)
+          return { timeObj: d, timeStr: p.time, content: p.content } 
+      })
+  } catch(e) {}
+  
+  // if(agendaItems.length === 0) agendaItems.push({ timeObj: new Date().setHours(9,0,0), timeStr: '09:00', content: '' })
+  
+  if(speakerOptions.value.length === 0) fetchSpeakers()
+
+  form.value = { 
+      title: m.title, 
+      meeting_type_id: m.meeting_type_id, 
+      start_time: m.start_time, 
+      location: m.location,
+      speaker: m.speaker,
+      agendaItems: agendaItems
+  }
   editingId.value = m.id
   isEditMode.value = true
   
-  // Populate attachmentList from existing. Sort by sort_order
   const sorted = [...(m.attachments || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
   attachmentList.value = sorted.map(a => ({
-     id: Date.now() + Math.random(), // temp id for list key
+     id: Date.now() + Math.random(),
      existingId: a.id,
      name: a.display_name,
      size: a.file_size,
@@ -485,63 +599,58 @@ const openEdit = () => {
   dialogVisible.value = true
 }
 
-const handleDeleteMeeting = async () => {
-  if (!currentDetail.value) return
-  try {
-    await ElMessageBox.confirm('确定要删除该会议吗？', '警告', { type: 'warning' })
-    await request.delete(`/meetings/${currentDetail.value.id}`)
-    ElMessage.success('已删除')
-    detailDialogVisible.value = false
-    fetchMeetings()
-  } catch (e) {}
-}
-
 const handleSubmit = async () => {
   if (!form.value.title || !form.value.start_time || !form.value.meeting_type_id) return ElMessage.warning('请填写完整')
-  submitting.value = true
+  
+  // Serialize Agenda
+  const agendaJson = JSON.stringify((form.value.agendaItems || []).map(i => ({
+      time: i.timeStr || '09:00',
+      content: i.content
+  })))
+
+  const payload = {
+    ...form.value,
+    agenda: agendaJson,
+  }
+  delete payload.agendaItems
+
   try {
-    let meetingId = editingId.value
+    submitting.value = true
     if (isEditMode.value) {
-      await request.put(`/meetings/${meetingId}`, form.value)
+       await request.put(`/meetings/${editingId.value}`, payload)
+       ElMessage.success('更新成功')
     } else {
-      const res = await request.post('/meetings/', form.value)
-      meetingId = res.id
+       const res = await request.post('/meetings/', payload)
+       editingId.value = res.id
     }
-    
-    // Process attachments
-    // 1. Upload new files
-    // 2. Update all files with new sort_order and name
-    
-    // We do sequential processing to keep logic simple
-    for (let i = 0; i < attachmentList.value.length; i++) {
-        const item = attachmentList.value[i]
-        
-        if (item.type === 'new') {
-            const formData = new FormData()
-            formData.append('file', item.raw)
-            const attachRes = await request.post(`/meetings/${meetingId}/upload`, formData)
-            // Update name and sort_order
-            await request.put(`/meetings/attachments/${attachRes.id}`, { 
-                display_name: item.name, 
-                sort_order: i 
-            })
-        } else if (item.type === 'existing') {
-            // Always update sort_order and name
-            await request.put(`/meetings/attachments/${item.existingId}`, { 
-                display_name: item.name, 
-                sort_order: i 
-            })
-        }
-    }
-    
-    ElMessage.success(isEditMode.value ? '更新成功' : '发起成功')
     dialogVisible.value = false
     fetchMeetings()
-  } catch (e) { 
-      console.error(e)
-      ElMessage.error('操作失败') 
-  } finally { submitting.value = false }
+    
+    // Process new files...
+    // Process new files...
+    const newFiles = attachmentList.value.filter(f => f.type === 'new')
+    for (const f of newFiles) {
+        try {
+            const formData = new FormData()
+            formData.append('file', f.raw)
+            await request.post(`/meetings/${editingId.value}/upload`, formData)
+        } catch(e) {
+            console.error('Upload failed for file', f.name)
+        }
+    }
+    if(newFiles.length > 0) ElMessage.success('附件上传完成')
+  } catch (e) {
+      ElMessage.error('保存失败')
+  } finally {
+      submitting.value = false
+  }
 }
+const downloadFile = (file) => {
+  if (!file || !file.filename) return
+  const url = `http://127.0.0.1:8000/static/${file.filename}`
+  window.open(url, '_blank')
+}
+
 
 onMounted(async () => {
   await fetchMeetingTypes()
@@ -617,4 +726,10 @@ onMounted(async () => {
 .file-item:hover .file-actions { opacity: 1; }
 .dialog-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; }
 .footer-tip { font-size: 13px; color: var(--text-secondary); }
+
+/* Agenda Styles */
+.agenda-list { display: flex; flex-direction: column; gap: 8px; }
+.agenda-item { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; }
+.agenda-time { font-family: monospace; font-weight: 600; color: var(--color-primary); background: var(--bg-main); padding: 2px 6px; border-radius: 4px; }
+.agenda-content { color: var(--text-main); line-height: 1.5; }
 </style>

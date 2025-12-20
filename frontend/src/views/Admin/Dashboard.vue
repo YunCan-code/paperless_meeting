@@ -27,7 +27,7 @@
           :collapse="isCollapse"
           :collapse-transition="false"
         >
-          <div class="menu-group-title" v-show="!isCollapse">MAIN MENU</div>
+
           <el-menu-item index="/admin/meetings">
             <el-icon><Calendar /></el-icon>
             <template #title>会议管理</template>
@@ -39,6 +39,10 @@
           <el-menu-item index="/admin/types">
             <el-icon><List /></el-icon>
             <template #title>类型管理</template>
+          </el-menu-item>
+          <el-menu-item index="/admin/followup">
+            <el-icon><Notebook /></el-icon>
+            <template #title>后续事项</template>
           </el-menu-item>
           <div class="menu-divider"></div>
           <el-menu-item index="/admin/settings">
@@ -57,7 +61,7 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting, Notebook } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import { ref, onMounted, onUnmounted } from 'vue'
 

@@ -220,6 +220,8 @@ class MeetingUpdate(SQLModel):
     start_time: Optional[datetime] = None
     location: Optional[str] = None
     status: Optional[str] = None
+    speaker: Optional[str] = None
+    agenda: Optional[str] = None
 
 @router.put("/{meeting_id}", response_model=Meeting)
 def update_meeting(

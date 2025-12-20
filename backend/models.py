@@ -72,6 +72,8 @@ class MeetingBase(SQLModel):
     meeting_type_id: Optional[int] = Field(default=None, foreign_key="meetingtype.id") # 关联会议类型
     start_time: datetime # 开始时间
     location: Optional[str] = None # 会议地点
+    speaker: Optional[str] = None # 主讲人
+    agenda: Optional[str] = None # 议程 (JSON format: [{"time": "10:00", "content": "Intro"}, ...])
     status: str = Field(default="scheduled") # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
 
 class Meeting(MeetingBase, table=True):
@@ -85,3 +87,24 @@ class Meeting(MeetingBase, table=True):
 class MeetingRead(MeetingBase):
     id: int
     created_at: datetime
+
+# 备忘录/后续事项模型
+class NoteBase(SQLModel):
+    title: str = Field(index=True)
+    content: str = Field(default="")
+    status: str = Field(default="pending") # pending, done
+
+class Note(NoteBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+class NoteRead(NoteBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+class NoteUpdate(SQLModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    status: Optional[str] = None

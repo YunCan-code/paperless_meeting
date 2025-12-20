@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
 from typing import List, Optional
+import io
+import openpyxl
+from urllib.parse import quote
 from database import get_session
 from models import User, UserRead
 
@@ -23,8 +27,90 @@ def get_user_stats(session: Session = Depends(get_session)):
         "total": total,
         "speakers": speakers,
         "attendees": attendees,
-        "active_today": 45 # Mock for now as requested
+        "active_today": 45 # Mock
     }
+
+@router.get("/template")
+def download_template():
+    """
+    Download User Import Template
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "用户导入模板"
+    # Headers
+    headers = ["姓名", "联系方式", "电子邮箱", "所属区县", "所属部门", "系统角色(主讲人/参会人员)"]
+    ws.append(headers)
+    
+    # Sample Row
+    ws.append(["张三", "13800138000", "zhangsan@example.com", "五华区", "研发部", "参会人员"])
+    
+    # Adjust column width
+    for col in range(1, len(headers)+1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    filename = quote("用户导入模板.xlsx")
+    return StreamingResponse(
+        output, 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}; filename*=utf-8''{filename}"}
+    )
+
+@router.post("/import")
+async def import_users(file: UploadFile = File(...), session: Session = Depends(get_session)):
+    """
+    Import Users from Excel
+    """
+    if not file.filename.endswith('.xlsx'):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload .xlsx file")
+    
+    try:
+        content = await file.read()
+        wb = openpyxl.load_workbook(io.BytesIO(content))
+        ws = wb.active
+        
+        users_to_add = []
+        errors = []
+        
+        # Skip header, iterate rows
+        for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # Row: Name, Phone, Email, District, Dept, Role
+            name, phone, email, district, dept, role = row[0:6]
+            
+            if not name: continue # Skip empty rows
+            
+            # Simple validation
+            # Check phone uniqueness (optional, might slow down bulk)
+            # For bulk, maybe we skip check or do it at end. 
+            # Here we just create objects.
+            
+            # Role validation
+            if role not in ["主讲人", "参会人员"]:
+                role = "参会人员" # Default
+            
+            user = User(
+                name=str(name),
+                phone=str(phone) if phone else None,
+                email=str(email) if email else None,
+                district=str(district) if district else None,
+                department=str(dept) if dept else None,
+                role=str(role),
+                is_active=True,
+                password="password123" # Default pwd
+            )
+            users_to_add.append(user)
+            
+        session.add_all(users_to_add)
+        session.commit()
+        
+        return {"count": len(users_to_add), "message": f"Successfully imported {len(users_to_add)} users"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
 
 @router.post("/", response_model=UserRead)
 def create_user(user: User, session: Session = Depends(get_session)):

@@ -65,6 +65,9 @@
         </div>
 
         <div class="toolbar-right">
+          <el-button @click="importDialogVisible = true" style="margin-right: 12px">
+            <template #icon><Upload /></template> 导入用户
+          </el-button>
           <el-button type="primary" class="btn-primary" @click="openDialog('create')">
             <template #icon><Plus /></template> 新增用户
           </el-button>
@@ -170,8 +173,6 @@
               <div 
                 class="status-indicator" 
                 :class="row.is_active ? 'active' : 'inactive'"
-                @click="handleStatusChange(row)"
-                title="点击切换状态"
               ></div>
             </template>
           </el-table-column>
@@ -282,6 +283,35 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- Import Dialog -->
+    <el-dialog
+       v-model="importDialogVisible"
+       title="批量导入用户"
+       width="500px"
+       align-center
+    >
+      <div style="text-align: center; margin-bottom: 20px;">
+          <p style="color: #64748b; margin-bottom: 12px;">请先下载模板，填写后再上传</p>
+          <el-button type="primary" link @click="downloadTemplate">
+             <el-icon style="margin-right: 4px"><Download /></el-icon> 下载导入模板
+          </el-button>
+      </div>
+      
+      <el-upload
+        class="upload-demo"
+        drag
+        action="#"
+        :http-request="handleImport"
+        :show-file-list="false"
+        accept=".xlsx"
+      >
+        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+        <div class="el-upload__text">
+           将 Excel 文件拖到此处，或 <em>点击上传</em>
+        </div>
+      </el-upload>
+    </el-dialog>
   </div>
 </template>
 
@@ -289,7 +319,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { 
   User, UserFilled, DataLine, Trophy, 
-  Search, Plus, 
+  Search, Plus, Upload, Download, UploadFilled,
   Top, Bottom, EditPen, Delete,
   Fold, Expand, View, Hide
 } from '@element-plus/icons-vue'
@@ -351,18 +381,30 @@ const getAvatarColor = (name) => {
 }
 
 // District Badges
+// District Badges (Auto-generated consistent colors)
 const getDistrictStyle = (name) => {
-    if(!name) return {}
-    const map = {
-        '市辖区': { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' }, // Slate
-        '高新区': { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe' }, // Blue
-        '呈贡区': { bg: '#fff7ed', text: '#ea580c', border: '#fed7aa' }, // Orange
-        '盘龙区': { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0' }, // Green
-        '官渡区': { bg: '#fdf4ff', text: '#c026d3', border: '#f0abfc' }, // Fuchsia
-        '西山区': { bg: '#faf5ff', text: '#7c3aed', border: '#ddd6fe' }, // Violet
-        '五华区': { bg: '#ecfeff', text: '#0891b2', border: '#a5f3fc' }, // Cyan
+    if(!name) return { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0' }
+    
+    // Palette of themes (bg, text, border)
+    const themes = [
+        { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe' }, // Blue
+        { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0' }, // Green
+        { bg: '#fff7ed', text: '#ea580c', border: '#fed7aa' }, // Orange
+        { bg: '#fdf4ff', text: '#c026d3', border: '#f0abfc' }, // Fuchsia
+        { bg: '#faf5ff', text: '#7c3aed', border: '#ddd6fe' }, // Violet
+        { bg: '#ecfeff', text: '#0891b2', border: '#a5f3fc' }, // Cyan
+        { bg: '#fff1f2', text: '#e11d48', border: '#fecdd3' }, // Rose
+        { bg: '#fefce8', text: '#ca8a04', border: '#fef08a' }, // Yellow
+        { bg: '#f5f3ff', text: '#7c3aed', border: '#ddd6fe' }, // Indigo
+    ]
+    
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash)
     }
-    return map[name] || { bg: '#f8fafc', text: '#64748b', border: '#e2e8f0' }
+    
+    const index = Math.abs(hash) % themes.length
+    return themes[index]
 }
 
 const maskPhone = (phone) => {
@@ -441,6 +483,30 @@ const handleStatusFilter = (val) => {
 const handlePageChange = (val) => {
     currentPage.value = val
     fetchUsers()
+}
+
+// --- Import ---
+const importDialogVisible = ref(false)
+
+const downloadTemplate = () => {
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/users/template`
+}
+
+const handleImport = async (options) => {
+    const formData = new FormData()
+    formData.append('file', options.file)
+    
+    try {
+        const res = await request.post('/users/import', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        ElMessage.success(res.message || '导入成功')
+        importDialogVisible.value = false
+        fetchUsers()
+        fetchStats()
+    } catch (error) {
+        ElMessage.error('导入失败，请检查文件格式')
+    }
 }
 
 // --- Form ---

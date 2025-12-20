@@ -1,13 +1,14 @@
+import os
 from sqlmodel import SQLModel, create_engine, Session
 
-# 定义 SQLite 数据库文件名
-sqlite_file_name = "database.db"
-# 构造数据库连接 URL
+# Define SQLite database path relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sqlite_file_name = os.path.join(BASE_DIR, "database.db")
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
-# 配置连接参数: check_same_thread=False 是为了让 SQLite 可以在多线程环境下使用 (FastAPI 是多线程的)
+# Configuration: check_same_thread=False for multithreading (FastAPI)
 connect_args = {"check_same_thread": False}
-# 创建数据库引擎
+# Create Engine
 engine = create_engine(sqlite_url, connect_args=connect_args)
 
 def create_db_and_tables():
