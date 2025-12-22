@@ -14,21 +14,43 @@ import androidx.navigation.compose.rememberNavController
 import com.example.paperlessmeeting.ui.screens.home.HomeScreen
 import com.example.paperlessmeeting.ui.theme.PaperlessMeetingTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge() // Prepare for edge-to-edge
+        enableEdgeToEdge()
         setContent {
             PaperlessMeetingTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                   com.example.paperlessmeeting.ui.screens.MainScreen()
-                }
+                AppRoot()
             }
+        }
+    }
+}
+
+@Composable
+fun AppRoot() {
+    // Simple authentication state management
+    // In a real app, use DataStore or SessionManager
+    var isLoggedIn by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        if (isLoggedIn) {
+            com.example.paperlessmeeting.ui.screens.MainScreen()
+        } else {
+            com.example.paperlessmeeting.ui.screens.login.LoginScreen(
+                onLoginSuccess = {
+                    isLoggedIn = true
+                }
+            )
         }
     }
 }

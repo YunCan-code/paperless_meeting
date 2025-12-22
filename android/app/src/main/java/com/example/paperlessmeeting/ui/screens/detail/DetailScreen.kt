@@ -218,7 +218,7 @@ fun MeetingDetailContent(
             
             if (!meeting.attachments.isNullOrEmpty()) {
                 meeting.attachments.forEach { file ->
-                    val fullUrl = "http://10.0.2.2:8000/static/${file.filename}"
+                    val fullUrl = "https://coso.top/static/${file.filename}"
                     FileItem(
                         name = file.displayName, 
                         size = formatFileSize(file.fileSize),

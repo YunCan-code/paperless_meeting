@@ -16,7 +16,7 @@ object AppModule {
     @Singleton
     fun provideRetrofit(): retrofit2.Retrofit {
         return retrofit2.Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:8000/")
+            .baseUrl("https://coso.top/api/")
             .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
             .build()
     }

@@ -6,6 +6,11 @@
         <el-icon class="logo-icon"><Lightning /></el-icon>
         <span class="logo-text">无纸化会议系统</span>
       </div>
+      
+      <a href="https://komari.coso.top" target="_blank" class="probe-link">
+        <el-icon class="link-icon"><Connection /></el-icon>
+        VPS 探针
+      </a>
 
     </nav>
 
@@ -161,6 +166,27 @@ const androidImages = [
 .logo-icon {
   color: #22d3ee;
   font-size: 28px;
+}
+.probe-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.05);
+}
+.probe-link:hover {
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, 0.3);
+  background: rgba(34, 211, 238, 0.1);
+}
+.link-icon {
+  font-size: 16px;
 }
 .nav-links {
   display: flex;

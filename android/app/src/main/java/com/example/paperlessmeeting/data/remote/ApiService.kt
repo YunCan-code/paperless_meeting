@@ -13,4 +13,7 @@ interface ApiService {
     @retrofit2.http.Streaming
     @GET
     suspend fun downloadFile(@retrofit2.http.Url url: String): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("auth/login")
+    suspend fun login(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse
 }

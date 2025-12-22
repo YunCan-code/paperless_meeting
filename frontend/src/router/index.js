@@ -39,6 +39,21 @@ const router = createRouter({
                     component: () => import('../views/Admin/FollowUp.vue')
                 }
             ]
+        },
+        {
+            path: '/mobile',
+            name: 'mobile',
+            redirect: '/mobile/login',
+            children: [
+                {
+                    path: 'login',
+                    component: () => import('../views/Mobile/Login.vue')
+                },
+                {
+                    path: 'home',
+                    component: () => import('../views/Mobile/Home.vue')
+                }
+            ]
         }
     ]
 })

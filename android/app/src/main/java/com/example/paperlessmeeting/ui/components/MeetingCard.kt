@@ -53,6 +53,8 @@ fun MeetingCard(
                         isPressed = true
                         tryAwaitRelease()
                         isPressed = false
+                    },
+                    onTap = {
                         onClick()
                     }
                 )
