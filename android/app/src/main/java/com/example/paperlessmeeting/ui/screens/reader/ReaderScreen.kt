@@ -12,6 +12,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -313,9 +315,9 @@ fun PDFViewerContent(
     isHorizontalScroll: Boolean,
     isAnnotationMode: Boolean,
     currentPage: Int,
-    isProgrammaticScroll: Boolean, // New Parameter
+    isProgrammaticScroll: Boolean, 
     currentStrokeColor: Int,
-    annotations: List<AnnotationLine>,
+    annotations: List<AnnotationLine>, // Coordinates in PDF Page % (0-1)
     onPageChange: (Int, Int) -> Unit,
     onTap: () -> Unit,
     onAnnotationAdded: (AnnotationLine) -> Unit,
@@ -324,37 +326,48 @@ fun PDFViewerContent(
 ) {
     // Shared State for PDF View Ref
     var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
-    // Temporary points for current stroke
-    val currentPoints = remember { mutableStateListOf<PointFCompat>() }
+    
+    // Fix Stale Closure: Always access latest annotations in onDraw
+    val currentAnnotations by rememberUpdatedState(annotations)
+    
+    // LAYER 2: Real-time Drawing State (Screen Coordinates)
+    val currentStrokePath = remember { mutableStateListOf<Pair<Float, Float>>() }
 
     Box(modifier = modifier) {
+        // -------------------------------------------------------------------------
+        // LAYER 1: PDF View (Bottom) - Renders PDF content + Saved Annotations
+        // -------------------------------------------------------------------------
         AndroidView(
             factory = { context ->
                 PDFView(context, null).apply {
                     pdfViewRef = this
-                    // Minimalist default styling
-                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null) // Hardware Acceleration
+                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     setBackgroundColor(if(isNightMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
                 }
             },
             modifier = Modifier.fillMaxSize(),
             update = { pdfView ->
-                // Configuration Key Logic to prevent unnecessary reloads
-                val configKey = "${file.absolutePath}_${isNightMode}_${isHorizontalScroll}_${isAnnotationMode}"
+                // Fix Flicker: Only reload if file/nightmode changes.
+                // Switching annotation mode should NOT trigger reload.
+                val configKey = "${file.absolutePath}_${isNightMode}" 
+                
+                // Note: We handle scroll direction changes separately if needed, 
+                // but usually that requires a full reload. 
+                // For now, minimal keys to prevent flicker.
                 
                 if (pdfView.tag != configKey) {
                     pdfView.tag = configKey
                     pdfView.fromFile(file)
                         .defaultPage(currentPage)
-                        .enableSwipe(!isAnnotationMode)
+                        .enableSwipe(true) // Always enable swipe in View (we intercept touch above if needed)
                         .swipeHorizontal(isHorizontalScroll)
-                        .pageSnap(false) // Disable snap for smooth scrolling
-                        .autoSpacing(false) // Disable auto spacing to prevent muddy scroll
+                        .pageSnap(false)
+                        .autoSpacing(false) 
                         .pageFling(true)
-                        .fitEachPage(false) // Allow free scrolling
+                        .fitEachPage(false)
                         .nightMode(isNightMode)
                         .enableAnnotationRendering(true)
-                        .enableAntialiasing(true) // Ensure text clarity as requested
+                        .enableAntialiasing(true)
                         .spacing(10)
                         .onPageChange { page, count -> 
                              if (page != currentPage) {
@@ -363,13 +376,13 @@ fun PDFViewerContent(
                         }
                         .onLoad { nbPages ->
                              onLoadToc(flattenBookmarks(pdfView.tableOfContents))
-                             onPageChange(pdfView.currentPage, nbPages)
+                             // Do not force jump on load to preserve state if just styling changed
                         }
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
-                             // ... (Drawing logic remains same, implicit here or preserved)
-                             // Optimization: Moved Paint/Path allocs out where possible, or use simplified logic
-                             // 1. Draw Saved Annotations
-                             annotations.forEach { line ->
+                             // Render Saved Annotations (PDF Coordinates -> View Coordinates)
+                             // Logic: The points are 0-1 relative to page.
+                             // Canvas here is already transformed to the page's local space.
+                             currentAnnotations.forEach { line ->
                                  if (line.pageIndex == pageIdx) {
                                      val paint = Paint().apply {
                                          color = line.color
@@ -391,25 +404,6 @@ fun PDFViewerContent(
                                      }
                                  }
                              }
-                             // 2. Draw Live Stroke
-                             if (isAnnotationMode && currentPoints.isNotEmpty() && currentPage == pageIdx) {
-                                  val paint = Paint().apply {
-                                      color = currentStrokeColor
-                                      strokeWidth = 5f
-                                      style = Paint.Style.STROKE
-                                      isAntiAlias = true
-                                      strokeCap = Paint.Cap.ROUND
-                                      strokeJoin = Paint.Join.ROUND
-                                  }
-                                  val path = Path()
-                                  val start = currentPoints[0]
-                                  path.moveTo(start.x * pageWidth, start.y * pageHeight)
-                                  for (i in 1 until currentPoints.size) {
-                                      val p = currentPoints[i]
-                                      path.lineTo(p.x * pageWidth, p.y * pageHeight)
-                                  }
-                                  canvas.drawPath(path, paint)
-                             }
                         }
                         .onTap { 
                             onTap()
@@ -420,8 +414,7 @@ fun PDFViewerContent(
             }
         )
 
-        // Sync Jump Logic - Moved via LaunchedEffect to avoid 'update' loop conflicts
-        // Sync Jump Logic - Only jump if the change was programmatic (TOC, Slider, etc.)
+        // Sync Jump Logic
         LaunchedEffect(currentPage, isProgrammaticScroll) {
              pdfViewRef?.let { v ->
                  if (isProgrammaticScroll && v.currentPage != currentPage) {
@@ -430,78 +423,167 @@ fun PDFViewerContent(
              }
         }
 
-
-
-        // Overlay for Drawing Input
+        // -------------------------------------------------------------------------
+        // LAYER 2: Gesture Interceptor & Real-time Canvas (Top)
+        // -------------------------------------------------------------------------
         if (isAnnotationMode) {
-             Box(
+             // 1. Transparent Canvas for Drawing
+             androidx.compose.foundation.Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInteropFilter { event ->
-                        val v = pdfViewRef ?: return@pointerInteropFilter false
-                        val viewWidth = v.width.toFloat()
-                        val viewHeight = v.height.toFloat()
-                        val pageSize = v.getPageSize(currentPage)
-                        
-                        // Only draw if page size is valid
-                        if (pageSize != null && pageSize.width > 0) {
-                             val pageW = pageSize.width.toFloat()
-                             val pageH = pageSize.height.toFloat()
-                             
-                             // Calculate Aspect Fit Projection
-                             val viewRatio = viewWidth / viewHeight
-                             val pageRatio = pageW / pageH
-                             var renderedW = viewWidth
-                             var renderedH = viewHeight
-                             var offsetX = 0f
-                             var offsetY = 0f
-
-                             if (pageRatio > viewRatio) {
-                                  renderedH = viewWidth / pageRatio
-                                  offsetY = (viewHeight - renderedH) / 2f
-                             } else {
-                                  renderedW = viewHeight * pageRatio
-                                  offsetX = (viewWidth - renderedW) / 2f
-                             }
-
-                             // Normalize Touch
-                             val localX = event.x - offsetX
-                             val localY = event.y - offsetY
-                             val xRatio = (localX / renderedW).coerceIn(0f, 1f)
-                             val yRatio = (localY / renderedH).coerceIn(0f, 1f)
-
-                             when (event.action) {
-                                 MotionEvent.ACTION_DOWN -> {
-                                     currentPoints.clear()
-                                     currentPoints.add(PointFCompat(xRatio, yRatio))
-                                     v.invalidate()
-                                     true
-                                 }
-                                 MotionEvent.ACTION_MOVE -> {
-                                     currentPoints.add(PointFCompat(xRatio, yRatio))
-                                     v.invalidate()
-                                     true
-                                 }
-                                 MotionEvent.ACTION_UP -> {
-                                     currentPoints.add(PointFCompat(xRatio, yRatio))
-                                     val newLine = AnnotationLine(
-                                         pageIndex = currentPage,
-                                         points = currentPoints.toList(),
-                                         color = currentStrokeColor,
-                                         strokeWidth = 5f
-                                     )
-                                     onAnnotationAdded(newLine)
-                                     currentPoints.clear()
-                                     v.invalidate()
-                                     true
-                                 }
-                                 else -> true
-                             }
-                        } else false
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                currentStrokePath.clear()
+                                currentStrokePath.add(offset.x to offset.y)
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                currentStrokePath.add(change.position.x to change.position.y)
+                            },
+                            onDragEnd = {
+                                // Convert Screen Coords -> PDF Page Coords
+                                pdfViewRef?.let { v ->
+                                    // Robustly determine which page received the stroke
+                                    // Use the first point to identify the target page
+                                    val startX = currentStrokePath.firstOrNull()?.first ?: 0f
+                                    val startY = currentStrokePath.firstOrNull()?.second ?: 0f
+                                    
+                                    val pageResult = findPageAndMapPoint(v, startX, startY)
+                                    
+                                    if (pageResult != null) {
+                                        val (targetPageIdx, _) = pageResult
+                                        
+                                        // Map all points to this target page
+                                        val mappedPoints = currentStrokePath.mapNotNull { (sx, sy) ->
+                                             // We force map to the identified page to keep the stroke continuous
+                                             convertScreenPointToPdfPoint(v, sx, sy, targetPageIdx)
+                                        }
+                                        
+                                        if (mappedPoints.isNotEmpty()) {
+                                            val newLine = AnnotationLine(
+                                                pageIndex = targetPageIdx,
+                                                points = mappedPoints,
+                                                color = currentStrokeColor,
+                                                strokeWidth = 5f
+                                            )
+                                            onAnnotationAdded(newLine)
+                                            currentStrokePath.clear()
+                                            v.invalidate()
+                                        }
+                                    }
+                                }
+                            }
+                        )
                     }
-             )
+             ) {
+                 // Draw the temporary stroke (Screen Coordinates)
+                 if (currentStrokePath.isNotEmpty()) {
+                     val path = androidx.compose.ui.graphics.Path().apply {
+                         moveTo(currentStrokePath.first().first, currentStrokePath.first().second)
+                         for (i in 1 until currentStrokePath.size) {
+                             lineTo(currentStrokePath[i].first, currentStrokePath[i].second)
+                         }
+                     }
+                     drawPath(
+                         path = path,
+                         color = Color(currentStrokeColor), // Compose Color
+                         style = androidx.compose.ui.graphics.drawscope.Stroke(
+                             width = 5.dp.toPx(),
+                             cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                             join = androidx.compose.ui.graphics.StrokeJoin.Round
+                         )
+                     )
+                 }
+             }
         }
     }
+}
+
+// Result Wrapper
+data class PageMapResult(val pageIndex: Int, val point: PointFCompat)
+
+// Helper: Find which page is at the screen coordinate and map the point
+fun findPageAndMapPoint(view: PDFView, screenX: Float, screenY: Float): PageMapResult? {
+    val zoom = view.zoom
+    val currentYOffset = view.currentYOffset // Typically negative
+    val spacingPx = 10f * zoom // Spacing scales with zoom? usually yes in this lib.
+    
+    // Global Y in the Document View (from top of Page 0)
+    // view (0,0) is at (currentXOffset, currentYOffset) relative to Document (0,0)
+    // So ScreenY = DocY * Zoom + currentYOffset
+    // DocY * Zoom = ScreenY - currentYOffset
+    // We work in "Zoomed Document Space" (View Pixels relative to Doc Top)
+    val touchYInDoc = screenY - currentYOffset
+    
+    var accumulatedHeight = 0f
+    
+    // Optimization: Check visible range instead of 0..count
+    // But safely, 0..count is fine for <100 pages.
+    for (i in 0 until view.pageCount) {
+        val pageSize = view.getPageSize(i) ?: continue
+        val pageH = pageSize.height.toFloat() * zoom
+        val pageW = pageSize.width.toFloat() * zoom
+        
+        // Check if Y falls within this page
+        // Page Interval: [accumulatedHeight, accumulatedHeight + pageH]
+        if (touchYInDoc >= accumulatedHeight && touchYInDoc <= accumulatedHeight + pageH) {
+             // Found the page!
+             // Map X and Y
+             val offsetX = (screenX - view.currentXOffset) // Global X in View Pixels
+             // Note: For X, we assume single column, or we just normalize relative to page width
+             
+             val localY = touchYInDoc - accumulatedHeight
+             
+             return PageMapResult(
+                 pageIndex = i,
+                 point = PointFCompat(
+                     x = (offsetX / pageW).coerceIn(0f, 1f),
+                     y = (localY / pageH).coerceIn(0f, 1f)
+                 )
+             )
+        }
+        
+        accumulatedHeight += pageH + spacingPx
+    }
+    return null
+}
+
+// Helper: Convert Screen (View) Coordinates to PDF Page Normalized Coordinates (0-1)
+// Heavily used for mapping the rest of the stroke once page is found
+fun convertScreenPointToPdfPoint(
+    view: PDFView, 
+    screenX: Float, 
+    screenY: Float, 
+    pageIndex: Int
+): PointFCompat? {
+    val zoom = view.zoom
+    val currentYOffset = view.currentYOffset
+    val spacingPx = 10f * zoom
+    
+    // Recalculate Offset for this specific page
+    // (Inefficient but robust state-less approach)
+    var accumulatedHeight = 0f
+    for (i in 0 until pageIndex) {
+        val size = view.getPageSize(i)
+        if (size != null) {
+            accumulatedHeight += (size.height.toFloat() * zoom) + spacingPx
+        }
+    }
+    
+    val touchYInDoc = screenY - currentYOffset
+    val pageH = (view.getPageSize(pageIndex)?.height ?: 0).toFloat() * zoom
+    val pageW = (view.getPageSize(pageIndex)?.width ?: 0).toFloat() * zoom
+    
+    if (pageW <= 0f || pageH <= 0f) return null
+    
+    val localY = touchYInDoc - accumulatedHeight
+    val offsetX = screenX - view.currentXOffset
+    
+    return PointFCompat(
+        x = (offsetX / pageW).coerceIn(0f, 1f),
+        y = (localY / pageH).coerceIn(0f, 1f)
+    )
 }
 
 @Composable
