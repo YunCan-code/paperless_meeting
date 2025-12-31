@@ -350,9 +350,10 @@ fun PDFViewerContent(
                         .pageSnap(false) // Disable snap for smooth scrolling
                         .autoSpacing(true) 
                         .pageFling(true)
-                        .fitEachPage(true)
+                        .fitEachPage(false) // Allow free scrolling
                         .nightMode(isNightMode)
                         .enableAnnotationRendering(true)
+                        .enableAntialiasing(true) // Ensure text clarity as requested
                         .spacing(10)
                         .onPageChange { page, count -> 
                              if (page != currentPage) {

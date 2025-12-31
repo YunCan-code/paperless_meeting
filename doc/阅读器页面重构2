@@ -187,7 +187,7 @@ fun PDFViewerContent(
                     .pageSnap(true)        // 自动对齐单页
                     .autoSpacing(true)     // 自动添加页间距
                     .pageFling(true)
-                    .fitEachPage(true)     // 确保每一页都完整显示
+                    .fitEachPage(false)     // 确保每一页都完整显示
                     .spacing(10)           // 页与页之间的空隙
                     .onPageChange { page, count ->
                         onPageChange(page, count)
