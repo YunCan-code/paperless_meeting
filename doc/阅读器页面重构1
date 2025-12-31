@@ -1,0 +1,70 @@
+“极简沉浸风格”的核心在于“退让”——UI 应该退居幕后，把舞台完全交给内容，同时在用户需要交互时提供丝滑、无压力的体验。
+
+以下为您准备了两部分内容：
+
+AI 绘画提示词（Prompt）：你可以直接复制去生成概念图。
+
+详细的设计描述文档：如果你需要把这个想法传达给开发人员或 UI 设计师，这段描述能清晰地解释每一个细节的设计逻辑。
+
+1. AI 绘画提示词 (Midjourney / Stable Diffusion)
+这组提示词强调悬浮感、毛玻璃效果、纸张质感和留白。
+
+Prompt: High-fidelity UI/UX design of a minimalist PDF reader app on Android, light mode. Core Concept: "Digital Paper" aesthetic. Background: A warm, soft cream-colored paper texture (#F9F7F1), plenty of white space padding around the text. Typography: Elegant serif font (like Merriweather), perfectly legible black text. UI Elements: No heavy navigation bars. Top: Completely transparent header, floating "Back" chevron icon (thin grey line) on the left, subtle chapter title in the center. Bottom: A floating glassmorphism capsule (pill-shaped) centered near the bottom, slightly elevated from the edge. The capsule contains minimal line-art icons: a refined progress slider, a pen tool, and a grid menu. Soft drop shadows under the floating capsule to create depth. Vibe: Zen, clutter-free, airy, Dribbble award-winning style, super clean interface. --ar 9:16 --v 6.0 --q 2
+
+2. 详细设计描述 (Design Blueprint)
+如果 AI 生成了图片，或者你需要向他人描述这个“极简沉浸”方案，请参考以下细节：
+
+A. 顶部区域：隐形与克制
+目前的痛点是黑色横条太压抑，且文件名包含后缀（.pdf）显得很像“文件管理器”而不是“书”。
+
+去背与悬浮： 彻底移除顶部的黑色背景条。顶部按钮直接浮在纸张背景上。
+
+智能标题：
+
+移除后缀： 强制通过代码截断 .pdf、.epub 后缀。
+
+重命名逻辑： 如果书名过长（超过15个字），显示“书名...”，或者优先显示当前的“章节名称”（如：第一卷：算术）。
+
+淡化处理： 标题字号要小（如 14sp），颜色使用中灰色而非纯黑，减少对阅读视线的抢夺。
+
+交互： 向上滑动页面阅读时，顶部所有元素（返回键、标题）自动淡出隐藏，实现 100% 全屏阅读。
+
+B. 阅读区域：纸的呼吸感
+目前的痛点是文字边距太窄，看着累。
+
+拟真背景： 抛弃死板的纯白色（#FFFFFF），改用米白色/羊皮纸色（例如 #FBF9F5 或 #F2EFE9）。这能极大降低长时间阅读的眼睛疲劳。
+
+黄金版心： 增加左右边距（Padding）。手机竖屏时，左右至少留出 24dp 到 32dp 的空白，让文字块居中，形成“版心”，增加高级感。
+
+字体优化： 中文推荐使用 Source Han Serif (思源宋体) 或 Noto Serif CJK，字重设为 Regular，行间距设为 1.6 倍到 1.8 倍。
+
+C. 底部区域：悬浮岛 (Floating Capsule)
+这是设计的核心亮点，用以取代底部那个厚重的黑条。
+
+形态： 一个圆角极大的长条形容器（Capsule/Pill shape），悬浮在距离屏幕底部 30dp 的位置，不贴边。
+
+材质： 采用 高斯模糊（Frosted Glass / Glassmorphism） 效果。半透明的白色背景，带有轻微的投影（Drop Shadow），让它看起来像是浮在文字上方。
+
+功能整合：
+
+进度条： 不再是单独的一行，而是整合在胶囊的上方边缘，或者作为胶囊内部的一条细线。
+
+图标： 仅保留 4 个核心图标，使用细线条风格（无填充）：
+
+目录 (三横线)
+
+手写/标注 (一支笔)
+
+夜间/显示设置 (字母 "Aa" 或 月亮)
+
+概览/缩略图 (四方格)
+
+翻页逻辑： 依然保留左右点击/滑动翻页，但不需要显性的按钮。
+
+D. 交互微动效 (Micro-interactions)
+唤起方式： 点击屏幕正中央的空白区域，顶部的标题和底部的悬浮岛同时配合淡入 + 轻微位移的动画出现。
+
+拖拽进度： 当手指按住进度条拖动时，手指上方出现一个放大的气泡预览图，显示当前页码和大致内容。
+
+总结画面想象
+想象一下，你拿着一块干净的玻璃，玻璃下面是一张质感温润的纸。 你不需要看到任何按钮，映入眼帘的只有排版精美的文字。 当你需要翻页或做笔记时，轻轻一点，一个像灵动岛一样的精致小长条浮现在底部，操作完后又悄然消失。

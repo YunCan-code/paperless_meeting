@@ -1,0 +1,329 @@
+你现有的代码结构清晰（使用了 Hilt, ViewModel, Compose），这为我们改造 UI 打下了很好的基础。
+
+要实现“极简沉浸风格 (Modern Minimalist & Immersive)”，我们需要重点改造 ReaderScreen.kt 中的 Scaffold 内容，用自定义的悬浮组件替换掉原本厚重的 TopAppBar 和简单的底部页码。
+
+以下是具体的代码修改方案。
+
+1. 准备工作：定义“纸张”配色与样式
+首先，我们需要定义这套“护眼纸张”风格的颜色。你可以直接在 ReaderScreen.kt 文件顶部定义，或者放进 Color.kt。
+
+Kotlin
+
+// 在 ReaderScreen.kt 顶部或 Color.kt 中添加
+val PaperBackground = Color(0xFFF9F7F1) // 暖调米白/羊皮纸色
+val InkText = Color(0xFF2C2C2C)       // 像墨水一样的深灰，不是纯黑
+val SubtleGrey = Color(0xFF888888)    // 用于非重要图标
+val FloatingSurface = Color.White.copy(alpha = 0.9f) // 悬浮岛背景（类毛玻璃）
+2. 核心重构：ReaderScreen.kt
+我为你重写了 ReaderScreen。主要改动点如下：
+
+去掉了 Scaffold 的 topBar：改为在 Box 内部使用自定义的 Row，实现完全透明悬浮。
+
+底部悬浮岛 (Floating Capsule)：用一个圆角的 Surface 替代了原来的文字，里面整合了进度条和功能按钮。
+
+文件名处理：增加了去除后缀的逻辑。
+
+PDFView 优化：增加了页间距 (spacing) 和背景色设置，让它看起来更像翻书。
+
+Kotlin
+
+package com.example.paperlessmeeting.ui.screens.reader
+
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.github.barteksc.pdfviewer.PDFView
+import com.github.barteksc.pdfviewer.util.FitPolicy
+import java.io.File
+
+// 定义极简风格颜色
+private val PaperBackground = Color(0xFFF9F7F1)
+private val InkText = Color(0xFF2C2C2C)
+private val IconGrey = Color(0xFF5F6368)
+
+@Composable
+fun ReaderScreen(
+    meetingId: Int,
+    attachmentId: Int,
+    downloadUrl: String,
+    fileName: String,
+    navController: NavController,
+    viewModel: ReaderViewModel = hiltViewModel()
+) {
+    LaunchedEffect(downloadUrl) {
+        viewModel.loadDocument(downloadUrl, fileName)
+    }
+
+    val uiState by viewModel.uiState.collectAsState()
+    
+    // 状态管理
+    var showOverlay by remember { mutableStateOf(true) } // 控制菜单显示/隐藏
+    var currentPage by remember { mutableIntStateOf(0) }
+    var totalPages by remember { mutableIntStateOf(0) }
+
+    // 处理文件名：移除后缀 (.pdf, .doc 等)
+    val cleanTitle = remember(fileName) {
+        fileName.substringBeforeLast(".")
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PaperBackground) // 1. 全局背景色
+    ) {
+        when (val state = uiState) {
+            is ReaderUiState.Loading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = InkText
+                )
+            }
+            is ReaderUiState.Error -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "无法加载文件", color = InkText)
+                    Text(text = state.message, color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            is ReaderUiState.Ready -> {
+                // 2. PDF 阅读器主体
+                PDFViewerContent(
+                    file = state.file,
+                    modifier = Modifier.fillMaxSize(),
+                    onPageChange = { page, count ->
+                        currentPage = page
+                        totalPages = count
+                    },
+                    onTap = {
+                        showOverlay = !showOverlay // 点击中心切换沉浸模式
+                    }
+                )
+
+                // 3. 顶部沉浸式标题栏 (Top Bar)
+                AnimatedVisibility(
+                    visible = showOverlay,
+                    enter = fadeIn() + slideInVertically { -it },
+                    exit = fadeOut() + slideOutVertically { -it },
+                    modifier = Modifier.align(Alignment.TopCenter)
+                ) {
+                    MinimalistTopBar(
+                        title = cleanTitle,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                // 4. 底部悬浮岛 (Floating Capsule)
+                AnimatedVisibility(
+                    visible = showOverlay,
+                    enter = fadeIn() + slideInVertically { it },
+                    exit = fadeOut() + slideOutVertically { it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp) // 距离底部留出呼吸感
+                ) {
+                    FloatingControlCapsule(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        onGridClick = { /* TODO: 打开大纲 */ },
+                        onPenClick = { /* TODO: 开启批注 */ },
+                        onSettingsClick = { /* TODO: 字体/亮度 */ }
+                    )
+                }
+            }
+            else -> {}
+        }
+    }
+}
+
+// --- 子组件拆分 ---
+
+@Composable
+fun PDFViewerContent(
+    file: File,
+    modifier: Modifier,
+    onPageChange: (Int, Int) -> Unit,
+    onTap: () -> Unit
+) {
+    AndroidView(
+        factory = { context ->
+            PDFView(context, null).apply {
+                setBackgroundColor(android.graphics.Color.WHITE) // PDF 自身的背景
+            }
+        },
+        modifier = modifier,
+        update = { pdfView ->
+            // 防止重复加载
+            if (pdfView.pageCount == 0) { 
+                pdfView.fromFile(file)
+                    .defaultPage(0)
+                    .enableSwipe(true)
+                    .swipeHorizontal(true) // 像书一样左右翻页
+                    .pageSnap(true)        // 自动对齐单页
+                    .autoSpacing(true)     // 自动添加页间距
+                    .pageFling(true)
+                    .fitEachPage(true)     // 确保每一页都完整显示
+                    .spacing(10)           // 页与页之间的空隙
+                    .onPageChange { page, count ->
+                        onPageChange(page, count)
+                    }
+                    .onTap { 
+                        onTap()
+                        true 
+                    }
+                    .load()
+            }
+        }
+    )
+}
+
+@Composable
+fun MinimalistTopBar(
+    title: String,
+    onBackClick: () -> Unit
+) {
+    // 顶部只有返回键和标题，没有背景色，完全悬浮
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding() // 避开状态栏
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBackClick) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = InkText.copy(alpha = 0.8f) // 深灰色图标
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.Serif, // 使用衬线体增加书卷气
+                fontWeight = FontWeight.Medium
+            ),
+            color = InkText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f) // 标题占据剩余空间
+        )
+    }
+}
+
+@Composable
+fun FloatingControlCapsule(
+    currentPage: Int,
+    totalPages: Int,
+    onGridClick: () -> Unit,
+    onPenClick: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.95f), // 极轻微的透明白
+        shape = RoundedCornerShape(50), // 完整的胶囊圆角
+        shadowElevation = 8.dp, // 柔和的阴影
+        modifier = Modifier
+            .height(64.dp) // 胶囊高度
+            .widthIn(min = 280.dp, max = 360.dp) // 限制宽度，不要铺满屏幕
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // 1. 进度指示 (文本形式，比进度条更精确简约)
+            Text(
+                text = "${currentPage + 1} / $totalPages",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFeatureSettings = "tnum" // 表格数字等宽
+                ),
+                color = IconGrey,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+
+            // 垂直分割线
+            VerticalDivider(
+                modifier = Modifier.height(24.dp),
+                color = Color.LightGray
+            )
+
+            // 2. 功能按钮区
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = onGridClick) {
+                    Icon(Icons.Default.GridView, contentDescription = "大纲", tint = IconGrey)
+                }
+                IconButton(onClick = onPenClick) {
+                    Icon(Icons.Default.Edit, contentDescription = "批注", tint = IconGrey)
+                }
+                IconButton(onClick = onSettingsClick) {
+                    Icon(Icons.Default.Settings, contentDescription = "设置", tint = IconGrey)
+                }
+            }
+        }
+    }
+}
+3. 代码中的设计细节解析
+为了达到你想要的“优化空间”，我在代码里做了这些特定的调整：
+
+Typography (字体):
+
+fontFamily = FontFamily.Serif：在顶部标题使用了衬线体（类似 Times New Roman），这会立刻给应用带来“阅读器”而非“工具软件”的高级感。
+
+Color Palette (配色):
+
+背景不再是 Color.Black，而是 Color(0xFFF9F7F1) (暖白)。
+
+图标不再是刺眼的纯黑，而是 Color(0xFF5F6368) (深灰)。
+
+这符合“护眼”和“纸张质感”的 Prompt 要求。
+
+Component Shape (形状):
+
+底部不再是一条横贯屏幕的黑条，而是一个 Surface + RoundedCornerShape(50)。这就是所谓的“灵动岛”或“胶囊”设计，它悬浮在内容之上，让界面看起来非常通透。
+
+Layout Logic (布局):
+
+TopAppBar 被移除，取而代之的是 MinimalistTopBar。它没有背景色 (ContainerColor)，这意味着当你在第一页下拉时，文字是浮在纸张背景上的，非常干净。
+
+文件名通过 fileName.substringBeforeLast(".") 自动去除了丑陋的 .pdf 后缀。
+
+4. 下一步建议
+添加依赖: 确保你项目里有 Material Icons Extended 依赖，因为我用到了 Icons.AutoMirrored.Filled.ArrowBack 等图标。
+
+Kotlin
+
+implementation("androidx.compose.material:material-icons-extended:1.x.x")
+PDF 库的局限性: AndroidPdfViewer 渲染出来的 PDF 页面通常自带白色背景。如果 PDF 本身是扫描版（图片），代码里的 PaperBackground 只能显示在 PDF 页面的边缘（padding 区域）。如果是纯文本 PDF，想改变页面底色需要更底层的修改（如使用 nightMode 并注入颜色过滤器），目前的方案是通过UI 包围感来营造氛围。
