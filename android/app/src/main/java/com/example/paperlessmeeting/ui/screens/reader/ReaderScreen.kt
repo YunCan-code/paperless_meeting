@@ -125,7 +125,7 @@ fun ReaderScreen(
     // --- UI Structure ---
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = !isAnnotationMode,
+        gesturesEnabled = drawerState.isOpen, // Only allow closing via gesture, prevent opening conflict
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = PaperBackground,
@@ -333,6 +333,7 @@ fun PDFViewerContent(
                 PDFView(context, null).apply {
                     pdfViewRef = this
                     // Minimalist default styling
+                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null) // Hardware Acceleration
                     setBackgroundColor(if(isNightMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
                 }
             },
@@ -348,7 +349,7 @@ fun PDFViewerContent(
                         .enableSwipe(!isAnnotationMode)
                         .swipeHorizontal(isHorizontalScroll)
                         .pageSnap(false) // Disable snap for smooth scrolling
-                        .autoSpacing(true) 
+                        .autoSpacing(false) // Disable auto spacing to prevent muddy scroll
                         .pageFling(true)
                         .fitEachPage(false) // Allow free scrolling
                         .nightMode(isNightMode)
@@ -586,7 +587,7 @@ fun FloatingControlCapsule(
                 
                 // 2. Thumbnails (Grid)
                 IconButton(onClick = onGridClick) {
-                    Icon(Icons.Default.GridView, "Thumbnails", tint = IconGrey)
+                    Icon(Icons.Default.Apps, "Thumbnails", tint = IconGrey)
                 }
 
                 // 3. Annotation (Pen)
@@ -599,7 +600,7 @@ fun FloatingControlCapsule(
                 IconButton(onClick = onSettingsClick) {
                     // Using a simple Moon/Sun logic indicator could be better, but sticking to icons
                     Icon(
-                        imageVector = if(isNightMode) Icons.Default.LightMode else Icons.Default.DarkMode, 
+                        imageVector = if(isNightMode) Icons.Default.WbSunny else Icons.Default.NightlightRound, 
                         contentDescription = "Night Mode", 
                         tint = IconGrey
                     )
