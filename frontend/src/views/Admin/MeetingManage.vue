@@ -647,8 +647,20 @@ const handleSubmit = async () => {
 }
 const downloadFile = (file) => {
   if (!file || !file.filename) return
-  const url = `http://127.0.0.1:8000/static/${file.filename}`
-  window.open(url, '_blank')
+  if (!file || !file.filename) return
+  const url = import.meta.env.PROD 
+      ? `https://coso.top/static/${file.filename}` 
+      : `/static/${file.filename}` // Local development uses proxy or relative path
+  // Ideally, use relative path if Nginx is configured correctly.
+  // But since user's VPS setup involves complex Nginx layers, let's use the explicit public domain to be safe, 
+  // or better, use relative path `/static/...` which works if hosted correcty.
+  // Providing the simplest fix: relative URL.
+  // const url = `/static/${file.filename}`
+  // WAIT, Nginx serves /static/ -> backend/static/. 
+  // So accessing https://coso.top/static/file.pdf should work.
+  // So relative path `/static/${file.filename}` is correct.
+  const downloadUrl = `/static/${file.filename}`
+  window.open(downloadUrl, '_blank')
 }
 
 

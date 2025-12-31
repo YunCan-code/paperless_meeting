@@ -1,5 +1,10 @@
 package com.example.paperlessmeeting.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,18 +44,47 @@ fun MainScreen() {
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             // === Navigation Rail (Left) ===
-            NavigationRail(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface
+            // Hide rail when in Reader mode
+            val isReaderScreen = currentDestination?.route?.startsWith("reader") == true
+            
+            AnimatedVisibility(
+                visible = !isReaderScreen,
+                enter = slideInHorizontally() + fadeIn(),
+                exit = slideOutHorizontally() + fadeOut()
             ) {
-                // Top items (Dashboard, Meetings)
-                items.filter { it != Screen.Settings }.forEach { screen ->
+                NavigationRail(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ) {
+                    // Top items (Dashboard, Meetings)
+                    items.filter { it != Screen.Settings }.forEach { screen ->
+                        NavigationRailItem(
+                            icon = { Icon(screen.icon, contentDescription = screen.title) },
+                            label = { Text(screen.title) },
+                            selected = currentDestination?.route == screen.route,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        )
+                    }
+
+                    // Push Settings to bottom
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Bottom item (Settings)
+                    val settingsSchema = Screen.Settings
                     NavigationRailItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                        selected = currentDestination?.route == screen.route,
+                        icon = { Icon(settingsSchema.icon, contentDescription = settingsSchema.title) },
+                        label = { Text(settingsSchema.title) },
+                        selected = currentDestination?.route == settingsSchema.route,
                         onClick = {
-                            navController.navigate(screen.route) {
+                            navController.navigate(settingsSchema.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
@@ -59,28 +93,8 @@ fun MainScreen() {
                             }
                         }
                     )
+                    Spacer(modifier = Modifier.height(16.dp)) // Bottom padding
                 }
-
-                // Push Settings to bottom
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Bottom item (Settings)
-                val settingsSchema = Screen.Settings
-                NavigationRailItem(
-                    icon = { Icon(settingsSchema.icon, contentDescription = settingsSchema.title) },
-                    label = { Text(settingsSchema.title) },
-                    selected = currentDestination?.route == settingsSchema.route,
-                    onClick = {
-                        navController.navigate(settingsSchema.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                )
-                Spacer(modifier = Modifier.height(16.dp)) // Bottom padding
             }
 
             // === Main Content Area (Right) ===

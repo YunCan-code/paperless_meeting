@@ -218,7 +218,9 @@ fun MeetingDetailContent(
             
             if (!meeting.attachments.isNullOrEmpty()) {
                 meeting.attachments.forEach { file ->
-                    val fullUrl = "https://coso.top/static/${file.filename}"
+                    // Fix: URL Encode the filename to handle Chinese characters and spaces
+                    val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
+                    val fullUrl = "https://coso.top/static/$encodedName"
                     FileItem(
                         name = file.displayName, 
                         size = formatFileSize(file.fileSize),

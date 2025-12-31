@@ -1,0 +1,24 @@
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:82:9 Unresolved reference: pdfView
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:82:24 Unresolved reference: configKey
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:83:9 Unresolved reference: pdfView
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:83:17 Variable expected
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:83:23 Unresolved reference: configKey
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:85:9 Unresolved reference: pdfView
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:85:26 Unresolved reference: state
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:86:26 Unresolved reference: currentPage
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:96:21 Unresolved reference: currentPage
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:97:21 Unresolved reference: currentPage
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:99:17 Unresolved reference: totalPages
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:105:9 Unresolved reference: pdfView
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:105:38 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:105:41 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:113:32 Unresolved reference: pdfView
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:113:52 Unresolved reference: currentPage
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:151:33 Unresolved reference: currentPoints
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:152:33 Unresolved reference: currentPoints
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:158:33 Unresolved reference: currentPoints
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:164:33 Unresolved reference: currentPoints
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:166:49 Unresolved reference: currentPage
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:167:46 Unresolved reference: currentPoints
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:172:33 Unresolved reference: currentPoints
+

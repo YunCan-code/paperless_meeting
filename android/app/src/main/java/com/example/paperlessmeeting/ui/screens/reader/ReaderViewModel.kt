@@ -8,9 +8,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 sealed class ReaderUiState {
     object Idle : ReaderUiState()
@@ -52,4 +55,57 @@ class ReaderViewModel @Inject constructor(
             }
         }
     }
+
+    // Annotation Logic
+    private val _annotations = MutableStateFlow<List<AnnotationLine>>(emptyList())
+    val annotations: StateFlow<List<AnnotationLine>> = _annotations.asStateFlow()
+
+    fun loadAnnotations(pdfFile: File) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonFile = File(pdfFile.parent, "${pdfFile.name}.json")
+                if (jsonFile.exists()) {
+                    val jsonString = jsonFile.readText()
+                    val type = object : TypeToken<DocumentAnnotations>() {}.type
+                    val data = Gson().fromJson<DocumentAnnotations>(jsonString, type)
+                    // Ensure we only load lines compatible with current data model
+                    _annotations.value = data.lines
+                } else {
+                    _annotations.value = emptyList()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // In case of error (e.g. malformed JSON), assume empty
+                _annotations.value = emptyList()
+            }
+        }
+    }
+
+    fun saveAnnotations(pdfFile: File) {
+        val currentLines = _annotations.value
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // If empty, maybe delete the file? Or just save empty.
+                // Saving empty is safer to overwrite previous data.
+                val data = DocumentAnnotations(pdfFile.name, currentLines)
+                val jsonString = Gson().toJson(data)
+                val jsonFile = File(pdfFile.parent, "${pdfFile.name}.json")
+                jsonFile.writeText(jsonString)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun addAnnotation(line: AnnotationLine) {
+        // Create new list to trigger flow emission
+        _annotations.value = _annotations.value + line
+    }
+
+    fun undoAnnotation() {
+        if (_annotations.value.isNotEmpty()) {
+            _annotations.value = _annotations.value.dropLast(1)
+        }
+    }
 }
+
