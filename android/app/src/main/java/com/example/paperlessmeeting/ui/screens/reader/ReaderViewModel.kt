@@ -18,7 +18,7 @@ import com.google.gson.reflect.TypeToken
 sealed class ReaderUiState {
     object Idle : ReaderUiState()
     object Loading : ReaderUiState()
-    data class Ready(val file: File) : ReaderUiState()
+    data class Ready(val file: File, val initialPage: Int = 0) : ReaderUiState()
     data class Error(val message: String) : ReaderUiState()
 }
 
@@ -32,6 +32,29 @@ class ReaderViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<ReaderUiState>(ReaderUiState.Idle)
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
+    init {
+        cleanupOldCache()
+    }
+
+    private fun cleanupOldCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>().applicationContext
+                val cacheDir = context.cacheDir
+                val expirationTime = System.currentTimeMillis() - (15L * 24 * 3600 * 1000) // 15 days
+                
+                cacheDir.listFiles()?.forEach { file ->
+                    // Iterate all files (pdfs, jsons, etc)
+                    if (file.isFile && file.lastModified() < expirationTime) {
+                         file.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     fun loadDocument(url: String, fileName: String) {
         if (_uiState.value is ReaderUiState.Ready) return
 
@@ -40,7 +63,11 @@ class ReaderViewModel @Inject constructor(
             try {
                 val context = getApplication<Application>().applicationContext
                 val cacheDir = context.cacheDir
-                val file = File(cacheDir, fileName)
+                
+                // Use URL hash to generate a unique filename, preventing conflicts for same-named files in different meetings
+                val extension = fileName.substringAfterLast(".", "pdf")
+                val uniqueName = "${url.hashCode()}.$extension"
+                val file = File(cacheDir, uniqueName)
 
                 if (!file.exists()) {
                     val success = repository.downloadFile(url, file)
@@ -48,9 +75,22 @@ class ReaderViewModel @Inject constructor(
                         _uiState.value = ReaderUiState.Error("Download failed")
                         return@launch
                     }
+                } else {
+                    // Touch file to extend its retention period
+                    val now = System.currentTimeMillis()
+                    file.setLastModified(now)
+                    // Also touch the annotation file if it exists
+                    val jsonFile = File(file.parent, "${file.name}.json")
+                    if (jsonFile.exists()) {
+                        jsonFile.setLastModified(now)
+                    }
                 }
                 
-                _uiState.value = ReaderUiState.Ready(file)
+                // Fetch saved progress
+                val savedProgress = readingProgressManager.getProgress(url)
+                val initialPage = savedProgress?.currentPage ?: 0
+                
+                _uiState.value = ReaderUiState.Ready(file, initialPage)
             } catch (e: Exception) {
                 _uiState.value = ReaderUiState.Error(e.message ?: "Unknown Error")
             }

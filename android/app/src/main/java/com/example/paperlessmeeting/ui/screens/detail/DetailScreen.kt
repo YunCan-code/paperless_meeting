@@ -2,6 +2,12 @@ package com.example.paperlessmeeting.ui.screens.detail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.platform.LocalContext
+import com.example.paperlessmeeting.ui.components.PdfThumbnail
+import java.io.File
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -98,6 +104,7 @@ fun MeetingDetailContent(
     meeting: Meeting,
     onAttachmentClick: (String, String) -> Unit
 ) {
+    val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize()) {
         // Hero Image Area
         // Fallback logic similar to MeetingCard if url missing (should stick to backend though)
@@ -175,59 +182,67 @@ fun MeetingDetailContent(
         }
 
         // Content Body
-        val scrollState = rememberScrollState()
-        Column(
+        // Content Body
+        BoxWithConstraints(
             modifier = Modifier
-                .padding(24.dp)
-                .verticalScroll(scrollState)
+                .weight(1f)
+                .fillMaxWidth()
         ) {
-            // 1. Personnel (Speaker) - moved to top
-            SectionHeader(title = "参会信息")
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                Text(meeting.speaker ?: "未指定")
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // 2. Description / Agenda
-            // Check if agenda is valid (not null, not empty, and not just "[]")
-            val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
-            val hasValidDescription = !meeting.description.isNullOrEmpty()
+            val isWideScreen = maxWidth > 700.dp
             
-            if (hasValidAgenda || hasValidDescription) {
-                SectionHeader(title = "会议内容 / 议程")
+            // Define sections as local composables to reuse logic
+            val InfoSectionContent: @Composable () -> Unit = {
+                SectionHeader(title = "参会信息")
                 Spacer(modifier = Modifier.height(8.dp))
-                
-                if (hasValidAgenda) {
-                    val agendaItems = parseAgenda(meeting.agenda!!)
-                    if (agendaItems.isNotEmpty()) {
-                        agendaItems.forEach { item ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                if (item.time.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    Text(meeting.speaker ?: "未指定")
+                }
+            }
+            
+            val AgendaSectionContent: @Composable () -> Unit = {
+                 val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
+                 val hasValidDescription = !meeting.description.isNullOrEmpty()
+                 
+                 if (hasValidAgenda || hasValidDescription) {
+                    SectionHeader(title = "会议内容 / 议程")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    if (hasValidAgenda) {
+                        val agendaItems = parseAgenda(meeting.agenda!!)
+                        if (agendaItems.isNotEmpty()) {
+                            agendaItems.forEach { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    if (item.time.isNotEmpty()) {
+                                        Text(
+                                            text = item.time,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.width(60.dp)
+                                        )
+                                    }
                                     Text(
-                                        text = item.time,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.width(60.dp)
+                                        text = item.content,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 24.sp
                                     )
                                 }
-                                Text(
-                                    text = item.content,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    lineHeight = 24.sp
-                                )
                             }
+                        } else if (hasValidDescription) {
+                            Text(
+                                text = meeting.description!!,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 24.sp
+                            )
                         }
                     } else if (hasValidDescription) {
-                        // Fallback to description if agenda parse fails
                         Text(
                             text = meeting.description!!,
                             style = MaterialTheme.typography.bodyLarge,
@@ -235,44 +250,70 @@ fun MeetingDetailContent(
                             lineHeight = 24.sp
                         )
                     }
-                } else if (hasValidDescription) {
-                    Text(
-                        text = meeting.description!!,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 24.sp
+                 }
+            }
+            
+            val MaterialsSectionContent: @Composable () -> Unit = {
+                SectionHeader(title = "会议资料")
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                if (!meeting.attachments.isNullOrEmpty()) {
+                    meeting.attachments.forEach { file ->
+                        val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
+                        val fullUrl = "https://coso.top/static/$encodedName"
+                        
+                        // Check for local cached file using exact logic from ReaderViewModel
+                        val extension = file.filename.substringAfterLast(".", "pdf")
+                        val uniqueName = "${fullUrl.hashCode()}.$extension"
+                        val localFile = File(context.cacheDir, uniqueName)
+                        
+                        FileItem(
+                            name = file.displayName, 
+                            size = formatFileSize(file.fileSize),
+                            localFile = if (localFile.exists()) localFile else null,
+                            onClick = { onAttachmentClick(fullUrl, file.displayName) }
+                        )
+                    }
+                } else {
+                     Text(
+                        text = "本次会议暂无上传附件",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            // If no valid agenda or description, just skip this section entirely
-            
-            Spacer(modifier = Modifier.height(32.dp))
 
-            // 3. Attachments
-            SectionHeader(title = "会议资料")
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            if (!meeting.attachments.isNullOrEmpty()) {
-                meeting.attachments.forEach { file ->
-                    // Fix: URL Encode the filename to handle Chinese characters and spaces
-                    val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
-                    val fullUrl = "https://coso.top/static/$encodedName"
-                    FileItem(
-                        name = file.displayName, 
-                        size = formatFileSize(file.fileSize),
-                        onClick = { onAttachmentClick(fullUrl, file.displayName) }
-                    )
+            val scrollState = rememberScrollState()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+                    .verticalScroll(scrollState)
+            ) {
+                if (isWideScreen) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.spacedBy(48.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(0.3f)) {
+                            InfoSectionContent()
+                            Spacer(modifier = Modifier.height(32.dp))
+                            AgendaSectionContent()
+                        }
+                        Column(modifier = Modifier.weight(0.7f)) {
+                            MaterialsSectionContent()
+                        }
+                    }
+                } else {
+                    InfoSectionContent()
+                    Spacer(modifier = Modifier.height(32.dp))
+                    AgendaSectionContent()
+                    Spacer(modifier = Modifier.height(32.dp))
+                    MaterialsSectionContent()
                 }
-            } else {
-                 Text(
-                    text = "本次会议暂无上传附件",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                
+                Spacer(modifier = Modifier.height(80.dp))
             }
-            
-            // Bottom Spacer for scrolling
-            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }
@@ -288,7 +329,7 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun FileItem(name: String, size: String, onClick: () -> Unit) {
+fun FileItem(name: String, size: String, localFile: File? = null, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -300,18 +341,29 @@ fun FileItem(name: String, size: String, onClick: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // File Icon
+        // File Icon or Thumbnail
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                .size(56.dp)
+                .background(
+                     if (localFile != null) Color.White else MaterialTheme.colorScheme.primaryContainer, 
+                     androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                )
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.Menu, // Placeholder
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            if (localFile != null) {
+                PdfThumbnail(
+                    filePath = localFile.absolutePath,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Menu, // Placeholder
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
         
         Spacer(modifier = Modifier.width(16.dp))
@@ -333,7 +385,7 @@ fun FileItem(name: String, size: String, onClick: () -> Unit) {
         // Read Button
         IconButton(onClick = onClick) {
              Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack, // Placeholder for "Go/Read" (rotated 180?)
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack, // Placeholder for "Go/Read"
                 contentDescription = "Read",
                 modifier = Modifier.rotate(180f),
                 tint = MaterialTheme.colorScheme.primary

@@ -221,6 +221,14 @@ fun ReaderScreen(
                     }
                 }
                 is ReaderUiState.Ready -> {
+                    // Restore Progress if needed
+                    LaunchedEffect(state.initialPage) {
+                        if (currentPage == 0 && initialPage == 0 && state.initialPage > 0) {
+                            currentPage = state.initialPage
+                            isProgrammaticScroll = true
+                        }
+                    }
+
                     if (isEditing && editPageBitmap != null) {
                         // ====== MODE B: Focus/Edit Mode ======
                         SinglePageEditor(
@@ -356,6 +364,7 @@ fun PDFViewerContent(
     
     // Local ref for page jumping
     var localPdfViewRef by remember { mutableStateOf<PDFView?>(null) }
+    var isPdfLoaded by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         // -------------------------------------------------------------------------
@@ -376,6 +385,7 @@ fun PDFViewerContent(
                 val configKey = "${file.absolutePath}_${isNightMode}" 
                 
                 if (pdfView.tag != configKey) {
+                    isPdfLoaded = false // Reset load state on new file
                     pdfView.tag = configKey
                     pdfView.fromFile(file)
                         .defaultPage(currentPage)
@@ -395,6 +405,7 @@ fun PDFViewerContent(
                              }
                         }
                         .onLoad { nbPages ->
+                             isPdfLoaded = true // Mark as loaded
                              onLoadToc(flattenBookmarks(pdfView.tableOfContents))
                         }
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
@@ -436,8 +447,9 @@ fun PDFViewerContent(
         )
 
         // Sync Jump Logic
-        LaunchedEffect(currentPage, isProgrammaticScroll) {
-            if (isProgrammaticScroll && localPdfViewRef != null) {
+        LaunchedEffect(currentPage, isProgrammaticScroll, isPdfLoaded) {
+            // Only jump if PDF is fully loaded to prevent race conditions or ignored calls
+            if (isPdfLoaded && isProgrammaticScroll && localPdfViewRef != null) {
                 localPdfViewRef?.jumpTo(currentPage, true)
             }
         }

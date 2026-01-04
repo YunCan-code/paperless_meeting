@@ -5,3 +5,8 @@ python-multipart
 aiofiles
 requests
 openpyxl
+# ============================================================
+# 生产环境依赖 (高并发优化)
+# ============================================================
+gunicorn              # 多Worker进程管理
+psycopg2-binary       # PostgreSQL 驱动 (如使用PostgreSQL)

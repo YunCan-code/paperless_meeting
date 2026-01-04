@@ -1,15 +1,43 @@
 import os
 from sqlmodel import SQLModel, create_engine, Session
 
-# Define SQLite database path relative to this file
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sqlite_file_name = os.path.join(BASE_DIR, "database.db")
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+# ============================================================
+# 数据库配置 - 支持 SQLite (开发) 和 PostgreSQL (生产)
+# ============================================================
 
-# Configuration: check_same_thread=False for multithreading (FastAPI)
-connect_args = {"check_same_thread": False}
-# Create Engine
-engine = create_engine(sqlite_url, connect_args=connect_args)
+# 通过环境变量配置数据库URL
+# 开发环境默认使用 SQLite
+# 生产环境设置 DATABASE_URL 环境变量切换到 PostgreSQL
+# 例如: DATABASE_URL=postgresql://user:password@localhost:5432/paperless_meeting
+
+DATABASE_URL = os.getenv("DATABASE_URL", None)
+
+if DATABASE_URL is None:
+    # 默认: SQLite (开发环境)
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    sqlite_file_name = os.path.join(BASE_DIR, "database.db")
+    DATABASE_URL = f"sqlite:///{sqlite_file_name}"
+    
+    # SQLite 特殊配置
+    connect_args = {"check_same_thread": False}
+    engine = create_engine(DATABASE_URL, connect_args=connect_args)
+    
+elif "sqlite" in DATABASE_URL:
+    # 显式指定 SQLite
+    connect_args = {"check_same_thread": False}
+    engine = create_engine(DATABASE_URL, connect_args=connect_args)
+    
+else:
+    # PostgreSQL / MySQL 生产环境配置
+    # 连接池优化: 支持高并发
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,         # 保持的连接数
+        max_overflow=10,      # 最大溢出连接数
+        pool_timeout=30,      # 获取连接超时时间(秒)
+        pool_recycle=1800,    # 连接回收时间(秒), 防止数据库断连
+        pool_pre_ping=True    # 使用前检测连接是否有效
+    )
 
 def create_db_and_tables():
     """

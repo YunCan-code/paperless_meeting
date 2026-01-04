@@ -5,7 +5,10 @@ import retrofit2.http.GET
 
 interface ApiService {
     @GET("meetings/")
-    suspend fun getMeetings(): List<Meeting>
+    suspend fun getMeetings(
+        @retrofit2.http.Query("skip") skip: Int = 0,
+        @retrofit2.http.Query("limit") limit: Int = 20
+    ): List<Meeting>
 
     @GET("meetings/{id}")
     suspend fun getMeeting(@retrofit2.http.Path("id") id: Int): Meeting

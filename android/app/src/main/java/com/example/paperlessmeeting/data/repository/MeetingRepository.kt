@@ -6,7 +6,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface MeetingRepository {
-    suspend fun getMeetings(): List<Meeting>
+    suspend fun getMeetings(skip: Int = 0, limit: Int = 20): List<Meeting>
     suspend fun getMeetingById(id: Int): Meeting?
     suspend fun downloadFile(url: String, destFile: java.io.File): Boolean
 }
@@ -15,8 +15,8 @@ interface MeetingRepository {
 class MeetingRepositoryImpl @Inject constructor(
     private val api: ApiService
 ) : MeetingRepository {
-    override suspend fun getMeetings(): List<Meeting> {
-        return api.getMeetings()
+    override suspend fun getMeetings(skip: Int, limit: Int): List<Meeting> {
+        return api.getMeetings(skip, limit)
     }
 
     override suspend fun getMeetingById(id: Int): Meeting? {

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.compose.foundation.gestures.animateScrollBy
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.MeetingType
 import com.example.paperlessmeeting.ui.screens.detail.MeetingDetailContent
@@ -51,10 +53,18 @@ fun AdaptiveMeetingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Filter Meetings
+    // Filter Meetings & Pagination State
     val allMeetings = if (uiState is com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success) {
         (uiState as com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success).meetings
     } else emptyList()
+    
+    val isLoadingMore = if (uiState is com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success) {
+        (uiState as com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success).isLoadingMore
+    } else false
+    
+    val hasMoreData = if (uiState is com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success) {
+        (uiState as com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success).hasMoreData
+    } else true
 
     // UI Logic State
     // Default filter: If nav param is not "ALL", use it as initial filter
@@ -62,7 +72,15 @@ fun AdaptiveMeetingScreen(
         mutableStateOf(if (meetingTypeName == "ALL") null else meetingTypeName) 
     }
     
-    var selectedMeetingId by remember(initialMeetingId) { mutableStateOf(initialMeetingId) }
+    val selectedMeetingId by viewModel.selectedMeetingId.collectAsState()
+    
+    // Handle Initial Link
+    LaunchedEffect(initialMeetingId) {
+        if (initialMeetingId != null) {
+            viewModel.selectMeeting(initialMeetingId)
+        }
+    }
+
     var fullMeeting by remember { mutableStateOf<Meeting?>(null) }
     
     // Fetch full details when ID changes
@@ -111,7 +129,10 @@ fun AdaptiveMeetingScreen(
                     meetings = filteredMeetings,
                     onMeetingClick = { meetingId ->
                         navController.navigate("detail/$meetingId")
-                    }
+                    },
+                    isLoadingMore = isLoadingMore,
+                    hasMoreData = hasMoreData,
+                    onLoadMore = { viewModel.loadMore() }
                 )
             }
         } else {
@@ -141,8 +162,11 @@ fun AdaptiveMeetingScreen(
 
                         MeetingListContent(
                             meetings = filteredMeetings,
-                            onMeetingClick = { meetingId -> selectedMeetingId = meetingId },
-                            selectedId = selectedMeetingId ?: selectedMeeting?.id
+                            onMeetingClick = { meetingId -> viewModel.selectMeeting(meetingId) },
+                            selectedId = selectedMeetingId ?: selectedMeeting?.id,
+                            isLoadingMore = isLoadingMore,
+                            hasMoreData = hasMoreData,
+                            onLoadMore = { viewModel.loadMore() }
                         )
                     }
                 }
@@ -180,15 +204,42 @@ fun FilterChipsBar(
     selectedType: String?,
     onTypeSelected: (String?) -> Unit
 ) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    
+    // Horizontal Scroll Hint Animation
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(800)
+        // Peek right and back
+        try {
+            listState.animateScrollBy(150f)
+            listState.animateScrollBy(-150f)
+        } catch (e: Exception) {
+            // Ignore animation errors
+        }
+    }
+
     androidx.compose.foundation.lazy.LazyRow(
+        state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         item {
             androidx.compose.material3.FilterChip(
                 selected = selectedType == null,
                 onClick = { onTypeSelected(null) },
-                label = { androidx.compose.material3.Text("全部") }
+                label = { androidx.compose.material3.Text("全部") },
+                colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                    containerColor = if (selectedType == null) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                    labelColor = if (selectedType == null) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selectedType == null,
+                    borderColor = androidx.compose.ui.graphics.Color.Transparent,
+                    selectedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                )
             )
         }
         items(availableTypes) { typeName ->

@@ -1,21 +1,7 @@
-e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:575:60 Unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
-public inline operator fun BigDecimal.times(other: BigDecimal): BigDecimal defined in kotlin
-public inline operator fun BigInteger.times(other: BigInteger): BigInteger defined in kotlin
-e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:576:59 Unresolved reference. None of the following candidates is applicable because of receiver type mismatch: 
-public inline operator fun BigDecimal.times(other: BigDecimal): BigDecimal defined in kotlin
-public inline operator fun BigInteger.times(other: BigInteger): BigInteger defined in kotlin
-e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:584:22 Overload resolution ambiguity: 
-public final operator fun div(other: Byte): Float defined in kotlin.Float
-public final operator fun div(other: Double): Double defined in kotlin.Float
-public final operator fun div(other: Float): Float defined in kotlin.Float
-public final operator fun div(other: Int): Float defined in kotlin.Float
-public final operator fun div(other: Long): Float defined in kotlin.Float
-public final operator fun div(other: Short): Float defined in kotlin.Float
-e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/reader/ReaderScreen.kt:585:21 Overload resolution ambiguity: 
-public final operator fun div(other: Byte): Float defined in kotlin.Float
-public final operator fun div(other: Double): Double defined in kotlin.Float
-public final operator fun div(other: Float): Float defined in kotlin.Float
-public final operator fun div(other: Int): Float defined in kotlin.Float
-public final operator fun div(other: Long): Float defined in kotlin.Float
-public final operator fun div(other: Short): Float defined in kotlin.Float
+> Task :app:compileDebugKotlin
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/adaptive/AdaptiveMeetingScreen.kt:205:64 Unresolved reference: fillMaxWidth
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/adaptive/MeetingListContent.kt:194:18 Unresolved reference: background
+e: file:///D:/ProgramData/paperless_meeting/android/app/src/main/java/com/example/paperlessmeeting/ui/screens/adaptive/MeetingListContent.kt:207:18 Unresolved reference: background
+
+> Task :app:compileDebugKotlin FAILED
 
