@@ -2,12 +2,12 @@
   <div class="follow-up-page">
     <div class="page-header">
       <div class="header-left">
-        <h1 class="page-title">后续事项</h1>
+        <h1 class="page-title">笔记</h1>
         <p class="page-subtitle">记录会议纪要后续跟进任务</p>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="openCreate">
-          <el-icon><Plus /></el-icon> 新建事项
+          <el-icon><Plus /></el-icon> 新建笔记
         </el-button>
       </div>
     </div>
@@ -42,13 +42,13 @@
       </div>
     </div>
     
-    <el-empty v-else description="暂无后续事项" />
+    <el-empty v-else description="暂无笔记" />
 
     <!-- Dialog -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑事项' : '新建事项'" width="500px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑笔记' : '新建笔记'" width="500px">
       <el-form label-position="top">
         <el-form-item label="标题">
-          <el-input v-model="form.title" placeholder="输入事项标题..." />
+          <el-input v-model="form.title" placeholder="输入笔记标题..." />
         </el-form-item>
         <el-form-item label="详细内容">
           <el-input 
@@ -108,7 +108,7 @@ const handleCommand = (cmd, note) => {
         form.value = { title: note.title, content: note.content }
         dialogVisible.value = true
     } else if (cmd === 'delete') {
-        ElMessageBox.confirm('确定删除该事项吗？', '提示', { type: 'warning' }).then(async () => {
+        ElMessageBox.confirm('确定删除该笔记吗？', '提示', { type: 'warning' }).then(async () => {
             await request.delete(`/notes/${note.id}`)
             ElMessage.success('已删除')
             fetchNotes()

@@ -17,14 +17,18 @@ sealed class DashboardUiState {
         val meetings: List<Meeting>, 
         val activeMeetings: List<Meeting>,
         val recentFiles: List<com.example.paperlessmeeting.domain.model.Attachment>,
-        val initialPageIndex: Int = 0
+        val readingProgress: List<com.example.paperlessmeeting.data.local.ReadingProgress> = emptyList(),
+        val initialPageIndex: Int = 0,
+        val userName: String
     ) : DashboardUiState()
     data class Error(val message: String) : DashboardUiState()
 }
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val repository: MeetingRepository
+    private val repository: MeetingRepository,
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    private val readingProgressManager: com.example.paperlessmeeting.data.local.ReadingProgressManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
@@ -34,9 +38,16 @@ class DashboardViewModel @Inject constructor(
         loadData()
     }
 
+    fun refreshData() {
+        loadData()
+    }
+
     private fun loadData() {
         viewModelScope.launch {
             try {
+                // Get user name
+                val userName = userPreferences.getUserName() ?: "用户"
+
                 val rawMeetings = repository.getMeetings()
                 
                 // 1. Parse and Sort by Start Time (Ascending)
@@ -51,10 +62,10 @@ class DashboardViewModel @Inject constructor(
                         
                         // Filter: ONLY show meetings for Today
                         if (!time.toLocalDate().isEqual(today)) {
-                            return@mapNotNull null
+                            null
+                        } else {
+                            Pair(meeting, time)
                         }
-                        
-                        Pair(meeting, time)
                     } catch (e: Exception) {
                         null // Skip invalid date meetings
                     }
@@ -75,14 +86,19 @@ class DashboardViewModel @Inject constructor(
                 // Active list is ALL of today's meetings (sorted)
                 val activeList = sortedMeetings.map { it.first }
 
-                // Flatten and grab recent files
+                // Flatten and grab recent files (Legacy logic, maybe replace with progress logic later)
                 val allFiles = rawMeetings.flatMap { it.attachments.orEmpty() }.take(10)
+                
+                // Load Reading Progress
+                val progressList = readingProgressManager.getAllProgress()
 
                 _uiState.value = DashboardUiState.Success(
                     meetings = rawMeetings, 
                     activeMeetings = activeList, 
                     recentFiles = allFiles,
-                    initialPageIndex = startIndex
+                    readingProgress = progressList,
+                    initialPageIndex = 0,
+                    userName = userName
                 )
             } catch (e: Exception) {
                 _uiState.value = DashboardUiState.Error(e.message ?: "Unknown error")

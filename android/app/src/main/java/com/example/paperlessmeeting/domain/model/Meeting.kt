@@ -46,6 +46,8 @@ data class Meeting(
     val meetingTypeName: String? = null,
     @com.google.gson.annotations.SerializedName("card_image_url")
     val cardImageUrl: String? = null,
+    val speaker: String? = null,
+    val agenda: String? = null,
     val attachments: List<Attachment>? = emptyList()
 ) {
     // Helper to map backend status string to UI Enum

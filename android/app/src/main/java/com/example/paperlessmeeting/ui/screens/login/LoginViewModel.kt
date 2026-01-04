@@ -12,7 +12,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -28,6 +29,7 @@ class LoginViewModel @Inject constructor(
             _uiState.value = LoginUiState.Loading
             try {
                 val response = apiService.login(LoginRequest(query))
+                userPreferences.saveUserName(response.name)
                 _uiState.value = LoginUiState.Success(response.name)
             } catch (e: Exception) {
                 // Parse error message if possible

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +46,7 @@ import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
 fun AdaptiveMeetingScreen(
     meetingTypeName: String, // Can be "ALL"
     navController: NavController,
+    initialMeetingId: Int? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -60,7 +62,7 @@ fun AdaptiveMeetingScreen(
         mutableStateOf(if (meetingTypeName == "ALL") null else meetingTypeName) 
     }
     
-    var selectedMeetingId by remember { mutableStateOf<Int?>(null) }
+    var selectedMeetingId by remember(initialMeetingId) { mutableStateOf(initialMeetingId) }
     var fullMeeting by remember { mutableStateOf<Meeting?>(null) }
     
     // Fetch full details when ID changes
@@ -91,6 +93,14 @@ fun AdaptiveMeetingScreen(
         
         if (!isTablet) {
             // === PHONE LAYOUT ===
+            // Auto-forward to detail if initial ID is present (and we haven't handled it yet)
+            // Note: ideally we consume the event.
+            LaunchedEffect(initialMeetingId) {
+                if (initialMeetingId != null) {
+                    navController.navigate("detail/$initialMeetingId")
+                }
+            }
+
             Column(modifier = Modifier.fillMaxSize()) {
                 FilterChipsBar(
                     availableTypes = availableTypes,
@@ -113,7 +123,7 @@ fun AdaptiveMeetingScreen(
                     color = MaterialTheme.colorScheme.surface, 
                     tonalElevation = 1.dp
                 ) {
-                    Column {
+                    Column(modifier = Modifier.statusBarsPadding()) {
                         // Title or Filter Header
                         androidx.compose.foundation.layout.Box(modifier = Modifier.padding(16.dp)) {
                              androidx.compose.material3.Text(

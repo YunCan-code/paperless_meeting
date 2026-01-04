@@ -2,7 +2,9 @@ package com.example.paperlessmeeting.ui.screens.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -10,11 +12,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,9 +36,16 @@ import java.util.Locale
 
 @Composable
 fun DashboardScreen(
+    onMeetingClick: (Int) -> Unit,
+    onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    
+    // Refresh data when entering screen
+    LaunchedEffect(Unit) {
+        viewModel.refreshData()
+    }
 
     when (val state = uiState) {
         is DashboardUiState.Loading -> {
@@ -48,14 +59,18 @@ fun DashboardScreen(
              }
         }
         is DashboardUiState.Success -> {
-            DashboardContent(state)
+            DashboardContent(state, onMeetingClick, onReadingClick)
         }
     }
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun DashboardContent(state: DashboardUiState.Success) {
+fun DashboardContent(
+    state: DashboardUiState.Success, 
+    onMeetingClick: (Int) -> Unit, 
+    onReadingClick: (String, String, Int) -> Unit
+) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
     state.activeMeetings.forEach { 
@@ -65,7 +80,8 @@ fun DashboardContent(state: DashboardUiState.Success) {
     val currentHour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = when (currentHour) {
         in 5..11 -> "上午好"
-        in 12..18 -> "下午好"
+        in 12..13 -> "中午好"
+        in 14..18 -> "下午好"
         else -> "晚上好"
     }
     
@@ -82,7 +98,7 @@ fun DashboardContent(state: DashboardUiState.Success) {
     ) {
         // 1. Header
         Text(
-            text = "$greeting, XX",
+            text = "$greeting, ${state.userName}",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -97,7 +113,7 @@ fun DashboardContent(state: DashboardUiState.Success) {
 
         // 2. Hero Card (Up Next)
         Text(
-            text = "当前会议",
+            text = "今日会议",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -119,12 +135,11 @@ fun DashboardContent(state: DashboardUiState.Success) {
                 HorizontalPager(
                     state = pagerState,
                     pageSpacing = 16.dp,
-                    // If we want peek, we need to adjust padding. For now, full width cards.
-                    modifier = Modifier.fillMaxWidth().height(200.dp) // Implicit height or let it wrap? MeetingCard has height?
+                    modifier = Modifier.fillMaxWidth().height(200.dp) 
                 ) { page ->
                     com.example.paperlessmeeting.ui.components.MeetingCard(
                         meeting = state.activeMeetings[page],
-                        onClick = { /* TODO: Navigate */ }
+                        onClick = { onMeetingClick(state.activeMeetings[page].id) }
                     )
                 }
                 
@@ -152,136 +167,71 @@ fun DashboardContent(state: DashboardUiState.Success) {
                 }
             }
         } else {
+             // Improved Empty State
              Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)),
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f),
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.1f)
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
              ) {
-                 Text("暂无会议安排", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                     Icon(
+                         imageVector = Icons.Default.EventAvailable, // Or similar icon
+                         contentDescription = null,
+                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                         modifier = Modifier.size(48.dp)
+                     )
+                     Spacer(modifier = Modifier.height(12.dp))
+                     Text(
+                         text = "今日暂无会议安排", 
+                         style = MaterialTheme.typography.titleMedium,
+                         color = MaterialTheme.colorScheme.onSurface,
+                         fontWeight = FontWeight.Medium
+                     )
+                 }
              }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 3. Meeting Stats / Heatmap
-        Text(
-            text = "参会数据概览",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        MeetingStatsCard()
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // 4. Recent Files
-        Text(
-            text = "最近阅读文件",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(state.recentFiles.size) { index ->
-                RecentFileCard(state.recentFiles[index])
+        // 3. Recent Reading (Using reading progress)
+        if (state.readingProgress.isNotEmpty()) {
+            Text(
+                text = "最近阅读",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(state.readingProgress) { progress ->
+                    com.example.paperlessmeeting.ui.components.RecentReadingCard(
+                        progress = progress,
+                        onClick = {
+                            onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
+                        }
+                    )
+                }
             }
+        } else {
+            // Optionally show empty state or nothing
         }
         
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
-@Composable
-fun MeetingStatsCard() {
-    // ... (Stats card implementation remains same for now)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "本周参会",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = "12 小时",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                // Mini indicator
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "+15% 较上周",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // Heatmap / Week View Visualization
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val weekDays = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-                val intensities = listOf(0.8f, 0.4f, 1.0f, 0.2f, 0.6f, 0.0f, 0.0f) // 0.0 - 1.0
-                
-                weekDays.zip(intensities).forEach { (day, intensity) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        // Bar/Dot
-                        val color = if (intensity > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f + (intensity * 0.8f)) 
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                    
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(color),
-                            contentAlignment = Alignment.Center
-                        ) {
-                             if (intensity > 0.5f) {
-                                 Text(
-                                     text = "${(intensity * 4).toInt()}h",
-                                     style = MaterialTheme.typography.labelSmall,
-                                     color = if (intensity > 0.7) Color.White else Color.Black,
-                                     fontSize = 10.sp
-                                 )
-                             }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = day.take(1), // Mon -> M
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.Gray
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 
 

@@ -61,14 +61,13 @@ fun MainScreen() {
                         NavigationRailItem(
                             icon = { Icon(screen.icon, contentDescription = screen.title) },
                             label = { Text(screen.title) },
-                            selected = currentDestination?.route == screen.route,
+                            selected = currentDestination?.route?.substringBefore("?") == screen.route,
                             onClick = {
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
                                     launchSingleTop = true
-                                    restoreState = true
                                 }
                             }
                         )
@@ -89,7 +88,6 @@ fun MainScreen() {
                                     saveState = true
                                 }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         }
                     )
@@ -107,14 +105,33 @@ fun MainScreen() {
             ) {
                 composable(Screen.Dashboard.route) {
                     // Placeholder for Dashboard
-                    com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen()
+                    com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen(
+                        onMeetingClick = { meetingId ->
+                            navController.navigate("meetings?meetingId=$meetingId")
+                        },
+                        onReadingClick = { url, name, page ->
+                            val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+                            val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
+                            navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$page")
+                        }
+                    )
                 }
-                composable(Screen.Meetings.route) {
-                    // We reuse AdaptiveMeetingScreen but maybe tweak it to accept internal filter selection
-                    // For now, defaulting to "General" or showing ALL (need to update AdaptiveScreen logic)
+                composable(
+                    route = Screen.Meetings.route + "?meetingId={meetingId}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("meetingId") { 
+                            type = androidx.navigation.NavType.StringType 
+                            nullable = true
+                            defaultValue = null
+                        }
+                    )
+                ) { backStackEntry ->
+                    val meetingId = backStackEntry.arguments?.getString("meetingId")?.toIntOrNull()
+                    // Default to "ALL" + meetingId selection
                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
-                        meetingTypeName = "ALL", // Signal to show filterable UI
-                        navController = navController
+                        meetingTypeName = "ALL", 
+                        navController = navController,
+                        initialMeetingId = meetingId
                     )
                 }
                 composable(
@@ -128,9 +145,7 @@ fun MainScreen() {
                     )
                 }
                 composable(Screen.Settings.route) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Text("Settings Placeholder", modifier = Modifier.align(Alignment.Center))
-                    }
+                    com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(navController = navController)
                 }
                 
                 // Keep Detail route accessible if needed for phone view deep links context
@@ -146,19 +161,25 @@ fun MainScreen() {
                 }
                 
                 composable(
-                    route = "reader?url={url}&name={name}",
+                    route = "reader?url={url}&name={name}&page={page}",
                     arguments = listOf(
                         androidx.navigation.navArgument("url") { type = androidx.navigation.NavType.StringType },
-                        androidx.navigation.navArgument("name") { type = androidx.navigation.NavType.StringType }
+                        androidx.navigation.navArgument("name") { type = androidx.navigation.NavType.StringType },
+                        androidx.navigation.navArgument("page") { 
+                            type = androidx.navigation.NavType.IntType 
+                            defaultValue = 0
+                        }
                     )
                 ) { backStackEntry ->
                     val url = backStackEntry.arguments?.getString("url") ?: ""
                     val name = backStackEntry.arguments?.getString("name") ?: ""
+                    val page = backStackEntry.arguments?.getInt("page") ?: 0
                     com.example.paperlessmeeting.ui.screens.reader.ReaderScreen(
                         meetingId = 0,
                         attachmentId = 0,
                         downloadUrl = url,
                         fileName = name,
+                        initialPage = page,
                         navController = navController
                     )
                 }

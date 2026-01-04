@@ -181,35 +181,71 @@ fun MeetingDetailContent(
                 .padding(24.dp)
                 .verticalScroll(scrollState)
         ) {
-            // 1. Description / Agenda
-            SectionHeader(title = "会议内容 / 议程")
-            Spacer(modifier = Modifier.height(8.dp))
-            if (!meeting.description.isNullOrEmpty()) {
-                Text(
-                    text = meeting.description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 24.sp
-                )
-            } else {
-                Text(
-                    text = "暂无详细描述",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // 2. Personnel (Host)
+            // 1. Personnel (Speaker) - moved to top
             SectionHeader(title = "参会信息")
             Spacer(modifier = Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("主持人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                Text(meeting.host ?: "未指定")
+                Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(meeting.speaker ?: "未指定")
             }
 
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // 2. Description / Agenda
+            // Check if agenda is valid (not null, not empty, and not just "[]")
+            val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
+            val hasValidDescription = !meeting.description.isNullOrEmpty()
+            
+            if (hasValidAgenda || hasValidDescription) {
+                SectionHeader(title = "会议内容 / 议程")
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                if (hasValidAgenda) {
+                    val agendaItems = parseAgenda(meeting.agenda!!)
+                    if (agendaItems.isNotEmpty()) {
+                        agendaItems.forEach { item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                if (item.time.isNotEmpty()) {
+                                    Text(
+                                        text = item.time,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.width(60.dp)
+                                    )
+                                }
+                                Text(
+                                    text = item.content,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = 24.sp
+                                )
+                            }
+                        }
+                    } else if (hasValidDescription) {
+                        // Fallback to description if agenda parse fails
+                        Text(
+                            text = meeting.description!!,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 24.sp
+                        )
+                    }
+                } else if (hasValidDescription) {
+                    Text(
+                        text = meeting.description!!,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 24.sp
+                    )
+                }
+            }
+            // If no valid agenda or description, just skip this section entirely
+            
             Spacer(modifier = Modifier.height(32.dp))
 
             // 3. Attachments
@@ -312,4 +348,21 @@ fun formatFileSize(size: Int): String {
     if (kb < 1024) return "%.1f KB".format(kb)
     val mb = kb / 1024.0
     return "%.1f MB".format(mb)
+}
+
+// Agenda Item data class
+data class AgendaItem(
+    val time: String = "",
+    val content: String = ""
+)
+
+// Parse agenda JSON string into list of AgendaItems
+fun parseAgenda(agendaJson: String): List<AgendaItem> {
+    return try {
+        val gson = com.google.gson.Gson()
+        val type = object : com.google.gson.reflect.TypeToken<List<AgendaItem>>() {}.type
+        gson.fromJson(agendaJson, type) ?: emptyList()
+    } catch (e: Exception) {
+        emptyList()
+    }
 }

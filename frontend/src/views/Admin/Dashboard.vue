@@ -42,7 +42,7 @@
           </el-menu-item>
           <el-menu-item index="/admin/followup">
             <el-icon><Notebook /></el-icon>
-            <template #title>后续事项</template>
+            <template #title>笔记</template>
           </el-menu-item>
           <div class="menu-divider"></div>
           <el-menu-item index="/admin/settings">

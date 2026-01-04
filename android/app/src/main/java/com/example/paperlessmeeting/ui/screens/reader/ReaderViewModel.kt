@@ -25,6 +25,7 @@ sealed class ReaderUiState {
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val repository: MeetingRepository,
+    private val readingProgressManager: com.example.paperlessmeeting.data.local.ReadingProgressManager,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -57,8 +58,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     // Annotation Logic
-    private val _annotations = MutableStateFlow<List<AnnotationLine>>(emptyList())
-    val annotations: StateFlow<List<AnnotationLine>> = _annotations.asStateFlow()
+    // Start with a Map for O(1) access by page index
+    private val _pageAnnotations = MutableStateFlow<Map<Int, List<AnnotationStroke>>>(emptyMap())
+    val pageAnnotations: StateFlow<Map<Int, List<AnnotationStroke>>> = _pageAnnotations.asStateFlow()
 
     fun loadAnnotations(pdfFile: File) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -66,29 +68,25 @@ class ReaderViewModel @Inject constructor(
                 val jsonFile = File(pdfFile.parent, "${pdfFile.name}.json")
                 if (jsonFile.exists()) {
                     val jsonString = jsonFile.readText()
-                    val type = object : TypeToken<DocumentAnnotations>() {}.type
-                    val data = Gson().fromJson<DocumentAnnotations>(jsonString, type)
-                    // Ensure we only load lines compatible with current data model
-                    _annotations.value = data.lines
+                    // Define a DTO for storage to keep JSON clean
+                    val type = object : TypeToken<Map<Int, List<AnnotationStroke>>>() {}.type
+                    val data = Gson().fromJson<Map<Int, List<AnnotationStroke>>>(jsonString, type)
+                    _pageAnnotations.value = data ?: emptyMap()
                 } else {
-                    _annotations.value = emptyList()
+                    _pageAnnotations.value = emptyMap()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // In case of error (e.g. malformed JSON), assume empty
-                _annotations.value = emptyList()
+                _pageAnnotations.value = emptyMap()
             }
         }
     }
 
     fun saveAnnotations(pdfFile: File) {
-        val currentLines = _annotations.value
+        val currentData = _pageAnnotations.value
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // If empty, maybe delete the file? Or just save empty.
-                // Saving empty is safer to overwrite previous data.
-                val data = DocumentAnnotations(pdfFile.name, currentLines)
-                val jsonString = Gson().toJson(data)
+                val jsonString = Gson().toJson(currentData)
                 val jsonFile = File(pdfFile.parent, "${pdfFile.name}.json")
                 jsonFile.writeText(jsonString)
             } catch (e: Exception) {
@@ -97,14 +95,21 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun addAnnotation(line: AnnotationLine) {
-        // Create new list to trigger flow emission
-        _annotations.value = _annotations.value + line
+    fun updatePageAnnotations(pageIndex: Int, strokes: List<AnnotationStroke>) {
+        val currentMap = _pageAnnotations.value.toMutableMap()
+        if (strokes.isEmpty()) {
+            currentMap.remove(pageIndex)
+        } else {
+            currentMap[pageIndex] = strokes
+        }
+        _pageAnnotations.value = currentMap
     }
 
-    fun undoAnnotation() {
-        if (_annotations.value.isNotEmpty()) {
-            _annotations.value = _annotations.value.dropLast(1)
+    fun saveReadingProgress(uniqueId: String, fileName: String, page: Int, total: Int, localPath: String? = null) {
+        viewModelScope.launch {
+            if (total > 0) {
+                readingProgressManager.saveProgress(uniqueId, fileName, page, total, localPath)
+            }
         }
     }
 }

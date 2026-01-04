@@ -46,8 +46,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.paperlessmeeting.ui.screens.reader.AnnotationLine
-import com.example.paperlessmeeting.ui.screens.reader.PointFCompat
 import com.example.paperlessmeeting.ui.screens.reader.ReaderUiState
 import com.example.paperlessmeeting.ui.screens.reader.ReaderViewModel
 import com.github.barteksc.pdfviewer.PDFView
@@ -70,6 +68,7 @@ fun ReaderScreen(
     attachmentId: Int,
     downloadUrl: String,
     fileName: String,
+    initialPage: Int = 0,
     navController: NavController,
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
@@ -78,16 +77,20 @@ fun ReaderScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
-    val annotations by viewModel.annotations.collectAsState()
+    val pageAnnotations by viewModel.pageAnnotations.collectAsState()
 
     // --- State Management ---
     var showOverlay by remember { mutableStateOf(true) }
     var isNightMode by remember { mutableStateOf(false) }
-    var isAnnotationMode by remember { mutableStateOf(false) }
-    var currentStrokeColor by remember { mutableIntStateOf(android.graphics.Color.RED) }
+    
+    // Mode State: Reading or Editing
+    var isEditing by remember { mutableStateOf(false) }
+    var editPageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var editingPageIndex by remember { mutableIntStateOf(0) }
+    
     var isHorizontalScroll by remember { mutableStateOf(false) } // Default Vertical
     
-    var currentPage by remember { mutableIntStateOf(0) }
+    var currentPage by remember { mutableIntStateOf(initialPage) }
     var totalPages by remember { mutableIntStateOf(0) }
     var isProgrammaticScroll by remember { mutableStateOf(true) } // Prevent scroll fighting
 
@@ -96,11 +99,27 @@ fun ReaderScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var showThumbnailSheet by remember { mutableStateOf(false) }
+
+    // Save Progress Effect
+    LaunchedEffect(currentPage, totalPages, uiState) {
+        if (totalPages > 0 && uiState is ReaderUiState.Ready) {
+            viewModel.saveReadingProgress(
+                uniqueId = downloadUrl,
+                fileName = fileName,
+                page = currentPage,
+                total = totalPages,
+                localPath = (uiState as ReaderUiState.Ready).file.absolutePath
+            )
+        }
+    }
     val sheetState = rememberModalBottomSheetState()
 
     // Utils
     val cleanTitle = remember(fileName) { fileName.substringBeforeLast(".") } // Removing Extension
     val context = LocalContext.current
+    
+    // PDF View Reference for capturing state
+    var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
 
     // --- Window Insets Logic (Immersive Mode) ---
     LaunchedEffect(showOverlay) {
@@ -202,98 +221,108 @@ fun ReaderScreen(
                     }
                 }
                 is ReaderUiState.Ready -> {
-                    // 1. PDF Content
-                    PDFViewerContent(
-                        file = state.file,
-                        isNightMode = isNightMode,
-                        isHorizontalScroll = isHorizontalScroll,
-                        isAnnotationMode = isAnnotationMode,
-                        currentPage = currentPage,
-                        isProgrammaticScroll = isProgrammaticScroll,
-                        currentStrokeColor = currentStrokeColor,
-                        annotations = annotations,
-                        onPageChange = { page, count ->
-                            isProgrammaticScroll = false // User scrolled
-                            currentPage = page
-                            totalPages = count
-                        },
-                        onTap = {
-                            if (!isAnnotationMode) showOverlay = !showOverlay
-                        },
-                        onAnnotationAdded = { viewModel.addAnnotation(it) },
-                        onLoadToc = { list -> tocList = list }, // Load TOC from PDF
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    // 2. Floating Top Bar
-                    AnimatedVisibility(
-                        visible = showOverlay,
-                        enter = fadeIn() + slideInVertically { -it },
-                        exit = fadeOut() + slideOutVertically { -it },
-                        modifier = Modifier.align(Alignment.TopCenter)
-                    ) {
-                        MinimalistTopBar(
-                            title = cleanTitle,
-                            isNightMode = isNightMode,
-                            onBackClick = { navController.popBackStack() }
-                        )
-                    }
-
-                    // 3. Floating Bottom Capsule
-                    AnimatedVisibility(
-                        visible = showOverlay,
-                        enter = fadeIn() + slideInVertically { it },
-                        exit = fadeOut() + slideOutVertically { it },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 32.dp)
-                    ) {
-                        FloatingControlCapsule(
-                            currentPage = currentPage,
-                            totalPages = totalPages,
-                            isAnnotationMode = isAnnotationMode,
-                            isNightMode = isNightMode,
-                            onTocClick = { scope.launch { drawerState.open() } }, // Open TOC
-                            onGridClick = { showThumbnailSheet = true },
-                            onPenClick = { isAnnotationMode = !isAnnotationMode },
-                            onSettingsClick = { isNightMode = !isNightMode }
-                        )
-                    }
-
-                    // 4. Annotation Palette (Top Right, vertical)
-                    if (isAnnotationMode && showOverlay) {
-                        AnnotationPalette(
-                            currentStrokeColor = currentStrokeColor,
-                            onColorChange = { currentStrokeColor = it },
-                            onUndo = { viewModel.undoAnnotation() },
-                            onSave = { viewModel.saveAnnotations(state.file) },
-                            onClose = { 
-                                isAnnotationMode = false
+                    if (isEditing && editPageBitmap != null) {
+                        // ====== MODE B: Focus/Edit Mode ======
+                        SinglePageEditor(
+                            bitmap = editPageBitmap!!,
+                            initialStrokes = pageAnnotations[editingPageIndex] ?: emptyList(),
+                            onCancel = { isEditing = false },
+                            onSave = { newStrokes ->
+                                viewModel.updatePageAnnotations(editingPageIndex, newStrokes)
                                 viewModel.saveAnnotations(state.file)
-                            },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 90.dp, end = 24.dp)
+                                isEditing = false
+                                // Invalidate PDFView to show updates logic handles by PDFView key/update
+                                pdfViewRef?.invalidate() 
+                            }
                         )
-                    }
+                    } else {
+                        // ====== MODE A: Reading Mode ======
+                        // 1. PDF Content
+                        PDFViewerContent(
+                            file = state.file,
+                            isNightMode = isNightMode,
+                            isHorizontalScroll = isHorizontalScroll,
+                            currentPage = currentPage,
+                            isProgrammaticScroll = isProgrammaticScroll,
+                            pageAnnotations = pageAnnotations,
+                            onPdfViewReady = { pdfViewRef = it },
+                            onPageChange = { page, count ->
+                                isProgrammaticScroll = false // User scrolled
+                                currentPage = page
+                                totalPages = count
+                            },
+                            onTap = {
+                                showOverlay = !showOverlay
+                            },
+                            onLoadToc = { list -> tocList = list }, // Load TOC from PDF
+                            modifier = Modifier.fillMaxSize()
+                        )
 
-                    // 5. Thumbnails Bottom Sheet
-                    if (showThumbnailSheet) {
-                        ModalBottomSheet(
-                            onDismissRequest = { showThumbnailSheet = false },
-                            sheetState = sheetState,
-                            containerColor = if(isNightMode) Color.DarkGray else PaperBackground
+                        // 2. Floating Top Bar
+                        AnimatedVisibility(
+                            visible = showOverlay,
+                            enter = fadeIn() + slideInVertically { -it },
+                            exit = fadeOut() + slideOutVertically { -it },
+                            modifier = Modifier.align(Alignment.TopCenter)
                         ) {
-                           PdfThumbnailGrid(
-                               file = state.file,
-                               isNightMode = isNightMode,
-                               currentPage = currentPage,
-                               onPageClick = { page ->
-                                   isProgrammaticScroll = true
-                                   currentPage = page
-                                   scope.launch { sheetState.hide() }.invokeOnCompletion { showThumbnailSheet = false }
-                               }
-                           ) 
+                            MinimalistTopBar(
+                                title = cleanTitle,
+                                isNightMode = isNightMode,
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+
+                        // 3. Floating Bottom Capsule
+                        AnimatedVisibility(
+                            visible = showOverlay,
+                            enter = fadeIn() + slideInVertically { it },
+                            exit = fadeOut() + slideOutVertically { it },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 32.dp)
+                        ) {
+                            FloatingControlCapsule(
+                                currentPage = currentPage,
+                                totalPages = totalPages,
+                                isEditing = false, // Always false here as we aren't in edit mode
+                                isNightMode = isNightMode,
+                                onTocClick = { scope.launch { drawerState.open() } }, // Open TOC
+                                onGridClick = { showThumbnailSheet = true },
+                                onPenClick = { 
+                                    // Enter Edit Mode Logic
+                                    scope.launch(Dispatchers.IO) {
+                                        val bmp = renderPdfPageToBitmap(state.file, currentPage)
+                                        if (bmp != null) {
+                                             withContext(Dispatchers.Main) {
+                                                 editPageBitmap = bmp
+                                                 editingPageIndex = currentPage
+                                                 isEditing = true
+                                             }
+                                        }
+                                    }
+                                },
+                                onSettingsClick = { isNightMode = !isNightMode }
+                            )
+                        }
+
+                        // 5. Thumbnails Bottom Sheet
+                        if (showThumbnailSheet) {
+                            ModalBottomSheet(
+                                onDismissRequest = { showThumbnailSheet = false },
+                                sheetState = sheetState,
+                                containerColor = if(isNightMode) Color.DarkGray else PaperBackground
+                            ) {
+                               PdfThumbnailGrid(
+                                   file = state.file,
+                                   isNightMode = isNightMode,
+                                   currentPage = currentPage,
+                                   onPageClick = { page ->
+                                       isProgrammaticScroll = true
+                                       currentPage = page
+                                       scope.launch { sheetState.hide() }.invokeOnCompletion { showThumbnailSheet = false }
+                                   }
+                               ) 
+                            }
                         }
                     }
                 }
@@ -313,25 +342,20 @@ fun PDFViewerContent(
     file: File,
     isNightMode: Boolean,
     isHorizontalScroll: Boolean,
-    isAnnotationMode: Boolean,
     currentPage: Int,
     isProgrammaticScroll: Boolean, 
-    currentStrokeColor: Int,
-    annotations: List<AnnotationLine>, // Coordinates in PDF Page % (0-1)
+    pageAnnotations: Map<Int, List<AnnotationStroke>>,
+    onPdfViewReady: (PDFView) -> Unit,
     onPageChange: (Int, Int) -> Unit,
     onTap: () -> Unit,
-    onAnnotationAdded: (AnnotationLine) -> Unit,
     onLoadToc: (List<Pair<Int, Bookmark>>) -> Unit,
     modifier: Modifier
 ) {
-    // Shared State for PDF View Ref
-    var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
-    
     // Fix Stale Closure: Always access latest annotations in onDraw
-    val currentAnnotations by rememberUpdatedState(annotations)
+    val currentAnnotations by rememberUpdatedState(pageAnnotations)
     
-    // LAYER 2: Real-time Drawing State (Screen Coordinates)
-    val currentStrokePath = remember { mutableStateListOf<Pair<Float, Float>>() }
+    // Local ref for page jumping
+    var localPdfViewRef by remember { mutableStateOf<PDFView?>(null) }
 
     Box(modifier = modifier) {
         // -------------------------------------------------------------------------
@@ -340,7 +364,8 @@ fun PDFViewerContent(
         AndroidView(
             factory = { context ->
                 PDFView(context, null).apply {
-                    pdfViewRef = this
+                    localPdfViewRef = this
+                    onPdfViewReady(this)
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     setBackgroundColor(if(isNightMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
                 }
@@ -348,18 +373,13 @@ fun PDFViewerContent(
             modifier = Modifier.fillMaxSize(),
             update = { pdfView ->
                 // Fix Flicker: Only reload if file/nightmode changes.
-                // Switching annotation mode should NOT trigger reload.
                 val configKey = "${file.absolutePath}_${isNightMode}" 
-                
-                // Note: We handle scroll direction changes separately if needed, 
-                // but usually that requires a full reload. 
-                // For now, minimal keys to prevent flicker.
                 
                 if (pdfView.tag != configKey) {
                     pdfView.tag = configKey
                     pdfView.fromFile(file)
                         .defaultPage(currentPage)
-                        .enableSwipe(true) // Always enable swipe in View (we intercept touch above if needed)
+                        .enableSwipe(true) 
                         .swipeHorizontal(isHorizontalScroll)
                         .pageSnap(false)
                         .autoSpacing(false) 
@@ -376,32 +396,30 @@ fun PDFViewerContent(
                         }
                         .onLoad { nbPages ->
                              onLoadToc(flattenBookmarks(pdfView.tableOfContents))
-                             // Do not force jump on load to preserve state if just styling changed
                         }
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
                              // Render Saved Annotations (PDF Coordinates -> View Coordinates)
                              // Logic: The points are 0-1 relative to page.
                              // Canvas here is already transformed to the page's local space.
-                             currentAnnotations.forEach { line ->
-                                 if (line.pageIndex == pageIdx) {
-                                     val paint = Paint().apply {
-                                         color = line.color
-                                         strokeWidth = line.strokeWidth
-                                         style = Paint.Style.STROKE
-                                         isAntiAlias = true
-                                         strokeCap = Paint.Cap.ROUND
-                                         strokeJoin = Paint.Join.ROUND
+                             
+                             currentAnnotations[pageIdx]?.forEach { stroke ->
+                                 val paint = Paint().apply {
+                                     color = stroke.color
+                                     style = Paint.Style.STROKE
+                                     strokeWidth = stroke.strokeWidth
+                                     strokeCap = Paint.Cap.ROUND
+                                     strokeJoin = Paint.Join.ROUND
+                                     isAntiAlias = true
+                                 }
+                                 val path = Path()
+                                 if (stroke.points.isNotEmpty()) {
+                                     val start = stroke.points[0]
+                                     path.moveTo(start.x * pageWidth, start.y * pageHeight)
+                                     for (i in 1 until stroke.points.size) {
+                                         val p = stroke.points[i]
+                                         path.lineTo(p.x * pageWidth, p.y * pageHeight)
                                      }
-                                     val path = Path()
-                                     if (line.points.isNotEmpty()) {
-                                         val start = line.points[0]
-                                         path.moveTo(start.x * pageWidth, start.y * pageHeight)
-                                         for (i in 1 until line.points.size) {
-                                             val p = line.points[i]
-                                             path.lineTo(p.x * pageWidth, p.y * pageHeight)
-                                         }
-                                         canvas.drawPath(path, paint)
-                                     }
+                                     canvas.drawPath(path, paint)
                                  }
                              }
                         }
@@ -411,179 +429,47 @@ fun PDFViewerContent(
                         }
                         .load()
                 }
+                
+                // Force invalidate to redraw annotations if they changed (even if configKey didnt change)
+                pdfView.invalidate()
             }
         )
 
         // Sync Jump Logic
         LaunchedEffect(currentPage, isProgrammaticScroll) {
-             pdfViewRef?.let { v ->
-                 if (isProgrammaticScroll && v.currentPage != currentPage) {
-                     v.jumpTo(currentPage)
-                 }
-             }
-        }
-
-        // -------------------------------------------------------------------------
-        // LAYER 2: Gesture Interceptor & Real-time Canvas (Top)
-        // -------------------------------------------------------------------------
-        if (isAnnotationMode) {
-             // 1. Transparent Canvas for Drawing
-             androidx.compose.foundation.Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                currentStrokePath.clear()
-                                currentStrokePath.add(offset.x to offset.y)
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                currentStrokePath.add(change.position.x to change.position.y)
-                            },
-                            onDragEnd = {
-                                // Convert Screen Coords -> PDF Page Coords
-                                pdfViewRef?.let { v ->
-                                    // Robustly determine which page received the stroke
-                                    // Use the first point to identify the target page
-                                    val startX = currentStrokePath.firstOrNull()?.first ?: 0f
-                                    val startY = currentStrokePath.firstOrNull()?.second ?: 0f
-                                    
-                                    val pageResult = findPageAndMapPoint(v, startX, startY)
-                                    
-                                    if (pageResult != null) {
-                                        val (targetPageIdx, _) = pageResult
-                                        
-                                        // Map all points to this target page
-                                        val mappedPoints = currentStrokePath.mapNotNull { (sx, sy) ->
-                                             // We force map to the identified page to keep the stroke continuous
-                                             convertScreenPointToPdfPoint(v, sx, sy, targetPageIdx)
-                                        }
-                                        
-                                        if (mappedPoints.isNotEmpty()) {
-                                            val newLine = AnnotationLine(
-                                                pageIndex = targetPageIdx,
-                                                points = mappedPoints,
-                                                color = currentStrokeColor,
-                                                strokeWidth = 5f
-                                            )
-                                            onAnnotationAdded(newLine)
-                                            currentStrokePath.clear()
-                                            v.invalidate()
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
-             ) {
-                 // Draw the temporary stroke (Screen Coordinates)
-                 if (currentStrokePath.isNotEmpty()) {
-                     val path = androidx.compose.ui.graphics.Path().apply {
-                         moveTo(currentStrokePath.first().first, currentStrokePath.first().second)
-                         for (i in 1 until currentStrokePath.size) {
-                             lineTo(currentStrokePath[i].first, currentStrokePath[i].second)
-                         }
-                     }
-                     drawPath(
-                         path = path,
-                         color = Color(currentStrokeColor), // Compose Color
-                         style = androidx.compose.ui.graphics.drawscope.Stroke(
-                             width = 5.dp.toPx(),
-                             cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                             join = androidx.compose.ui.graphics.StrokeJoin.Round
-                         )
-                     )
-                 }
-             }
+            if (isProgrammaticScroll && localPdfViewRef != null) {
+                localPdfViewRef?.jumpTo(currentPage, true)
+            }
         }
     }
 }
 
-// Result Wrapper
-data class PageMapResult(val pageIndex: Int, val point: PointFCompat)
-
-// Helper: Find which page is at the screen coordinate and map the point
-fun findPageAndMapPoint(view: PDFView, screenX: Float, screenY: Float): PageMapResult? {
-    val zoom = view.zoom
-    val currentYOffset = view.currentYOffset // Typically negative
-    val spacingPx = 10f * zoom // Spacing scales with zoom? usually yes in this lib.
-    
-    // Global Y in the Document View (from top of Page 0)
-    // view (0,0) is at (currentXOffset, currentYOffset) relative to Document (0,0)
-    // So ScreenY = DocY * Zoom + currentYOffset
-    // DocY * Zoom = ScreenY - currentYOffset
-    // We work in "Zoomed Document Space" (View Pixels relative to Doc Top)
-    val touchYInDoc = screenY - currentYOffset
-    
-    var accumulatedHeight = 0f
-    
-    // Optimization: Check visible range instead of 0..count
-    // But safely, 0..count is fine for <100 pages.
-    for (i in 0 until view.pageCount) {
-        val pageSize = view.getPageSize(i) ?: continue
-        val pageH = pageSize.height.toFloat() * zoom
-        val pageW = pageSize.width.toFloat() * zoom
+// Helper: Render High-Res Bitmap of a PDF Page
+fun renderPdfPageToBitmap(file: File, pageIndex: Int): Bitmap? {
+    return try {
+        val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        val renderer = PdfRenderer(fileDescriptor)
+        val page = renderer.openPage(pageIndex)
         
-        // Check if Y falls within this page
-        // Page Interval: [accumulatedHeight, accumulatedHeight + pageH]
-        if (touchYInDoc >= accumulatedHeight && touchYInDoc <= accumulatedHeight + pageH) {
-             // Found the page!
-             // Map X and Y
-             val offsetX = (screenX - view.currentXOffset) // Global X in View Pixels
-             // Note: For X, we assume single column, or we just normalize relative to page width
-             
-             val localY = touchYInDoc - accumulatedHeight
-             
-             return PageMapResult(
-                 pageIndex = i,
-                 point = PointFCompat(
-                     x = (offsetX / pageW).coerceIn(0f, 1f),
-                     y = (localY / pageH).coerceIn(0f, 1f)
-                 )
-             )
-        }
+        // Render High Res (e.g. 2x screen width or fixed 1080p width)
+        // Let's assume a reasonable width for editing.
+        val width = 1500 
+        val height = (width * page.height / page.width.toFloat()).toInt()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         
-        accumulatedHeight += pageH + spacingPx
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(android.graphics.Color.WHITE)
+        
+        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+        
+        page.close()
+        renderer.close()
+        fileDescriptor.close()
+        bitmap
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
     }
-    return null
-}
-
-// Helper: Convert Screen (View) Coordinates to PDF Page Normalized Coordinates (0-1)
-// Heavily used for mapping the rest of the stroke once page is found
-fun convertScreenPointToPdfPoint(
-    view: PDFView, 
-    screenX: Float, 
-    screenY: Float, 
-    pageIndex: Int
-): PointFCompat? {
-    val zoom = view.zoom
-    val currentYOffset = view.currentYOffset
-    val spacingPx = 10f * zoom
-    
-    // Recalculate Offset for this specific page
-    // (Inefficient but robust state-less approach)
-    var accumulatedHeight = 0f
-    for (i in 0 until pageIndex) {
-        val size = view.getPageSize(i)
-        if (size != null) {
-            accumulatedHeight += (size.height.toFloat() * zoom) + spacingPx
-        }
-    }
-    
-    val touchYInDoc = screenY - currentYOffset
-    val pageH = (view.getPageSize(pageIndex)?.height ?: 0).toFloat() * zoom
-    val pageW = (view.getPageSize(pageIndex)?.width ?: 0).toFloat() * zoom
-    
-    if (pageW <= 0f || pageH <= 0f) return null
-    
-    val localY = touchYInDoc - accumulatedHeight
-    val offsetX = screenX - view.currentXOffset
-    
-    return PointFCompat(
-        x = (offsetX / pageW).coerceIn(0f, 1f),
-        y = (localY / pageH).coerceIn(0f, 1f)
-    )
 }
 
 @Composable
@@ -593,28 +479,35 @@ fun MinimalistTopBar(
     onBackClick: () -> Unit
 ) {
     val textColor = if(isNightMode) Color.White else InkText
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val backgroundColor = if(isNightMode) Color.Black else FloatingSurface
+
+    Surface(
+        color = backgroundColor,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        IconButton(onClick = onBackClick) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = textColor.copy(alpha = 0.8f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBackClick) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = textColor.copy(alpha = 0.8f))
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Normal
+                ),
+                color = textColor,
+                maxLines = 1, 
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontFamily = FontFamily.Serif,
-                fontWeight = FontWeight.Normal
-            ),
-            color = textColor,
-            maxLines = 1, 
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 
@@ -622,7 +515,7 @@ fun MinimalistTopBar(
 fun FloatingControlCapsule(
     currentPage: Int,
     totalPages: Int,
-    isAnnotationMode: Boolean,
+    isEditing: Boolean,
     isNightMode: Boolean,
     onTocClick: () -> Unit,
     onGridClick: () -> Unit,
@@ -635,15 +528,14 @@ fun FloatingControlCapsule(
         shadowElevation = 8.dp,
         modifier = Modifier
             .height(64.dp)
-            .widthIn(min = 300.dp, max = 400.dp)
             .shadow(16.dp, RoundedCornerShape(50), ambientColor = Color.Black.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
+                .wrapContentWidth()
                 .padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             // Left: Progress
             Text(
@@ -673,71 +565,21 @@ fun FloatingControlCapsule(
                 }
 
                 // 3. Annotation (Pen)
+                /*
                 IconButton(onClick = onPenClick) {
-                    val tint = if(isAnnotationMode) MaterialTheme.colorScheme.primary else IconGrey
+                    val tint = if(isEditing) MaterialTheme.colorScheme.primary else IconGrey
                     Icon(Icons.Default.Edit, "Annotate", tint = tint)
                 }
+                */
 
                 // 4. Night Mode / Settings
                 IconButton(onClick = onSettingsClick) {
-                    // Using a simple Moon/Sun logic indicator could be better, but sticking to icons
                     Icon(
                         imageVector = if(isNightMode) Icons.Default.WbSunny else Icons.Default.NightlightRound, 
                         contentDescription = "Night Mode", 
                         tint = IconGrey
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun AnnotationPalette(
-    currentStrokeColor: Int,
-    onColorChange: (Int) -> Unit,
-    onUndo: () -> Unit,
-    onSave: () -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier
-) {
-    Surface(
-        modifier = modifier.width(56.dp),
-        shadowElevation = 6.dp,
-        color = FloatingSurface,
-        shape = RoundedCornerShape(28.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Color Pickers
-            val colors = listOf(Color.Red, Color.Blue, Color.Black)
-            colors.forEach { color ->
-                val androidColor = color.toArgb()
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .background(color, CircleShape)
-                        .clickable { onColorChange(androidColor) }
-                        .border(
-                            if (currentStrokeColor == androidColor) 2.dp else 0.dp,
-                            IconGrey,
-                            CircleShape
-                        )
-                )
-            }
-            
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), color = Color.LightGray)
-
-            // Actions
-            IconButton(onClick = onUndo) {
-                Icon(Icons.Default.Refresh, "Undo", tint = IconGrey)
-            }
-            
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Check, "Done", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
