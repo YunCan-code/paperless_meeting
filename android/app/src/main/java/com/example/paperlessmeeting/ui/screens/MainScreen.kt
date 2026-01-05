@@ -8,9 +8,15 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,7 +60,8 @@ fun MainScreen() {
             ) {
                 NavigationRail(
                     containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    windowInsets = WindowInsets.safeDrawing // Ensure rail respects system bars/cutouts
                 ) {
                     // Top items (Dashboard, Meetings)
                     items.filter { it != Screen.Settings }.forEach { screen ->
@@ -102,6 +109,7 @@ fun MainScreen() {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing) // Ensure content is safe from cutouts/bars
             ) {
                 composable(Screen.Dashboard.route) {
                     // Placeholder for Dashboard

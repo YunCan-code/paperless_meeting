@@ -88,6 +88,9 @@ def read_meetings(
     skip: int = 0, 
     limit: int = 100, 
     status: Optional[str] = None,
+    sort: Optional[str] = "desc", # asc, desc
+    start_date: Optional[str] = None, # YYYY-MM-DD
+    end_date: Optional[str] = None, # YYYY-MM-DD
     session: Session = Depends(get_session)
 ):
     """
@@ -97,7 +100,34 @@ def read_meetings(
     if status:
         query = query.where(Meeting.status == status)
     
-    query = query.offset(skip).limit(limit).order_by(Meeting.start_time.desc())
+    # Date Filtering
+    if start_date:
+        try:
+            # Parse start of day
+            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            print(f"[DEBUG] Filtering start_date >= {s_dt}")
+            query = query.where(Meeting.start_time >= s_dt)
+        except ValueError as e:
+            print(f"[DEBUG] start_date parse error: {e}")
+            pass
+            
+    if end_date:
+        try:
+            # Parse end of day (23:59:59)
+            e_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            print(f"[DEBUG] Filtering end_date <= {e_dt}")
+            query = query.where(Meeting.start_time <= e_dt)
+        except ValueError as e:
+            print(f"[DEBUG] end_date parse error: {e}")
+            pass
+
+    # Sorting
+    if sort == "asc":
+        query = query.order_by(Meeting.start_time.asc())
+    else:
+        query = query.order_by(Meeting.start_time.desc())
+
+    query = query.offset(skip).limit(limit)
     meetings = session.exec(query).all()
     
     results = []

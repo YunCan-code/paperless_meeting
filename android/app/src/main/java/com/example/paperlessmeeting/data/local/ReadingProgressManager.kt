@@ -75,4 +75,10 @@ class ReadingProgressManager @Inject constructor(
             }
         }
     }
+
+    suspend fun clearAll() {
+        withContext(Dispatchers.IO) {
+            prefs.edit().remove(KEY_PROGRESS_LIST).apply()
+        }
+    }
 }

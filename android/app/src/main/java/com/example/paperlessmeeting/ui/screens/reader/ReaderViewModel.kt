@@ -18,6 +18,7 @@ import com.google.gson.reflect.TypeToken
 sealed class ReaderUiState {
     object Idle : ReaderUiState()
     object Loading : ReaderUiState()
+    data class Downloading(val progress: Float, val fileName: String) : ReaderUiState()
     data class Ready(val file: File, val initialPage: Int = 0) : ReaderUiState()
     data class Error(val message: String) : ReaderUiState()
 }
@@ -70,9 +71,34 @@ class ReaderViewModel @Inject constructor(
                 val file = File(cacheDir, uniqueName)
 
                 if (!file.exists()) {
-                    val success = repository.downloadFile(url, file)
+                    // 使用带进度的下载，支持自动重试
+                    val maxRetries = 3
+                    var success = false
+                    var lastError: String? = null
+                    
+                    for (attempt in 1..maxRetries) {
+                        _uiState.value = ReaderUiState.Downloading(0f, fileName)
+                        
+                        success = repository.downloadFileWithProgress(url, file) { progress ->
+                            _uiState.value = ReaderUiState.Downloading(progress, fileName)
+                        }
+                        
+                        if (success) break
+                        
+                        // 下载失败，准备重试
+                        if (attempt < maxRetries) {
+                            lastError = "下载失败，正在重试 ($attempt/$maxRetries)..."
+                            _uiState.value = ReaderUiState.Error(lastError)
+                            kotlinx.coroutines.delay(2000) // 等待2秒后重试
+                            // 删除可能的不完整文件
+                            if (file.exists()) file.delete()
+                        }
+                    }
+                    
                     if (!success) {
-                        _uiState.value = ReaderUiState.Error("Download failed")
+                        // 删除不完整的文件
+                        if (file.exists()) file.delete()
+                        _uiState.value = ReaderUiState.Error("下载失败，请检查网络连接后重试")
                         return@launch
                     }
                 } else {

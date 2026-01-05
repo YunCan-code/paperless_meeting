@@ -48,33 +48,31 @@ class DashboardViewModel @Inject constructor(
                 // Get user name
                 val userName = userPreferences.getUserName() ?: "用户"
 
-                val rawMeetings = repository.getMeetings()
+                // 1. Get Today's Meetings (for Hero Card)
+                val todayStr = java.time.LocalDate.now().toString()
+                val todayMeetings = repository.getMeetings(
+                    limit = 100, // Ensure we get all of today's meetings
+                    startDate = todayStr,
+                    endDate = todayStr,
+                    sort = "asc"
+                )
                 
-                // 1. Parse and Sort by Start Time (Ascending)
+                // Parse times for internal logic (focus index)
                 val now = java.time.LocalDateTime.now()
-                val today = java.time.LocalDate.now()
-                
-                val sortedMeetings = rawMeetings.mapNotNull { meeting ->
+                val activeListWithTimes = todayMeetings.mapNotNull { meeting ->
                     try {
-                        // Standardize format: "2023-12-19 09:00:00" -> "2023-12-19T09:00:00"
                         val isoTime = meeting.startTime.replace(" ", "T")
                         val time = java.time.LocalDateTime.parse(isoTime)
-                        
-                        // Filter: ONLY show meetings for Today
-                        if (!time.toLocalDate().isEqual(today)) {
-                            null
-                        } else {
-                            Pair(meeting, time)
-                        }
+                        Pair(meeting, time)
                     } catch (e: Exception) {
-                        null // Skip invalid date meetings
+                        null
                     }
-                }.sortedBy { it.second }
+                } // Already sorted from backend
 
                 // 2. Determine "Focus" Index based on 15-min Logic
                 var startIndex = 0
-                for (i in 0 until sortedMeetings.size - 1) {
-                    val nextMeetingTime = sortedMeetings[i + 1].second
+                for (i in 0 until activeListWithTimes.size - 1) {
+                    val nextMeetingTime = activeListWithTimes[i + 1].second
                     val switchTime = nextMeetingTime.minusMinutes(15)
                     if (now.isAfter(switchTime)) {
                         startIndex = i + 1
@@ -82,22 +80,19 @@ class DashboardViewModel @Inject constructor(
                         break
                     }
                 }
-                
-                // Active list is ALL of today's meetings (sorted)
-                val activeList = sortedMeetings.map { it.first }
 
-                // Flatten and grab recent files (Legacy logic, maybe replace with progress logic later)
-                val allFiles = rawMeetings.flatMap { it.attachments.orEmpty() }.take(10)
+                // 3. Get Recent Files (Mock or separate API call if needed, here just use today's)
+                val recentFiles = todayMeetings.flatMap { it.attachments.orEmpty() }.take(10)
                 
                 // Load Reading Progress
                 val progressList = readingProgressManager.getAllProgress()
 
                 _uiState.value = DashboardUiState.Success(
-                    meetings = rawMeetings, 
-                    activeMeetings = activeList, 
-                    recentFiles = allFiles,
+                    meetings = todayMeetings,  // Only show today's meetings in raw list if needed, or separate
+                    activeMeetings = todayMeetings, 
+                    recentFiles = recentFiles,
                     readingProgress = progressList,
-                    initialPageIndex = 0,
+                    initialPageIndex = startIndex,
                     userName = userName
                 )
             } catch (e: Exception) {

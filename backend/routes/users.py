@@ -14,6 +14,13 @@ router = APIRouter(prefix="/users", tags=["users"])
 # Response Model using Pydantic Generic not supported directly in simple setup, so we return dict or specific schema
 # For list with pagination, we can return { "items": [...], "total": ... }
 
+from pydantic import BaseModel
+
+class ChangePasswordRequest(BaseModel):
+    user_id: int
+    old_password: str
+    new_password: str
+
 @router.get("/stats")
 def get_user_stats(session: Session = Depends(get_session)):
     """
@@ -207,3 +214,25 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
     session.delete(user)
     session.commit()
     return {"ok": True}
+
+@router.post("/change_password")
+def change_password(req: ChangePasswordRequest, session: Session = Depends(get_session)):
+    """
+    修改用户密码
+    """
+    user = session.get(User, req.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # 简单验证旧密码
+    # 注意：实际生产中应使用哈希比对
+    current_pwd = user.password or "password123" # Fallback to default if null
+    
+    if current_pwd != req.old_password:
+        raise HTTPException(status_code=400, detail="旧密码错误")
+        
+    user.password = req.new_password
+    session.add(user)
+    session.commit()
+    
+    return {"message": "密码修改成功"}

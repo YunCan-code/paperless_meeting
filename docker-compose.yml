@@ -1,16 +1,37 @@
 version: '3.8'
 
 services:
+  # === 数据库服务 ===
+  db:
+    image: postgres:15-alpine
+    container_name: meeting_db
+    restart: always
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD=123456 # <--- 请务必修改此密码
+      - POSTGRES_DB=paperless_meeting
+      - TZ=Asia/Shanghai
+
+  # === 后端服务 ===
   backend:
     build: ./backend
     container_name: meeting_backend
     restart: always
+    command: [ "/bin/bash", "./run_production.sh" ] # 使用 Gunicorn 生产启动
     volumes:
-      - ./backend/database.db:/app/database.db
       - ./backend/uploads:/app/uploads
+      # 如果需要保留 SQLite 作为备份，可以取消注释下面这行
+      # - ./backend/database.db:/app/database.db
+    depends_on:
+      - db
     environment:
       - TZ=Asia/Shanghai
+      # 连接到名为 'db' 的服务
+      - DATABASE_URL=postgresql://paperless:123456@db:5432/paperless_meeting
 
+  # === 前端服务 ===
   frontend:
     build: ./frontend
     container_name: meeting_frontend

@@ -10,3 +10,9 @@ data class LoginResponse(
     val department: String?,
     val token: String
 )
+
+data class ChangePasswordRequest(
+    val user_id: Int,
+    val old_password: String,
+    val new_password: String
+)

@@ -30,6 +30,7 @@ class LoginViewModel @Inject constructor(
             try {
                 val response = apiService.login(LoginRequest(query))
                 userPreferences.saveUserName(response.name)
+                userPreferences.saveUserId(response.user_id)
                 _uiState.value = LoginUiState.Success(response.name)
             } catch (e: Exception) {
                 // Parse error message if possible

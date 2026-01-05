@@ -38,6 +38,34 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
+     * 会议排序：今天 -> 未来 -> 历史
+     */
+    private fun sortMeetingsWithTodayFirst(meetings: List<Meeting>): List<Meeting> {
+        val today = java.time.LocalDate.now()
+        
+        val (todayMeetings, otherMeetings) = meetings.partition { meeting ->
+            try {
+                val dateStr = meeting.startTime.substringBefore(" ")
+                val meetingDate = java.time.LocalDate.parse(dateStr)
+                meetingDate == today
+            } catch (e: Exception) { false }
+        }
+        
+        val (futureMeetings, pastMeetings) = otherMeetings.partition { meeting ->
+            try {
+                val dateStr = meeting.startTime.substringBefore(" ")
+                val meetingDate = java.time.LocalDate.parse(dateStr)
+                meetingDate.isAfter(today)
+            } catch (e: Exception) { false }
+        }
+        
+        // 今日(时间升序) + 未来(日期升序) + 历史(日期降序)
+        return todayMeetings.sortedBy { it.startTime } +
+               futureMeetings.sortedBy { it.startTime } +
+               pastMeetings.sortedByDescending { it.startTime }
+    }
+
+    /**
      * 初始加载或刷新
      */
     fun loadMeetings() {
@@ -48,12 +76,12 @@ class HomeViewModel @Inject constructor(
             allMeetings.clear()
             
             try {
-                val meetings = repository.getMeetings(skip = 0, limit = pageSize)
+                val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "asc")
                 // Prevention against duplicate keys (crash cause)
                 allMeetings.addAll(meetings.distinctBy { it.id })
                 hasMoreData = meetings.size >= pageSize
                 _uiState.value = HomeUiState.Success(
-                    meetings = allMeetings.toList(),
+                    meetings = sortMeetingsWithTodayFirst(allMeetings),
                     isLoadingMore = false,
                     hasMoreData = hasMoreData
                 )
@@ -78,7 +106,7 @@ class HomeViewModel @Inject constructor(
             
             try {
                 val skip = allMeetings.size
-                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize)
+                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize, sort = "asc")
                 
                 if (newMeetings.isEmpty()) {
                     hasMoreData = false
@@ -102,7 +130,7 @@ class HomeViewModel @Inject constructor(
                     hasMoreData = newMeetings.size >= pageSize
                     
                     _uiState.value = HomeUiState.Success(
-                        meetings = allMeetings.toList(),
+                        meetings = sortMeetingsWithTodayFirst(allMeetings),
                         isLoadingMore = false,
                         hasMoreData = hasMoreData
                     )

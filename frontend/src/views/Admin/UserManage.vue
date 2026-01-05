@@ -159,7 +159,7 @@
           <el-table-column label="密码" min-width="120">
              <template #default="{ row }">
                 <div class="privacy-cell">
-                    <span>{{ row.showPassword ? (row.password || '******') : '******' }}</span>
+                    <span>{{ row.showPassword ? (row.password || 'password123') : '******' }}</span>
                      <el-icon class="privacy-icon" @click="togglePassword(row)">
                       <component :is="row.showPassword ? 'View' : 'Hide'" />
                     </el-icon>

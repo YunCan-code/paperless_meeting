@@ -42,6 +42,7 @@ fun LoginScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0), // Disable default insets to handle manually
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Row(
@@ -77,6 +78,7 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
+                        .windowInsetsPadding(WindowInsets.safeDrawing) // Ensure text clears nav bar/cutout
                         .padding(48.dp)
                 ) {
                     Text(
@@ -105,6 +107,7 @@ fun LoginScreen(
             ) {
                 Column(
                     modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.safeDrawing) // Ensure form clears safe area
                         .width(320.dp)
                         .padding(24.dp)
                 ) {

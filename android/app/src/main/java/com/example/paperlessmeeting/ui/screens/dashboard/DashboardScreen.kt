@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -120,14 +121,21 @@ fun DashboardContent(
         Spacer(modifier = Modifier.height(16.dp))
         
         if (state.activeMeetings.isNotEmpty()) {
+            val actualCount = state.activeMeetings.size
+            // 使用适中的页数模拟循环轮播 (避免Int.MAX_VALUE导致内存溢出)
+            val loopMultiplier = 1000
+            val virtualPageCount = if (actualCount > 1) actualCount * loopMultiplier else 1
+            val startPage = if (actualCount > 1) (virtualPageCount / 2) - ((virtualPageCount / 2) % actualCount) + state.initialPageIndex else 0
+            
             val pagerState = rememberPagerState(
-                initialPage = state.initialPageIndex,
-                pageCount = { state.activeMeetings.size }
+                initialPage = startPage,
+                pageCount = { virtualPageCount }
             )
             
             androidx.compose.runtime.LaunchedEffect(state.initialPageIndex) {
-                if (state.activeMeetings.isNotEmpty()) {
-                    pagerState.scrollToPage(state.initialPageIndex)
+                if (state.activeMeetings.isNotEmpty() && actualCount > 1) {
+                    val targetPage = (virtualPageCount / 2) - ((virtualPageCount / 2) % actualCount) + state.initialPageIndex
+                    pagerState.scrollToPage(targetPage)
                 }
             }
             
@@ -136,23 +144,26 @@ fun DashboardContent(
                     state = pagerState,
                     pageSpacing = 16.dp,
                     modifier = Modifier.fillMaxWidth().height(200.dp) 
-                ) { page ->
+                ) { virtualPage ->
+                    // 取模映射到实际索引
+                    val actualPage = virtualPage % actualCount
                     com.example.paperlessmeeting.ui.components.MeetingCard(
-                        meeting = state.activeMeetings[page],
-                        onClick = { onMeetingClick(state.activeMeetings[page].id) }
+                        meeting = state.activeMeetings[actualPage],
+                        onClick = { onMeetingClick(state.activeMeetings[actualPage].id) }
                     )
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Indicators
-                if (state.activeMeetings.size > 1) {
+                if (actualCount > 1) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        repeat(state.activeMeetings.size) { iteration ->
-                            val color = if (pagerState.currentPage == iteration) 
+                        repeat(actualCount) { iteration ->
+                            val currentActualPage = pagerState.currentPage % actualCount
+                            val color = if (currentActualPage == iteration) 
                                 MaterialTheme.colorScheme.primary 
                             else MaterialTheme.colorScheme.surfaceVariant
                             Box(
@@ -204,14 +215,14 @@ fun DashboardContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         // 3. Recent Reading (Using reading progress)
+        Text(
+            text = "最近阅读",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        
         if (state.readingProgress.isNotEmpty()) {
-            Text(
-                text = "最近阅读",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -225,7 +236,32 @@ fun DashboardContent(
                 }
             }
         } else {
-            // Optionally show empty state or nothing
+            // 空状态提示
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        RoundedCornerShape(16.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.MenuBook,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "暂无阅读记录",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(24.dp))

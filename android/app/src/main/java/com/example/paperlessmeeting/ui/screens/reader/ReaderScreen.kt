@@ -211,6 +211,102 @@ fun ReaderScreen(
                         color = InkText
                     )
                 }
+                is ReaderUiState.Downloading -> {
+                    // 下载进度 UI - 带返回按钮
+                    Column(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // 顶部栏
+                        Surface(
+                            color = FloatingSurface,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .statusBarsPadding()
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = InkText.copy(alpha = 0.8f))
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "下载中...",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = InkText,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        
+                        // 下载进度内容
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "正在下载文件",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = InkText
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = state.fileName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = IconGrey,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(24.dp))
+                                
+                                if (state.progress >= 0f) {
+                                    // 已知进度 - 显示百分比和进度条
+                                    Text(
+                                        text = "${(state.progress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    LinearProgressIndicator(
+                                        progress = { state.progress },
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.7f)
+                                            .height(8.dp)
+                                            .clip(RoundedCornerShape(4.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                } else {
+                                    // 未知进度 - 显示无限循环动画
+                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "文件大小未知...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = IconGrey
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(32.dp))
+                                Text(
+                                    text = "返回后下载将在后台继续",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = IconGrey
+                                )
+                            }
+                        }
+                    }
+                }
                 is ReaderUiState.Error -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center), 
