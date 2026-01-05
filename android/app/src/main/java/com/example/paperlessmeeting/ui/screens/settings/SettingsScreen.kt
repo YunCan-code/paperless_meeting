@@ -480,13 +480,7 @@ fun ChangePasswordSheet(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Drag Handle
-        Spacer(modifier = Modifier.height(12.dp))
-        Surface(
-            modifier = Modifier.size(width = 32.dp, height = 4.dp),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-            shape = RoundedCornerShape(2.dp)
-        ) {}
+        // Drag Handle removed (using default ModalBottomSheet handle)
         Spacer(modifier = Modifier.height(24.dp))
         
         Text(
