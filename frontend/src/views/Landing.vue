@@ -1,6 +1,6 @@
 <template>
   <div class="landing-page">
-    <!-- Navbar -->
+    <!-- Navbar (Logo only) -->
     <nav class="navbar">
       <div class="logo">
         <el-icon class="logo-icon"><Lightning /></el-icon>
@@ -11,136 +11,130 @@
         <el-icon class="link-icon"><Connection /></el-icon>
         VPS 探针
       </a>
-
     </nav>
 
     <!-- Hero Section -->
     <main class="hero-section">
       <div class="hero-content">
-        <h1 class="main-title">
-          <!-- <span class="gradient-text">智慧电力</span> -->
-          <br />
-          无纸化会议系统
-        </h1>
-        <p class="subtitle">
-          安全可靠 · 高效协同<br/>
-          <!-- 专为电力行业打造的新一代智能会议解决方案 -->
-        </p>
+        <div class="hero-badge">高效协同 · 绿色办公</div>
+        <h1 class="main-title">无纸化会议系统</h1>
         
         <div class="cta-group">
+          <!-- Enter System Button -->
           <el-button type="primary" size="large" class="enter-btn" @click="enterSystem">
             立即进入系统 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
           </el-button>
+
+          <!-- Download Android Button (with Popover) -->
+          <el-popover
+            trigger="click"
+            title="扫码下载安卓端"
+            :width="200"
+            placement="bottom"
+          >
+            <template #reference>
+              <el-button size="large" class="download-btn">
+                <el-icon class="el-icon--left"><Cellphone /></el-icon>
+                下载安卓端
+              </el-button>
+            </template>
+            
+            <div class="qr-container">
+              <qrcode-vue v-if="downloadUrl" :value="fullDownloadUrl" :size="160" level="H" />
+              <div v-else class="loading-text">获取链接中...</div>
+              
+              <div class="version-info" v-if="latestVersion">
+                v{{ latestVersion.version_name }}
+              </div>
+              
+              <a v-if="downloadUrl" :href="fullDownloadUrl" target="_blank" class="direct-link">
+                点击直接下载
+              </a>
+            </div>
+          </el-popover>
         </div>
       </div>
       
-      <!-- Visual Element (Abstract Power Grid) -->
-      <div class="hero-visual">
-         <div class="glowing-orb"></div>
-         <div class="grid-lines"></div>
+      <!-- Decorative Elements -->
+      <div class="hero-decoration">
+        <div class="decoration-circle circle-1"></div>
+        <div class="decoration-circle circle-2"></div>
+        <div class="decoration-circle circle-3"></div>
       </div>
     </main>
 
-    <!-- Showcase Sections -->
-    <div class="sections-container" id="showcase">
-      
-      <!-- Android Platform Section (Simplified) -->
-      <section class="showcase-section android-focus">
-        <div class="header-group">
-            <div class="showcase-tag">移动端</div>
-        </div>
-        
-        <div class="showcase-visual full-width">
-          <div class="tablet-mockup tilt-idle">
-            <div class="tablet-screen">
-               <el-carousel trigger="click" height="100%" arrow="always" :interval="4000" autoplay style="width: 100%">
-                 <el-carousel-item v-for="(img, key) in androidImages" :key="key" style="text-align: center; background: #000;">
-                   <img :src="img" class="tablet-screenshot" alt="App Screenshot" />
-                 </el-carousel-item>
-               </el-carousel>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <p>&copy; 2025 Smart Power Tech. All rights reserved.</p>
-    </footer>
+    <!-- No Footer -->
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Lightning, ArrowRight, ArrowDown, Monitor, DataBoard, Files, Setting, Reading, Connection, EditPen } from '@element-plus/icons-vue'
+import { Lightning, ArrowRight, Connection, Cellphone } from '@element-plus/icons-vue'
+import QrcodeVue from 'qrcode.vue'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const downloadUrl = ref('')
+const latestVersion = ref(null)
+
+// Compute full URL for QR code (linking to backend static file or external URL)
+const fullDownloadUrl = computed(() => {
+  if (!downloadUrl.value) return ''
+  if (downloadUrl.value.startsWith('http')) {
+    return downloadUrl.value
+  }
+
+  // Hardcode VPS Production URL as requested
+  // This ensures the QR code always points to the public VPS address
+  const baseUrl = 'https://coso.top'
+  return `${baseUrl}${downloadUrl.value.startsWith('/') ? '' : '/'}${downloadUrl.value}`
+})
 
 const enterSystem = () => {
   router.push('/admin/meetings')
 }
 
-const scrollToContent = () => {
-  document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth' })
+const fetchLatestApk = async () => {
+  try {
+    // Assuming axios is configured globally with base URL, or use direct path
+    // Let's use relative path /api/updates/latest if proxy is set up, 
+    // or rely on the axios instance created in utils/request.js if available.
+    // Here we'll try to use the standard fetch for simplicity in this file scope
+    // or import the request utility.
+    
+    // Using global axios default or relative path
+    // Note: Project likely has a configured axios instance.
+    // Let's assume /api prefix via vite proxy or direct.
+    
+    // Quick fix: user project structure check showed axios use.
+    // Let's try to import request from utils if possible, otherwise use axios directly.
+    
+    const res = await axios.get('/api/updates/latest') // Assuming /api proxy
+    if (res.data) {
+      latestVersion.value = res.data
+      downloadUrl.value = res.data.download_url
+    }
+  } catch (error) {
+    console.error('Failed to fetch latest APK:', error)
+    // ElMessage.warning('无法获取最新安卓版本')
+  }
 }
 
-const androidImages = [
-  '/landingPic/android_home.png',
-  '/landingPic/android_meetings.png',
-  '/landingPic/android_detail.png'
-]
+onMounted(() => {
+  fetchLatestApk()
+})
 </script>
 
 <style scoped>
-/* ... */
-/* Tablet Mockup Styling */
-
-.tablet-mockup {
-  width: 500px;
-  height: 380px; /* Landscape */
-  background: #0f172a;
-  border: 10px solid #334155;
-  border-radius: 24px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.1);
-}
-
-.tablet-screen {
-  padding: 0;
-  height: 100%;
-  background: black;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-}
-
-.tablet-screenshot {
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
-  display: block;
-}
-
-:deep(.el-carousel), :deep(.el-carousel__container) {
-  height: 100%;
-}
-
-/* ... Existing Styles ... */
-
 .landing-page {
   min-height: 100vh;
-  background-color: #0f172a;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-  color: white;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
+  color: #0f172a;
   font-family: 'Inter', sans-serif;
-  overflow: hidden;
   position: relative;
+  overflow: hidden;
 }
 
 /* Navbar */
@@ -152,61 +146,47 @@ const androidImages = [
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
+  width: 100%;
   z-index: 10;
+  box-sizing: border-box;
 }
+
 .logo {
   display: flex;
   align-items: center;
   gap: 12px;
   font-size: 20px;
   font-weight: 700;
-  color: white;
+  color: #0f172a;
 }
+
 .logo-icon {
-  color: #22d3ee;
+  color: #3b82f6;
   font-size: 28px;
 }
+
 .probe-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #64748b;
   text-decoration: none;
   font-size: 14px;
   padding: 8px 16px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #e2e8f0;
   transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.05);
+  background: white;
 }
+
 .probe-link:hover {
-  color: #22d3ee;
-  border-color: rgba(34, 211, 238, 0.3);
-  background: rgba(34, 211, 238, 0.1);
+  color: #3b82f6;
+  border-color: #3b82f6;
+  background: #eff6ff;
 }
+
 .link-icon {
   font-size: 16px;
-}
-.nav-links {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-}
-.nav-btn {
-  color: #94a3b8;
-  font-size: 15px;
-}
-.nav-btn:hover {
-  color: white;
-}
-.login-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-}
-.login-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Hero Section */
@@ -214,51 +194,123 @@ const androidImages = [
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 85vh;
+  height: 100vh;
+  width: 100%;
   padding: 0 48px;
   position: relative;
   text-align: center;
+  box-sizing: border-box;
 }
+
 .hero-content {
   z-index: 2;
   max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Visual adjustment: Shift UP */
+  margin-bottom: 25vh; 
 }
+
+.hero-badge {
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #3b82f6;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 32px;
+  border: 1px solid #bfdbfe;
+  letter-spacing: 1px;
+}
+
 .main-title {
   font-size: 64px;
   font-weight: 800;
   line-height: 1.1;
-  margin-bottom: 24px;
-  letter-spacing: -1px;
-}
-.gradient-text {
-  background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+  margin-bottom: 48px;
+  letter-spacing: -1.5px;
+  color: #0f172a;
+  background: linear-gradient(120deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.subtitle {
-  font-size: 20px;
-  color: #94a3b8;
-  margin-bottom: 48px;
-  line-height: 1.6;
-}
-.enter-btn {
-  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
-  border: none;
-  border-radius: 30px;
-  padding: 16px 48px;
-  font-size: 18px;
-  font-weight: 600;
-  height: auto;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
-  transition: transform 0.2s;
-}
-.enter-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.5);
+
+.cta-group {
+  display: flex;
+  gap: 24px;
+  align-items: center;
 }
 
-/* Visuals */
-.hero-visual {
+.enter-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 20px 40px;
+  font-size: 17px;
+  font-weight: 600;
+  height: auto;
+  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s;
+}
+
+.enter-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 30px -10px rgba(59, 130, 246, 0.5);
+}
+
+.download-btn {
+  background: white;
+  border: 2px solid #e2e8f0;
+  color: #475569;
+  border-radius: 12px;
+  padding: 20px 40px;
+  font-size: 17px;
+  font-weight: 600;
+  height: auto;
+  transition: all 0.2s;
+}
+
+.download-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #f8fafc;
+}
+
+/* QR Code Popover Content */
+.qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  text-align: center;
+}
+
+.loading-text {
+  padding: 20px;
+  color: #94a3b8;
+}
+
+.version-info {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.direct-link {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #3b82f6;
+  text-decoration: none;
+}
+.direct-link:hover {
+  text-decoration: underline;
+}
+
+/* Decorative Elements */
+.hero-decoration {
   position: absolute;
   top: 0;
   left: 0;
@@ -266,276 +318,36 @@ const androidImages = [
   height: 100%;
   z-index: 1;
   pointer-events: none;
-}
-.glowing-orb {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%);
-  filter: blur(60px);
-}
-.grid-lines {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
-}
-
-/* Showcase Sections */
-.sections-container {
-  position: relative;
-  z-index: 2;
-  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.8) 100%);
-}
-
-.showcase-section {
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 48px;
-  gap: 80px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.showcase-section.reverse {
-  flex-direction: row-reverse;
-}
-
-.showcase-content {
-  flex: 1;
-  max-width: 500px;
-}
-
-.showcase-tag {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(34, 211, 238, 0.1);
-  color: #22d3ee;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 24px;
-  border: 1px solid rgba(34, 211, 238, 0.2);
-}
-
-.section-title {
-  font-size: 40px;
-  font-weight: 700;
-  margin-bottom: 24px;
-  line-height: 1.2;
-}
-
-.section-desc {
-  font-size: 18px;
-  color: #94a3b8;
-  margin-bottom: 32px;
-  line-height: 1.6;
-}
-
-.feature-list {
-  list-style: none;
-  padding: 0;
-}
-
-.feature-list li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  font-size: 16px;
-  color: #e2e8f0;
-}
-
-.feature-list li .el-icon {
-  color: #818cf8;
-  background: rgba(129, 140, 248, 0.1);
-  padding: 8px;
-  border-radius: 8px;
-  box-sizing: content-box;
-}
-
-/* MOCKUPS */
-.showcase-visual {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-/* Browser Mockup */
-.browser-mockup {
-  width: 500px;
-  height: 350px;
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
-  position: relative;
 }
 
-.showcase-visual.full-width {
-    width: 100%;
-}
-
-.showcase-section.android-focus {
-  flex-direction: column !important;
-  padding-top: 40px;
-  gap: 60px;
-  min-height: 90vh;
-}
-
-.header-group {
-    text-align: center;
-    width: 100%;
-}
-.header-group .showcase-tag {
-    font-size: 18px; 
-    padding: 10px 32px;
-    margin-bottom: 0;
-}
-
-/* Tablet Mockup Styling */
-.tablet-mockup {
-  width: 100%;
-  max-width: 1200px; /* Allow wider */
-  height: 800px; /* Fixed large height to accommodate original size */
-  background: #0f172a;
-  border: 12px solid #334155;
-  border-radius: 24px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.1);
-  margin: 0 auto;
-}
-
-.tablet-screen {
-  padding: 0;
-  height: 100%;
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-  display: flex;       /* Center the image if aspect ratio differs */
-  align-items: center;
-  justify-content: center;
-}
-
-.tablet-screenshot {
-  width: 100%;
-  height: 100%;
-  object-fit: contain; /* Critical Fix: Maintain aspect ratio */
-  display: block;
-}
-
-:deep(.el-carousel), :deep(.el-carousel__container) {
-  height: 100%;
-}
-
-/* Tilts */
-.tilt-idle {
-  transform: perspective(2000px) rotateX(5deg);
-  transition: transform 0.6s ease-out;
-}
-.showcase-visual:hover .tilt-idle {
-  transform: perspective(2000px) rotateX(0) scale(1.02);
-}
-
-/* Footer */
-.footer {
-  text-align: center;
-  padding: 24px;
-  color: #475569;
-  font-size: 12px;
+.decoration-circle {
   position: absolute;
-  bottom: 0;
-  width: 100%;
+  border-radius: 50%;
+  opacity: 0.6;
 }
-/* Mobile Adaptation */
-@media (max-width: 768px) {
-  .navbar {
-    padding: 16px 24px;
-  }
-  
-  .logo-text {
-    font-size: 16px;
-  }
 
-  .hero-section {
-    padding: 0 24px;
-    min-height: 70vh;
-  }
-  
-  .main-title {
-    font-size: 36px;
-    line-height: 1.2;
-    margin-bottom: 24px;
-  }
-  
-  .subtitle {
-    font-size: 16px;
-    margin-bottom: 32px;
-  }
-  
-  .features-section {
-    flex-direction: column;
-    align-items: center;
-    gap: 24px;
-    padding-bottom: 48px;
-  }
-  
-  .feature-card {
-    width: 100%;
-    max-width: 340px;
-  }
-  
-  .enter-btn {
-    padding: 12px 32px;
-    font-size: 16px;
-    width: 100%;
-    max-width: 300px;
-  }
-  
-  /* Showcase Responsive */
-  .showcase-section,
-  .showcase-section.reverse {
-    flex-direction: column;
-    padding: 64px 24px;
-    gap: 48px;
-    text-align: center;
-  }
-  
-  .showcase-content {
-    max-width: 100%;
-  }
-  
-  .section-title {
-    font-size: 28px;
-  }
-  
-  .feature-list {
-    display: inline-block;
-    text-align: left;
-  }
+.circle-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+  top: -100px;
+  right: -100px;
+}
 
-  .browser-mockup {
-    width: 100%;
-    height: 250px;
-  }
-  
-  .tablet-mockup {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 16/10;
-  }
+.circle-2 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.08) 0%, transparent 70%);
+  bottom: 50px;
+  left: -50px;
+}
+
+.circle-3 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
+  top: 40%;
+  right: 10%;
 }
 </style>

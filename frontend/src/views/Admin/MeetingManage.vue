@@ -25,7 +25,7 @@
     <!-- 顶部统计卡片 (Sessions Overview) -->
     <el-row :gutter="20" class="stats-row">
       <el-col :xs="12" :sm="12" :md="6" :span="6" v-for="(stat, index) in statsData" :key="index">
-        <el-card shadow="hover" class="stat-card">
+        <el-card shadow="hover" class="stat-card" :class="{ 'clickable': stat.clickable }" @click="stat.onClick && stat.onClick()">
           <div class="stat-content">
             <div class="stat-icon" :class="stat.bgClass">
               <el-icon :class="stat.textClass" :size="24">
@@ -69,6 +69,36 @@
       @view="viewDetails"
       @upload="handleUploadClick"
     />
+
+    <!-- 文件列表抽屉 -->
+    <el-drawer v-model="filesDrawerVisible" title="会议文件列表" size="500px">
+      <div class="files-drawer-content">
+        <div v-if="allFilesList.length === 0" class="empty-state" style="padding: 40px;">
+          <el-icon :size="48" color="#e2e8f0"><FolderOpened /></el-icon>
+          <p>暂无已上传的会议文件</p>
+        </div>
+        <div v-else class="files-list">
+          <div v-for="file in allFilesList" :key="file.id" class="file-card">
+            <div class="file-card-left">
+              <div class="file-icon-box">
+                <el-icon><Document /></el-icon>
+              </div>
+              <div class="file-info">
+                <div class="file-name">{{ file.display_name }}</div>
+                <div class="file-meeting">{{ file.meetingTitle }}</div>
+                <div class="file-date">{{ new Date(file.meetingDate).toLocaleDateString() }} · {{ formatSize(file.file_size) }}</div>
+              </div>
+            </div>
+            <el-button link type="primary" @click="downloadFile(file)">
+              <el-icon><Download /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div style="color: #94a3b8; font-size: 13px;">共 {{ allFilesList.length }} 个文件</div>
+      </template>
+    </el-drawer>
 
     <!-- 会议详情对话框 -->
     <el-dialog 
@@ -321,7 +351,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Calendar, Timer as Clock, User, CircleCheck, Fold, Expand, 
   Document, UploadFilled, Top, Bottom, Delete, Edit, Plus,
-  CollectionTag, LocationInformation, FolderOpened, Download
+  CollectionTag, LocationInformation, FolderOpened, Download, DataAnalysis
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import SessionCalendar from './components/SessionCalendar.vue'
@@ -339,6 +369,26 @@ const dialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const currentDetail = ref(null)
 
+// Files Drawer
+const filesDrawerVisible = ref(false)
+const allFilesList = computed(() => {
+    const files = []
+    meetings.value.forEach(m => {
+        if (m.attachments && m.attachments.length > 0) {
+            m.attachments.forEach(a => {
+                files.push({
+                    ...a,
+                    meetingTitle: m.title,
+                    meetingDate: m.start_time
+                })
+            })
+        }
+    })
+    // Sort by date descending
+    files.sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate))
+    return files
+})
+
 // Forms & States
 const submitting = ref(false)
 const isEditMode = ref(false)
@@ -353,66 +403,57 @@ const form = ref({
 
 const currentSelectedDate = ref(new Date())
 
-// Stats
+// Stats State
+const stats = ref({
+  yearly_count: 0,
+  monthly_count: 0,
+  weekly_count: 0,
+  total_storage_bytes: 0
+})
+
+const fetchStats = async () => {
+  try {
+    const res = await request.get('/meetings/stats')
+    stats.value = res
+  } catch(e) { console.error('Failed to fetch stats', e) }
+}
+
+onMounted(async () => {
+  await fetchMeetingTypes()
+  await fetchMeetings()
+  fetchStats()
+})
+
+
+
 const statsData = computed(() => {
-  const total = meetings.value.length || 0
-  
-  // Card 1: 本月会议数 (Monthly Meeting Count)
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthlyCount = meetings.value.filter(m => {
-      if(!m.start_time) return false
-      const d = new Date(m.start_time)
-      return d >= startOfMonth && d <= new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-  }).length
-
-  // Card 2: 本周会议数 (Weekly Meeting Count)
-  const dayOfWeek = now.getDay() || 7 // 1-7
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - dayOfWeek + 1)
-  startOfWeek.setHours(0,0,0,0)
-  
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6)
-  endOfWeek.setHours(23,59,59,999)
-
-  const weeklyCount = meetings.value.filter(m => {
-      if(!m.start_time) return false
-      const d = new Date(m.start_time)
-      // Check if within this week
-      return d >= startOfWeek && d <= endOfWeek
-  }).length
-
-  // Calculate file storage
-  let totalBytes = 0
-  meetings.value.forEach(m => {
-     if(m.attachments) {
-        m.attachments.forEach(a => totalBytes += (a.file_size || 0))
-     }
-  })
   const formatBytesSimple = (bytes) => {
       const k = 1024
       const sizes = ['B', 'KB', 'MB', 'GB']
+      if (bytes === 0) return '0 B'
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
-  const storageStr = totalBytes > 0 ? formatBytesSimple(totalBytes) : '0 MB'
-
-  const onlineUsers = Math.floor(Math.random() * 5) + 12 // Mock active users
+  const storageStr = formatBytesSimple(stats.value.total_storage_bytes || 0)
 
   return [
     { 
+      title: '本年会议数', // Replaced "User Online"
+      value: stats.value.yearly_count, 
+      icon: 'DataAnalysis', // Changed icon
+      bgClass: 'bg-purple-50', 
+      textClass: 'text-purple-500' 
+    },
+    { 
       title: '本月会议数', 
-      value: monthlyCount, 
-      // subtitle: '本月累计', 
+      value: stats.value.monthly_count, 
       icon: 'Calendar', 
       bgClass: 'bg-blue-50', 
       textClass: 'text-blue-500' 
     },
     { 
       title: '本周会议数', 
-      value: weeklyCount, 
-      // subtitle: '本周安排', 
+      value: stats.value.weekly_count, 
       icon: 'CollectionTag', 
       bgClass: 'bg-orange-50', 
       textClass: 'text-orange-500' 
@@ -420,18 +461,11 @@ const statsData = computed(() => {
     { 
       title: '文件存储', 
       value: storageStr, 
-      // subtitle: '已用空间', 
       icon: 'FolderOpened', 
       bgClass: 'bg-green-50', 
-      textClass: 'text-green-500' 
-    },
-    { 
-      title: '用户在线数', 
-      value: onlineUsers, 
-      // subtitle: '实时在线', 
-      icon: 'User', 
-      bgClass: 'bg-purple-50', 
-      textClass: 'text-purple-500' 
+      textClass: 'text-green-500',
+      clickable: true,
+      onClick: () => { filesDrawerVisible.value = true }
     }
   ]
 })
@@ -744,4 +778,29 @@ onMounted(async () => {
 .agenda-item { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; }
 .agenda-time { font-family: monospace; font-weight: 600; color: var(--color-primary); background: var(--bg-main); padding: 2px 6px; border-radius: 4px; }
 .agenda-content { color: var(--text-main); line-height: 1.5; }
+
+/* Clickable Stat Card */
+.stat-card.clickable { cursor: pointer; }
+
+/* Files Drawer */
+.files-drawer-content { height: 100%; overflow-y: auto; }
+.files-list { display: flex; flex-direction: column; gap: 12px; }
+.file-card {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px; background: var(--card-bg);
+    border: 1px solid var(--border-color); border-radius: 12px;
+    transition: all 0.2s;
+}
+.file-card:hover { border-color: var(--color-slate-400); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.file-card-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
+.file-icon-box {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: #f0fdf4; color: #22c55e;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+}
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-weight: 600; color: var(--text-main); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-meeting { font-size: 13px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-date { font-size: 12px; color: #94a3b8; margin-top: 4px; }
 </style>

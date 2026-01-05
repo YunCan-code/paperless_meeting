@@ -37,6 +37,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14" // Matches Kotlin 1.9.24
@@ -77,6 +78,11 @@ dependencies {
 
     // PDF Viewer
     implementation("com.github.asadwaheed1:AndroidPdfViewer:v3.2.0-beta06")
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

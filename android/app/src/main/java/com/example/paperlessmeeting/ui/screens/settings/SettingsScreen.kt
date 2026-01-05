@@ -113,7 +113,25 @@ fun SettingsScreen(
                         title = "检查更新",
                         subtitle = "当前版本 ${state.versionName}",
                         onClick = { 
-                             Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                            viewModel.checkForUpdate(
+                                onNoUpdate = {
+                                    Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                                },
+                                onUpdateAvailable = { version, notes ->
+                                    android.app.AlertDialog.Builder(context)
+                                        .setTitle("发现新版本 $version")
+                                        .setMessage(notes.ifBlank { "有新版本可用，是否立即下载？" })
+                                        .setPositiveButton("立即更新") { _, _ ->
+                                            viewModel.triggerAppUpdate()
+                                            Toast.makeText(context, "正在下载更新...", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .setNegativeButton("稍后再说", null)
+                                        .show()
+                                },
+                                onError = { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            )
                         }
                     )
                 }

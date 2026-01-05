@@ -3,7 +3,7 @@ from sqlmodel import Session, select, SQLModel
 from typing import List, Optional
 import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database import get_session
 from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase
@@ -34,6 +34,57 @@ def create_meeting(meeting: Meeting, session: Session = Depends(get_session)):
     session.refresh(meeting)
     return meeting
 
+@router.get("/stats")
+def get_meeting_stats(session: Session = Depends(get_session)):
+    """
+    获取会议统计数据 (本年/本月/本周/存储)
+    """
+    now = datetime.now()
+    
+    # 1. Calculate Date Ranges
+    # Year
+    start_of_year = datetime(now.year, 1, 1)
+    # End of Year (Start of next year)
+    end_of_year = datetime(now.year + 1, 1, 1)
+    
+    # Month
+    start_of_month = datetime(now.year, now.month, 1)
+    # End of Month (Start of next month)
+    if now.month == 12:
+        end_of_month = datetime(now.year + 1, 1, 1)
+    else:
+        end_of_month = datetime(now.year, now.month + 1, 1)
+    
+    # Week (Start from Monday)
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    # End of Week (Next Monday)
+    end_of_week = start_of_week + timedelta(days=7)
+    
+    # Importing func here to avoid extensive imports change on top if not present
+    from sqlalchemy import func, and_
+    
+    def count_in_range(start_dt, end_dt):
+        return session.exec(
+            select(func.count(Meeting.id))
+            .where(Meeting.start_time >= start_dt)
+            .where(Meeting.start_time < end_dt)
+        ).one()
+        
+    yearly_count = count_in_range(start_of_year, end_of_year)
+    monthly_count = count_in_range(start_of_month, end_of_month)
+    weekly_count = count_in_range(start_of_week, end_of_week)
+    
+    # 3. Calculate Storage
+    total_bytes = session.exec(select(func.sum(Attachment.file_size))).one() or 0
+    
+    return {
+        "yearly_count": yearly_count,
+        "monthly_count": monthly_count,
+        "weekly_count": weekly_count,
+        "total_storage_bytes": total_bytes
+    }
+
 import random
 import os
 
@@ -41,6 +92,7 @@ import os
 class MeetingCardResponse(MeetingRead):
     card_image_url: Optional[str] = None
     meeting_type_name: Optional[str] = None
+    attachments: List[AttachmentRead] = []
 
 # Default Image Pool for Random Strategy (Fallback)
 DEFAULT_IMAGES = {

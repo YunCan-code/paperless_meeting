@@ -108,3 +108,59 @@ class NoteUpdate(SQLModel):
     title: Optional[str] = None
     content: Optional[str] = None
     status: Optional[str] = None
+
+# 设备管理模型
+class DeviceBase(SQLModel):
+    device_id: str = Field(unique=True, index=True) # 硬件标识
+    name: Optional[str] = None # 设备名称 (e.g. "张三的平板")
+    alias: Optional[str] = None # 用户自定义别名
+    model: Optional[str] = None # 型号
+    mac_address: Optional[str] = None
+    os_version: Optional[str] = None
+    app_version: Optional[str] = None
+    ip_address: Optional[str] = None
+    battery_level: Optional[int] = None # 0-100
+    is_charging: bool = Field(default=False)
+    storage_total: Optional[int] = None # bytes
+    storage_available: Optional[int] = None # bytes
+    last_active_at: datetime = Field(default_factory=datetime.now)
+    status: str = Field(default="active") # active, blocked
+
+class Device(DeviceBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class DeviceRead(DeviceBase):
+    id: int
+
+# APP更新模型
+class AppUpdateBase(SQLModel):
+    version_code: int # 安卓版本号 (用于比较)
+    version_name: str # 显示版本 (e.g. "1.0.2")
+    release_notes: Optional[str] = None
+    download_url: str # APK下载地址
+    is_force_update: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+class AppUpdate(AppUpdateBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class AppUpdateRead(AppUpdateBase):
+    id: int
+
+# 设备指令模型 (用于批量更新/重启等远程操作)
+class DeviceCommandBase(SQLModel):
+    device_id: str = Field(index=True)  # 目标设备的device_id
+    command_type: str  # "update_app", "restart", "lock"
+    payload: Optional[str] = None  # JSON格式附加参数
+    status: str = Field(default="pending")  # pending, acked, failed, expired
+
+class DeviceCommand(DeviceCommandBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    acked_at: Optional[datetime] = None
+
+class DeviceCommandRead(DeviceCommandBase):
+    id: int
+    created_at: datetime
+    acked_at: Optional[datetime]
+

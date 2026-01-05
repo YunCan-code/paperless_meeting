@@ -34,6 +34,7 @@ class SettingsViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val apiService: ApiService,
     private val readingProgressManager: ReadingProgressManager,
+    private val deviceRepository: com.example.paperlessmeeting.data.repository.DeviceRepository,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -43,6 +44,16 @@ class SettingsViewModel @Inject constructor(
     init {
         loadUserProfile()
         calculateCacheSize()
+        loadVersionName()
+    }
+
+    private fun loadVersionName() {
+        try {
+            val pInfo = getApplication<Application>().packageManager.getPackageInfo(
+                getApplication<Application>().packageName, 0
+            )
+            _uiState.value = _uiState.value.copy(versionName = "v${pInfo.versionName}")
+        } catch (e: Exception) { }
     }
 
     private fun loadUserProfile() {
@@ -179,6 +190,71 @@ class SettingsViewModel @Inject constructor(
                 userEmail = email
             )
             onSuccess()
+        }
+    }
+
+    fun checkForUpdate(
+        onNoUpdate: () -> Unit,
+        onUpdateAvailable: (versionName: String, releaseNotes: String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val result = deviceRepository.checkAppUpdate()
+                _uiState.value = _uiState.value.copy(isLoading = false)
+
+                if (result.isFailure) {
+                    onError("检查更新失败: ${result.exceptionOrNull()?.message}")
+                    return@launch
+                }
+
+                val remoteUpdate = result.getOrNull()
+                if (remoteUpdate == null) {
+                    onNoUpdate()
+                    return@launch
+                }
+
+                // Compare version codes
+                val pInfo = getApplication<Application>().packageManager.getPackageInfo(
+                    getApplication<Application>().packageName, 0
+                )
+                val currentVersionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    pInfo.longVersionCode.toInt()
+                } else {
+                    @Suppress("DEPRECATION")
+                    pInfo.versionCode
+                }
+
+                if (remoteUpdate.version_code > currentVersionCode) {
+                    onUpdateAvailable(remoteUpdate.version_name, remoteUpdate.release_notes)
+                } else {
+                    onNoUpdate()
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                onError("检查更新失败: ${e.message}")
+            }
+        }
+    }
+
+    fun triggerAppUpdate() {
+        viewModelScope.launch {
+            try {
+                val result = deviceRepository.checkAppUpdate()
+                if (result.isSuccess && result.getOrNull() != null) {
+                    val update = result.getOrNull()!!
+                    val updateRequest = androidx.work.OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.UpdateWorker>()
+                        .setInputData(
+                            androidx.work.Data.Builder()
+                                .putString(com.example.paperlessmeeting.worker.UpdateWorker.KEY_DOWNLOAD_URL, update.download_url)
+                                .putInt(com.example.paperlessmeeting.worker.UpdateWorker.KEY_COMMAND_ID, -1)
+                                .build()
+                        )
+                        .build()
+                    androidx.work.WorkManager.getInstance(getApplication()).enqueue(updateRequest)
+                }
+            } catch (e: Exception) { }
         }
     }
 }

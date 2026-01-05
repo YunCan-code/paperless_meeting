@@ -25,4 +25,20 @@ interface ApiService {
 
     @retrofit2.http.POST("users/change_password")
     suspend fun changePassword(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.ChangePasswordRequest): Map<String, String>
+
+    @retrofit2.http.POST("devices/heartbeat")
+    suspend fun deviceHeartbeat(@retrofit2.http.Body heartbeat: com.example.paperlessmeeting.domain.model.DeviceHeartbeat): com.example.paperlessmeeting.domain.model.DeviceResponse
+
+    @retrofit2.http.GET("updates/latest")
+    suspend fun checkAppUpdate(): com.example.paperlessmeeting.domain.model.AppUpdateCheck?
+
+    @retrofit2.http.GET("devices/{deviceId}/commands")
+    suspend fun getDeviceCommands(@retrofit2.http.Path("deviceId") deviceId: String): List<com.example.paperlessmeeting.domain.model.DeviceCommand>
+
+    @retrofit2.http.PUT("devices/commands/{commandId}/ack")
+    suspend fun ackCommand(@retrofit2.http.Path("commandId") commandId: Int): Map<String, String>
+
+    @retrofit2.http.Streaming
+    @retrofit2.http.GET
+    suspend fun downloadApk(@retrofit2.http.Url url: String): okhttp3.ResponseBody
 }

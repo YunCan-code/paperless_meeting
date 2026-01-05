@@ -37,6 +37,11 @@ const router = createRouter({
                     path: 'followup',
                     name: 'followup',
                     component: () => import('../views/Admin/FollowUp.vue')
+                },
+                {
+                    path: 'devices',
+                    name: 'devices',
+                    component: () => import('../views/Admin/DeviceManage.vue')
                 }
             ]
         },

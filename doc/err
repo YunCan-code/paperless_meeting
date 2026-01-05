@@ -1,312 +1,309 @@
-root@racknerd-f615542:/opt/paperless_meeting/backend# docker compose logs -f
-WARN[0000] /opt/paperless_meeting/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
-meeting_backend  | Starting Paperless Meeting Backend with 4 workers...
-meeting_backend  | [2026-01-04 14:47:16 +0800] [8] [INFO] Starting gunicorn 23.0.0
-meeting_backend  | [2026-01-04 14:47:16 +0800] [8] [INFO] Listening at: http://0.0.0.0:8000 (8)
-meeting_backend  | [2026-01-04 14:47:16 +0800] [8] [INFO] Using worker: uvicorn.workers.UvicornWorker
-meeting_backend  | [2026-01-04 14:47:16 +0800] [9] [INFO] Booting worker with pid: 9
-meeting_backend  | [2026-01-04 14:47:16 +0800] [10] [INFO] Booting worker with pid: 10
-meeting_backend  | [2026-01-04 14:47:16 +0800] [11] [INFO] Booting worker with pid: 11
-meeting_backend  | [2026-01-04 14:47:16 +0800] [12] [INFO] Booting worker with pid: 12
-meeting_backend  | [2026-01-04 14:47:25 +0800] [9] [INFO] Started server process [9]
-meeting_backend  | [2026-01-04 14:47:25 +0800] [10] [INFO] Started server process [10]
-meeting_backend  | [2026-01-04 14:47:25 +0800] [10] [INFO] Waiting for application startup.
-meeting_backend  | [2026-01-04 14:47:25 +0800] [9] [INFO] Waiting for application startup.
-meeting_backend  | [2026-01-04 14:47:25 +0800] [11] [INFO] Started server process [11]
-meeting_backend  | [2026-01-04 14:47:25 +0800] [11] [INFO] Waiting for application startup.
-meeting_backend  | [2026-01-04 14:47:25 +0800] [12] [INFO] Started server process [12]
-meeting_backend  | [2026-01-04 14:47:25 +0800] [12] [INFO] Waiting for application startup.
-meeting_backend  | [2026-01-04 14:47:26 +0800] [11] [ERROR] Traceback (most recent call last):
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend  |     self.dialect.do_execute(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend  |     cursor.execute(statement, parameters)
-meeting_backend  | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend  | DETAIL:  Key (relname, relnamespace)=(user_id_seq, 2200) already exists.
-meeting_backend  | 
-meeting_backend  | 
-meeting_backend  | The above exception was the direct cause of the following exception:
-meeting_backend  | 
-meeting_backend  | Traceback (most recent call last):
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
-meeting_backend  |     async with self.lifespan_context(app) as maybe_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/app/main.py", line 23, in lifespan
-meeting_backend  |     create_db_and_tables()
-meeting_backend  |   File "/app/database.py", line 47, in create_db_and_tables
-meeting_backend  |     SQLModel.metadata.create_all(engine)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
-meeting_backend  |     bind._run_ddl_visitor(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
-meeting_backend  |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
-meeting_backend  |     ).traverse_single(element)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend  |     return meth(obj, **kw)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
-meeting_backend  |     self.traverse_single(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend  |     return meth(obj, **kw)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
-meeting_backend  |     )._invoke_with(self.connection)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
-meeting_backend  |     return bind.execute(self)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-meeting_backend  |     return meth(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
-meeting_backend  |     return connection._execute_ddl(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
-meeting_backend  |     ret = self._execute_context(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-meeting_backend  |     return self._exec_single_context(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-meeting_backend  |     self._handle_dbapi_exception(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-meeting_backend  |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend  |     self.dialect.do_execute(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend  |     cursor.execute(statement, parameters)
-meeting_backend  | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend  | DETAIL:  Key (relname, relnamespace)=(user_id_seq, 2200) already exists.
-meeting_backend  | 
-meeting_backend  | [SQL: 
-meeting_backend  | CREATE TABLE "user" (
-meeting_backend  |      name VARCHAR NOT NULL, 
-meeting_backend  |      email VARCHAR, 
-meeting_backend  |      phone VARCHAR, 
-meeting_backend  |      district VARCHAR, 
-meeting_backend  |      department VARCHAR, 
-meeting_backend  |      position VARCHAR, 
-meeting_backend  |      role VARCHAR NOT NULL, 
-meeting_backend  |      is_active BOOLEAN NOT NULL, 
-meeting_backend  |      password VARCHAR, 
-meeting_backend  |      last_login TIMESTAMP WITHOUT TIME ZONE, 
-meeting_backend  |      id SERIAL NOT NULL, 
-meeting_backend  |      PRIMARY KEY (id)
-meeting_backend  | )
-meeting_backend  | 
-meeting_backend  | ]
-meeting_backend  | (Background on this error at: https://sqlalche.me/e/20/gkpj)
-meeting_backend  | 
-meeting_backend  | [2026-01-04 14:47:26 +0800] [11] [ERROR] Application startup failed. Exiting.
-meeting_backend  | [2026-01-04 14:47:26 +0800] [9] [ERROR] Traceback (most recent call last):
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend  |     self.dialect.do_execute(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend  |     cursor.execute(statement, parameters)
-meeting_backend  | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_type_typname_nsp_index"
-meeting_backend  | DETAIL:  Key (typname, typnamespace)=(user, 2200) already exists.
-meeting_backend  | 
-meeting_backend  | 
-meeting_backend  | The above exception was the direct cause of the following exception:
-meeting_backend  | 
-meeting_backend  | Traceback (most recent call last):
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
-meeting_backend  |     async with self.lifespan_context(app) as maybe_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/app/main.py", line 23, in lifespan
-meeting_backend  |     create_db_and_tables()
-meeting_backend  |   File "/app/database.py", line 47, in create_db_and_tables
-meeting_backend  |     SQLModel.metadata.create_all(engine)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
-meeting_backend  |     bind._run_ddl_visitor(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
-meeting_backend  |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
-meeting_backend  |     ).traverse_single(element)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend  |     return meth(obj, **kw)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
-meeting_backend  |     self.traverse_single(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend  |     return meth(obj, **kw)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
-meeting_backend  |     )._invoke_with(self.connection)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
-meeting_backend  |     return bind.execute(self)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-meeting_backend  |     return meth(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
-meeting_backend  |     return connection._execute_ddl(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
-meeting_backend  |     ret = self._execute_context(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-meeting_backend  |     return self._exec_single_context(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-meeting_backend  |     self._handle_dbapi_exception(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-meeting_backend  |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend  |     self.dialect.do_execute(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend  |     cursor.execute(statement, parameters)
-meeting_backend  | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_type_typname_nsp_index"
-meeting_backend  | DETAIL:  Key (typname, typnamespace)=(user, 2200) already exists.
-meeting_backend  | 
-meeting_backend  | [SQL: 
-meeting_backend  | CREATE TABLE "user" (
-meeting_backend  |      name VARCHAR NOT NULL, 
-meeting_backend  |      email VARCHAR, 
-meeting_backend  |      phone VARCHAR, 
-meeting_backend  |      district VARCHAR, 
-meeting_backend  |      department VARCHAR, 
-meeting_backend  |      position VARCHAR, 
-meeting_backend  |      role VARCHAR NOT NULL, 
-meeting_backend  |      is_active BOOLEAN NOT NULL, 
-meeting_backend  |      password VARCHAR, 
-meeting_backend  |      last_login TIMESTAMP WITHOUT TIME ZONE, 
-meeting_backend  |      id SERIAL NOT NULL, 
-meeting_backend  |      PRIMARY KEY (id)
-meeting_backend  | )
-meeting_backend  | 
-meeting_backend  | ]
-meeting_backend  | (Background on this error at: https://sqlalche.me/e/20/gkpj)
-meeting_backend  | 
-meeting_backend  | [2026-01-04 14:47:26 +0800] [9] [ERROR] Application startup failed. Exiting.
-meeting_backend  | [2026-01-04 14:47:26 +0800] [12] [ERROR] Traceback (most recent call last):
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend  |     self.dialect.do_execute(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend  |     cursor.execute(statement, parameters)
-meeting_backend  | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_type_typname_nsp_index"
-meeting_backend  | DETAIL:  Key (typname, typnamespace)=(user, 2200) already exists.
-meeting_backend  | 
-meeting_backend  | 
-meeting_backend  | The above exception was the direct cause of the following exception:
-meeting_backend  | 
-meeting_backend  | Traceback (most recent call last):
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
-meeting_backend  |     async with self.lifespan_context(app) as maybe_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend  |     async with original_context(app) as maybe_original_state:
-meeting_backend  |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend  |     return await anext(self.gen)
-meeting_backend  |   File "/app/main.py", line 23, in lifespan
-meeting_backend  |     create_db_and_tables()
-meeting_backend  |   File "/app/database.py", line 47, in create_db_and_tables
-meeting_backend  |     SQLModel.metadata.create_all(engine)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
-meeting_backend  |     bind._run_ddl_visitor(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
-meeting_backend  |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
-meeting_backend  |     ).traverse_single(element)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend  |     return meth(obj, **kw)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
-meeting_backend  |     self.traverse_single(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend  |     return meth(obj, **kw)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
-meeting_backend  |     )._invoke_with(self.connection)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
-meeting_backend  |     return bind.execute(self)
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-meeting_backend  |     return meth(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
-meeting_backend  |     return connection._execute_ddl(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
-meeting_backend  |     ret = self._execute_context(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-meeting_backend  |     return self._exec_single_context(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-meeting_backend  |     self._handle_dbapi_exception(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-meeting_backend  |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend  |     self.dialect.do_execute(
-meeting_backend  |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend  |     cursor.execute(statement, parameters)
-meeting_backend  | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_type_typname_nsp_index"
-meeting_backend  | DETAIL:  Key (typname, typnamespace)=(user, 2200) already exists.
-meeting_backend  | 
-meeting_backend  | [SQL: 
-meeting_backend  | CREATE TABLE "user" (
-meeting_backend  |      name VARCHAR NOT NULL, 
-meeting_backend  |      email VARCHAR, 
-meeting_backend  |      phone VARCHAR, 
-meeting_backend  |      district VARCHAR, 
-meeting_backend  |      department VARCHAR, 
-meeting_backend  |      position VARCHAR, 
-meeting_backend  |      role VARCHAR NOT NULL, 
-meeting_backend  |      is_active BOOLEAN NOT NULL, 
-meeting_backend  |      password VARCHAR, 
-meeting_backend  |      last_login TIMESTAMP WITHOUT TIME ZONE, 
-meeting_backend  |      id SERIAL NOT NULL, 
-meeting_backend  |      PRIMARY KEY (id)
-meeting_backend  | )
-meeting_backend  | 
-meeting_backend  | ]
-meeting_backend  | (Background on this error at: https://sqlalche.me/e/20/gkpj)
-meeting_backend  | 
-meeting_backend  | [2026-01-04 14:47:26 +0800] [12] [ERROR] Application startup failed. Exiting.
-meeting_frontend  | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
-meeting_backend   | [2026-01-04 14:47:26 +0800] [12] [INFO] Worker exiting (pid: 12)
-meeting_backend   | [2026-01-04 14:47:26 +0800] [9] [INFO] Worker exiting (pid: 9)
-meeting_backend   | [2026-01-04 14:47:26 +0800] [11] [INFO] Worker exiting (pid: 11)
-meeting_backend   | [2026-01-04 14:47:26 +0800] [10] [INFO] Application startup complete.
-meeting_backend   | [2026-01-04 14:47:27 +0800] [8] [ERROR] Worker (pid:11) exited with code 3
+meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [10] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [ERROR] Traceback (most recent call last):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+meeting_backend   |     self.dialect.do_execute(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+meeting_backend   |     cursor.execute(statement, parameters)
+meeting_backend   | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
+meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
+meeting_backend   | 
+meeting_backend   | 
+meeting_backend   | The above exception was the direct cause of the following exception:
+meeting_backend   | 
+meeting_backend   | Traceback (most recent call last):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
+meeting_backend   |     async with self.lifespan_context(app) as maybe_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/app/main.py", line 23, in lifespan
+meeting_backend   |     create_db_and_tables()
+meeting_backend   |   File "/app/database.py", line 47, in create_db_and_tables
+meeting_backend   |     SQLModel.metadata.create_all(engine)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
+meeting_backend   |     bind._run_ddl_visitor(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
+meeting_backend   |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
+meeting_backend   |     ).traverse_single(element)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+meeting_backend   |     return meth(obj, **kw)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+meeting_backend   |     self.traverse_single(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+meeting_backend   |     return meth(obj, **kw)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+meeting_backend   |     )._invoke_with(self.connection)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+meeting_backend   |     return bind.execute(self)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+meeting_backend   |     return meth(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+meeting_backend   |     return connection._execute_ddl(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+meeting_backend   |     ret = self._execute_context(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+meeting_backend   |     return self._exec_single_context(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+meeting_backend   |     self._handle_dbapi_exception(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+meeting_backend   |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+meeting_backend   |     self.dialect.do_execute(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+meeting_backend   |     cursor.execute(statement, parameters)
+meeting_backend   | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
+meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
+meeting_backend   | 
+meeting_backend   | [SQL: 
+meeting_backend   | CREATE TABLE devicecommand (
+meeting_backend   |     device_id VARCHAR NOT NULL, 
+meeting_backend   |     command_type VARCHAR NOT NULL, 
+meeting_backend   |     payload VARCHAR, 
+meeting_backend   |     status VARCHAR NOT NULL, 
+meeting_backend   |     id SERIAL NOT NULL, 
+meeting_backend   |     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+meeting_backend   |     acked_at TIMESTAMP WITHOUT TIME ZONE, 
+meeting_backend   |     PRIMARY KEY (id)
+meeting_backend   | )
+meeting_backend   | 
+meeting_backend   | ]
+meeting_backend   | (Background on this error at: https://sqlalche.me/e/20/gkpj)
+meeting_backend   | 
+meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [ERROR] Traceback (most recent call last):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+meeting_backend   |     self.dialect.do_execute(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+meeting_backend   |     cursor.execute(statement, parameters)
+meeting_backend   | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
+meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
+meeting_backend   | 
+meeting_backend   | 
+meeting_backend   | The above exception was the direct cause of the following exception:
+meeting_backend   | 
+meeting_backend   | Traceback (most recent call last):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
+meeting_backend   |     async with self.lifespan_context(app) as maybe_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/app/main.py", line 23, in lifespan
+meeting_backend   |     create_db_and_tables()
+meeting_backend   |   File "/app/database.py", line 47, in create_db_and_tables
+meeting_backend   |     SQLModel.metadata.create_all(engine)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
+meeting_backend   |     bind._run_ddl_visitor(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
+meeting_backend   |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
+meeting_backend   |     ).traverse_single(element)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+meeting_backend   |     return meth(obj, **kw)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+meeting_backend   |     self.traverse_single(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+meeting_backend   |     return meth(obj, **kw)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+meeting_backend   |     )._invoke_with(self.connection)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+meeting_backend   |     return bind.execute(self)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+meeting_backend   |     return meth(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+meeting_backend   |     return connection._execute_ddl(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+meeting_backend   |     ret = self._execute_context(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+meeting_backend   |     return self._exec_single_context(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+meeting_backend   |     self._handle_dbapi_exception(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+meeting_backend   |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+meeting_backend   |     self.dialect.do_execute(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+meeting_backend   |     cursor.execute(statement, parameters)
+meeting_backend   | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
+meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
+meeting_backend   | 
+meeting_backend   | [SQL: 
+meeting_backend   | CREATE TABLE devicecommand (
+meeting_backend   |     device_id VARCHAR NOT NULL, 
+meeting_backend   |     command_type VARCHAR NOT NULL, 
+meeting_backend   |     payload VARCHAR, 
+meeting_backend   |     status VARCHAR NOT NULL, 
+meeting_backend   |     id SERIAL NOT NULL, 
+meeting_backend   |     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+meeting_backend   |     acked_at TIMESTAMP WITHOUT TIME ZONE, 
+meeting_backend   |     PRIMARY KEY (id)
+meeting_backend   | )
+meeting_backend   | 
+meeting_backend   | ]
+meeting_backend   | (Background on this error at: https://sqlalche.me/e/20/gkpj)
+meeting_backend   | 
+meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [ERROR] Traceback (most recent call last):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+meeting_backend   |     self.dialect.do_execute(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+meeting_backend   |     cursor.execute(statement, parameters)
+meeting_backend   | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
+meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
+meeting_backend   | 
+meeting_backend   | 
+meeting_backend   | The above exception was the direct cause of the following exception:
+meeting_backend   | 
+meeting_backend   | Traceback (most recent call last):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
+meeting_backend   |     async with self.lifespan_context(app) as maybe_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
+meeting_backend   |     async with original_context(app) as maybe_original_state:
+meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
+meeting_backend   |     return await anext(self.gen)
+meeting_backend   |   File "/app/main.py", line 23, in lifespan
+meeting_backend   |     create_db_and_tables()
+meeting_backend   |   File "/app/database.py", line 47, in create_db_and_tables
+meeting_backend   |     SQLModel.metadata.create_all(engine)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
+meeting_backend   |     bind._run_ddl_visitor(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
+meeting_backend   |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
+meeting_backend   |     ).traverse_single(element)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+meeting_backend   |     return meth(obj, **kw)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+meeting_backend   |     self.traverse_single(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+meeting_backend   |     return meth(obj, **kw)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+meeting_backend   |     )._invoke_with(self.connection)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+meeting_backend   |     return bind.execute(self)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+meeting_backend   |     return meth(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+meeting_backend   |     return connection._execute_ddl(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+meeting_backend   |     ret = self._execute_context(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+meeting_backend   |     return self._exec_single_context(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+meeting_backend   |     self._handle_dbapi_exception(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+meeting_backend   |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+meeting_backend   |     self.dialect.do_execute(
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+meeting_backend   |     cursor.execute(statement, parameters)
+meeting_backend   | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
+meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
+meeting_backend   | 
+meeting_backend   | [SQL: 
+meeting_backend   | CREATE TABLE devicecommand (
+meeting_backend   |     device_id VARCHAR NOT NULL, 
+meeting_backend   |     command_type VARCHAR NOT NULL, 
+meeting_backend   |     payload VARCHAR, 
+meeting_backend   |     status VARCHAR NOT NULL, 
+meeting_backend   |     id SERIAL NOT NULL, 
+meeting_backend   |     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+meeting_backend   |     acked_at TIMESTAMP WITHOUT TIME ZONE, 
+meeting_backend   |     PRIMARY KEY (id)
+meeting_backend   | )
+meeting_backend   | 
+meeting_backend   | ]
+meeting_backend   | (Background on this error at: https://sqlalche.me/e/20/gkpj)
+meeting_backend   | 
+meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [ERROR] Application startup failed. Exiting.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [ERROR] Application startup failed. Exiting.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [ERROR] Application startup failed. Exiting.
+meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [INFO] Worker exiting (pid: 9)
+meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [INFO] Worker exiting (pid: 11)
+meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [INFO] Worker exiting (pid: 12)
+meeting_backend   | [2026-01-05 16:35:06 +0800] [10] [INFO] Application startup complete.
+meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Worker (pid:12) exited with code 3
 meeting_backend   | --- Logging error ---
 meeting_backend   | Traceback (most recent call last):
 meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1103, in emit
@@ -358,494 +355,66 @@ meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arb
 meeting_backend   |     self.log.error('Worker (pid:%s) exited with code %s', wpid, exitcode)
 meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/glogging.py", line 271, in error
 meeting_backend   |     self.error_log.error(msg, *args, **kwargs)
+meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1506, in error
+meeting_backend   |     self._log(ERROR, msg, args, **kwargs)
+meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1622, in _log
+meeting_backend   |     record = self.makeRecord(self.name, level, fn, lno, msg, args,
+meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1591, in makeRecord
+meeting_backend   |     rv = _logRecordFactory(name, level, fn, lno, msg, args, exc_info, func,
+meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 317, in __init__
+meeting_backend   |     self.filename = os.path.basename(pathname)
+meeting_backend   |   File "/usr/local/lib/python3.10/posixpath.py", line 143, in basename
+meeting_backend   |     sep = _get_sep(p)
+meeting_backend   |   File "/usr/local/lib/python3.10/posixpath.py", line 41, in _get_sep
+meeting_backend   |     def _get_sep(path):
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 241, in handle_chld
+meeting_backend   |     self.reap_workers()
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 526, in reap_workers
+meeting_backend   |     self.log.error('Worker (pid:%s) exited with code %s', wpid, exitcode)
+meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/glogging.py", line 271, in error
+meeting_backend   |     self.error_log.error(msg, *args, **kwargs)
 meeting_backend   | Message: 'Worker (pid:%s) exited with code %s'
-meeting_backend   | Arguments: (11, 3)
-meeting_backend   | [2026-01-04 14:47:27 +0800] [10] [INFO] Shutting down
-meeting_backend   | [2026-01-04 14:47:27 +0800] [10] [INFO] Waiting for application shutdown.
-meeting_backend   | [2026-01-04 14:47:27 +0800] [10] [INFO] Application shutdown complete.
-meeting_backend   | [2026-01-04 14:47:27 +0800] [10] [INFO] Finished server process [10]
-meeting_backend   | [2026-01-04 14:47:27 +0800] [8] [ERROR] Worker (pid:10) was sent SIGTERM!
-meeting_backend   | [2026-01-04 14:47:27 +0800] [8] [ERROR] Worker (pid:12) exited with code 3
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 208, in run
-meeting_backend   |     self.sleep()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 359, in sleep
-meeting_backend   |     ready = select.select([self.PIPE[0]], [], [], 1.0)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 241, in handle_chld
-meeting_backend   |     self.reap_workers()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 529, in reap_workers
-meeting_backend   |     raise HaltServer(reason, self.WORKER_BOOT_ERROR)
-meeting_backend   | gunicorn.errors.HaltServer: <HaltServer 'Worker failed to boot.' 3>
-meeting_backend   | 
-meeting_backend   | During handling of the above exception, another exception occurred:
-meeting_backend   | 
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/bin/gunicorn", line 8, in <module>
-meeting_backend   |     sys.exit(run())
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/app/wsgiapp.py", line 66, in run
-meeting_backend   |     WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]", prog=prog).run()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/app/base.py", line 235, in run
-meeting_backend   |     super().run()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/app/base.py", line 71, in run
-meeting_backend   |     Arbiter(self).run()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 228, in run
-meeting_backend   |     self.halt(reason=inst.reason, exit_status=inst.exit_status)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 341, in halt
-meeting_backend   |     self.stop()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 395, in stop
-meeting_backend   |     time.sleep(0.1)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 241, in handle_chld
-meeting_backend   |     self.reap_workers()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 529, in reap_workers
-meeting_frontend  | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
-meeting_frontend  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
-meeting_frontend  | 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
-meeting_frontend  | 10-listen-on-ipv6-by-default.sh: info: /etc/nginx/conf.d/default.conf differs from the packaged version
-meeting_frontend  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
-meeting_frontend  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
-meeting_frontend  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
-meeting_frontend  | /docker-entrypoint.sh: Configuration complete; ready for start up
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: using the "epoll" event method
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: nginx/1.28.1
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: built by gcc 15.2.0 (Alpine 15.2.0) 
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: OS: Linux 6.8.0-88-generic
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1024:524288
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: start worker processes
-meeting_frontend  | 2026/01/04 14:47:15 [notice] 1#1: start worker process 30
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:08 +0800] "GET / HTTP/1.1" 200 447 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:08 +0800] "GET /assets/index-CA1Tso-Z.js HTTP/1.1" 200 1144832 "https://coso.top/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.69.176.50"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:11 +0800] "GET /assets/Landing-Dxs0WKdR.js HTTP/1.1" 200 2310 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.70.142.154"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:13 +0800] "GET /assets/MeetingManage-BstCxxiB.js HTTP/1.1" 200 24292 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.70.142.168"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:13 +0800] "GET /assets/useSidebar-JbQohnVN.js HTTP/1.1" 200 141 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 162.158.88.117"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:14 +0800] "GET /assets/Dashboard-Biw9lEQ3.css HTTP/1.1" 200 2918 "https://coso.top/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 104.23.175.101"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:14 +0800] "GET /assets/Dashboard-wrdQ3HxB.js HTTP/1.1" 200 2384 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.110"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:14 +0800] "GET /assets/request-Df4cG4Kb.js HTTP/1.1" 200 36493 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.71.81.171"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:15 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 142 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:16 +0800] "GET /api/meetings/ HTTP/1.1" 200 2 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:18 +0800] "GET /assets/UserManage-DeH_sBFn.css HTTP/1.1" 200 3926 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 162.158.107.25"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:18 +0800] "GET /assets/UserManage-CtOdv_fe.js HTTP/1.1" 200 13709 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.71.124.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:19 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 46 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:20 +0800] "GET /assets/MeetingTypeManage-Dw9wybZZ.css HTTP/1.1" 200 3745 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 162.158.162.79"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:22 +0800] "GET /assets/MeetingTypeManage-CMiZHy08.js HTTP/1.1" 200 7671 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.70.93.106"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:22 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 142 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:24 +0800] "GET /api/users/stats HTTP/1.1" 200 56 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.5"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:25 +0800] "GET /assets/FollowUp-CtNzEAXy.js HTTP/1.1" 200 3998 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.70.142.87"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:25 +0800] "GET /assets/FollowUp-D6VQNWV3.css HTTP/1.1" 200 1731 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 162.158.162.96"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:26 +0800] "GET /api/notes/ HTTP/1.1" 200 2 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:27 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 142 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.5"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:48:28 +0800] "GET /api/meetings/ HTTP/1.1" 200 2 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 108.162.226.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:12 +0800] "GET /admin/meetings HTTP/1.1" 200 447 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:13 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:15 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:26 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2269 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:26 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:28 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:32 +0800] "GET /api/notes/ HTTP/1.1" 200 2 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:34 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:52:35 +0800] "GET /api/notes/ HTTP/1.1" 200 2 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:23 +0800] "POST /api/notes/ HTTP/1.1" 200 358 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:24 +0800] "GET /api/notes/ HTTP/1.1" 200 360 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:39 +0800] "PUT /api/notes/1 HTTP/1.1" 200 356 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:40 +0800] "GET /api/notes/ HTTP/1.1" 200 358 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:45 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:48 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:56:48 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2269 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:04 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:06 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:11 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:11 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2269 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:12 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:13 +0800] "GET /api/notes/ HTTP/1.1" 200 358 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:14 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:14 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:14 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2269 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:15 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:15 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:23 +0800] "GET /api/meetings/18 HTTP/1.1" 200 619 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:24 +0800] "GET /api/meetings/18 HTTP/1.1" 200 619 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:29 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2269 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:29 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:50 +0800] "POST /api/users/ HTTP/1.1" 200 175 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:57:51 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2223 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:24 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:25 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:25 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2223 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:25 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:26 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:26 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:27 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:33 +0800] "GET /api/users/?page=1&page_size=100 HTTP/1.1" 200 10654 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:39 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2223 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:39 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:47 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:48 +0800] "GET /api/notes/ HTTP/1.1" 200 358 "https://coso.top/admin/followup" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:50 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/types" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:51 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:51 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2223 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:52 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:58:52 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.68.164.36"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:23 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:23 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:23 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:44 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:44 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:49 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:51 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:14:59:51 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 141.101.98.19"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:01:22 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 172.71.241.137"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:01:23 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.71.241.137"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:01:23 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.71.241.136"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:04:42 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:04:42 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.51"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:04:43 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.51"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:04:45 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.51"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:05:15 +0800] "GET /admin/meetings HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.71.82.128"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:05:17 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.71.81.75"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:05:17 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.71.81.75"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:21 +0800] "GET /api/users/stats HTTP/1.1" 200 59 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.70.142.79"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:21 +0800] "GET /api/users/?page=1&page_size=10 HTTP/1.1" 200 2223 "https://coso.top/admin/users" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 172.70.142.78"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:29 +0800] "POST /api/auth/login HTTP/1.1" 200 85 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:29 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.231"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:29 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.231"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:32 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.231"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:32 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.231"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:32 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:32 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:41 +0800] "GET /api/meetings/?skip=20&limit=20 HTTP/1.1" 200 10064 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:49 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:50 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:50 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:51 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:53 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:53 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:06:54 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:07:55 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:07:55 +0800] "GET /api/meetings/?skip=0&limit=20 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:08:18 +0800] "GET /robots.txt HTTP/1.1" 200 447 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.134 Safari/537.36" "2001:4ca0:108:42::24, 198.41.242.221"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:08:28 +0800] "GET /api/meetings/?skip=20&limit=20 HTTP/1.1" 200 10064 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:08:33 +0800] "GET /api/meetings/9 HTTP/1.1" 200 601 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:08:36 +0800] "GET /api/meetings/18 HTTP/1.1" 200 619 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.195"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:08:43 +0800] "GET /api/meeting_types/ HTTP/1.1" 200 1616 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 162.158.108.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:08:44 +0800] "GET /api/meetings/ HTTP/1.1" 200 21995 "https://coso.top/admin/meetings" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0" "2406:da18:abf:6a50:d24d:2d30:2154:109c, 162.158.108.6"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:07 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.164"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:08 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.63"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:08 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.63"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:14 +0800] "GET /wp-login.php HTTP/1.1" 200 447 "https://www.bing.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7; rv:119.0) Gecko/20100101 Firefox/119.0" "160.250.132.49, 162.158.106.219"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:15 +0800] "GET /wp-login.php HTTP/1.1" 200 447 "https://www.google.com/search?q=wordpress" "Mozilla/5.0 (Windows NT 11.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0" "160.250.132.49, 162.158.106.219"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:15 +0800] "GET /wp-admin/ HTTP/1.1" 200 447 "https://t.co/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "160.250.132.49, 162.158.106.219"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:17 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.164"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:17 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:15:22 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.164"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:16:02 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:16:02 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.164"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:16:03 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:16:03 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.64.192.164"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:16 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.214.247"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:16 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.214.247"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:16 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.214.247"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:18 +0800] "GET /static/20251222155543_%E4%B8%9C%E6%99%8B%E9%97%A8%E9%98%80%E6%94%BF%E6%B2%BB%20%28%E7%94%B0%E4%BD%99%E5%BA%86%29%20%28Z-Library%29.pdf HTTP/1.1" 200 17400917 "-" "okhttp/4.12.0" "211.103.46.118, 104.23.251.8"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:34 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.91.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:36 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.91.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:36 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.91.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:46 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.91.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:19:47 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.91.4"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:20:14 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:20:15 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:20:15 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:21:04 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:21:04 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 172.70.211.146"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:27:53 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:27:54 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.63"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:27:54 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.63"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:11 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:12 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 45.91.64.6 - - [04/Jan/2026:15:28:12 +0800] "\x16\x03\x01\x05\xA8\x01\x00\x05\xA4\x03\x03\xA0\xC7f\x12\xCB\x04\xAA\xE9\x91\xD59\xF3\xA2u\xF8C~\x83d\xB2\xF8\xD0t\xA9Rg\xAE\xC9\x1E!\x8E\xBD \x11iX\xB6\x1F\x06M(p\xB1\x7FZ\x8F\xD9\x9CZ\x90\xA0d69\xB10\xE4W\xBE\xD8\xF4G\x86\xF8\xFA\x00\x1A\xC0+\xC0/\xC0,\xC00\xCC\xA9\xCC\xA8\xC0\x09\xC0\x13\xC0" 400 157 "-" "-" "-"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:12 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:49 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:50 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:50 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:50 +0800] "GET /api/meetings/?skip=0&limit=20&sort=asc HTTP/1.1" 200 11932 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:28:53 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 162.158.216.165"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:29:33 +0800] "POST /api/auth/login HTTP/1.1" 200 76 "-" "okhttp/4.12.0" "211.103.46.118, 172.71.178.136"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:29:34 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.71.178.73"
-meeting_frontend  | 172.18.0.1 - - [04/Jan/2026:15:29:34 +0800] "GET /api/meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.1" 200 21995 "-" "okhttp/4.12.0" "211.103.46.118, 172.71.178.72"
-meeting_backend   |     raise HaltServer(reason, self.WORKER_BOOT_ERROR)
-meeting_backend   | gunicorn.errors.HaltServer: <HaltServer 'Worker failed to boot.' 3>
+meeting_backend   | Arguments: (12, 3)
+meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Shutting down
+meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Waiting for application shutdown.
+meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Application shutdown complete.
+meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Finished server process [10]
+meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Worker (pid:10) was sent SIGTERM!
+meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Shutting down: Master
+meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Reason: Worker failed to boot.
 meeting_backend   | Starting Paperless Meeting Backend with 4 workers...
-meeting_backend   | [2026-01-04 14:47:28 +0800] [8] [INFO] Starting gunicorn 23.0.0
-meeting_backend   | [2026-01-04 14:47:28 +0800] [8] [INFO] Listening at: http://0.0.0.0:8000 (8)
-meeting_backend   | [2026-01-04 14:47:28 +0800] [8] [INFO] Using worker: uvicorn.workers.UvicornWorker
-meeting_backend   | [2026-01-04 14:47:28 +0800] [9] [INFO] Booting worker with pid: 9
-meeting_backend   | [2026-01-04 14:47:28 +0800] [10] [INFO] Booting worker with pid: 10
-meeting_backend   | [2026-01-04 14:47:28 +0800] [11] [INFO] Booting worker with pid: 11
-meeting_backend   | [2026-01-04 14:47:28 +0800] [12] [INFO] Booting worker with pid: 12
-meeting_backend   | [2026-01-04 14:47:34 +0800] [10] [INFO] Started server process [10]
-meeting_backend   | [2026-01-04 14:47:34 +0800] [9] [INFO] Started server process [9]
-meeting_backend   | [2026-01-04 14:47:34 +0800] [9] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-04 14:47:34 +0800] [10] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-04 14:47:35 +0800] [11] [INFO] Started server process [11]
-meeting_backend   | [2026-01-04 14:47:35 +0800] [11] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-04 14:47:35 +0800] [12] [INFO] Started server process [12]
-meeting_backend   | [2026-01-04 14:47:35 +0800] [12] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-04 14:47:35 +0800] [10] [INFO] Application startup complete.
-meeting_backend   | [2026-01-04 14:47:35 +0800] [9] [INFO] Application startup complete.
-meeting_backend   | [2026-01-04 14:47:35 +0800] [11] [INFO] Application startup complete.
-meeting_backend   | [2026-01-04 14:47:35 +0800] [12] [INFO] Application startup complete.
-meeting_backend   | 172.18.0.4:53606 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53614 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53616 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40012 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40022 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40026 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40030 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40032 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46074 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46088 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:38094 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:38104 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:38120 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40594 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40608 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40624 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55424 - "POST /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55428 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:38646 - "PUT /notes/1 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:59570 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:59580 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:59594 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:59604 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:39882 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:39888 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57382 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57392 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57396 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57400 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57406 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57408 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57416 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57424 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57436 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:37070 - "GET /meetings/18 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:37084 - "GET /meetings/18 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:37092 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:37096 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50598 - "POST /users/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50612 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34592 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34600 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34610 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34612 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34620 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34636 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34648 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:58406 - "GET /users/?page=1&page_size=100 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:58416 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:58418 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:43286 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:43294 - "GET /notes/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:35104 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:35114 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:35124 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:35140 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:35156 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:42164 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:42174 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:42180 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50720 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50724 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50734 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46110 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46122 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53890 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53898 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53902 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40158 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40162 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40168 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:40178 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56084 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56092 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48938 - "GET /users/stats HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48952 - "GET /users/?page=1&page_size=10 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48958 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48968 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48970 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50152 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50158 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50160 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50170 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48826 - "GET /meetings/?skip=20&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48834 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56308 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56320 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56330 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56346 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56350 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:56366 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:60934 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:60948 - "GET /meetings/?skip=0&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:52420 - "GET /meetings/?skip=20&limit=20 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:33660 - "GET /meetings/9 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:33670 - "GET /meetings/18 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48200 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:48210 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34750 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34756 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:34760 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50468 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50470 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:50760 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:39318 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:39332 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:39334 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:39350 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57704 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57716 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57728 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:57738 - "GET /static/20251222155543_%E4%B8%9C%E6%99%8B%E9%97%A8%E9%98%80%E6%94%BF%E6%B2%BB%20%28%E7%94%B0%E4%BD%99%E5%BA%86%29%20%28Z-Library%29.pdf HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55556 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55558 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55566 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:33922 - "GET /meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:33930 - "GET /meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46172 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46178 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:46194 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:45010 - "GET /meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:45022 - "GET /meetings/?skip=0&limit=20&sort=asc&start_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53316 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53320 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53332 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:52066 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:52076 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:52082 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:43128 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:43132 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53896 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53906 - "GET /meetings/?skip=0&limit=20&sort=asc HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53916 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55788 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55792 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:55800 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-04&end_date=2026-01-04 HTTP/1.0" 200
-meeting_db        | The files belonging to this database system will be owned by user "postgres".
-meeting_db        | This user must also own the server process.
-meeting_db        | 
-meeting_db        | The database cluster will be initialized with locale "en_US.utf8".
-meeting_db        | The default database encoding has accordingly been set to "UTF8".
-meeting_db        | The default text search configuration will be set to "english".
-meeting_db        | 
-meeting_db        | Data page checksums are disabled.
-meeting_db        | 
-meeting_db        | fixing permissions on existing directory /var/lib/postgresql/data ... ok
-meeting_db        | creating subdirectories ... ok
-meeting_db        | selecting dynamic shared memory implementation ... posix
-meeting_db        | selecting default max_connections ... 100
-meeting_db        | selecting default shared_buffers ... 128MB
-meeting_db        | selecting default time zone ... Asia/Shanghai
-meeting_db        | creating configuration files ... ok
-meeting_db        | running bootstrap script ... ok
-meeting_db        | sh: locale: not found
-meeting_db        | 2026-01-04 14:47:17.191 CST [34] WARNING:  no usable system locales were found
-meeting_db        | performing post-bootstrap initialization ... ok
-meeting_db        | syncing data to disk ... ok
-meeting_db        | 
-meeting_db        | initdb: warning: enabling "trust" authentication for local connections
-meeting_db        | 
-meeting_db        | Success. You can now start the database server using:
-meeting_db        | 
-meeting_db        |     pg_ctl -D /var/lib/postgresql/data -l logfile start
-meeting_db        | 
-meeting_db        | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
-meeting_db        | waiting for server to start....2026-01-04 14:47:19.500 CST [40] LOG:  starting PostgreSQL 15.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
-meeting_db        | 2026-01-04 14:47:19.501 CST [40] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
-meeting_db        | 2026-01-04 14:47:19.514 CST [43] LOG:  database system was shut down at 2026-01-04 14:47:19 CST
-meeting_db        | 2026-01-04 14:47:19.532 CST [40] LOG:  database system is ready to accept connections
-meeting_db        |  done
-meeting_db        | server started
-meeting_db        | CREATE DATABASE
-meeting_db        | 
-meeting_db        | 
-meeting_db        | /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
-meeting_db        | 
-meeting_db        | 2026-01-04 14:47:19.928 CST [40] LOG:  received fast shutdown request
-meeting_db        | waiting for server to shut down....2026-01-04 14:47:19.931 CST [40] LOG:  aborting any active transactions
-meeting_db        | 2026-01-04 14:47:20.002 CST [40] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
-meeting_db        | 2026-01-04 14:47:20.004 CST [41] LOG:  shutting down
-meeting_db        | 2026-01-04 14:47:20.008 CST [41] LOG:  checkpoint starting: shutdown immediate
-meeting_db        | 2026-01-04 14:47:20.154 CST [41] LOG:  checkpoint complete: wrote 921 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.107 s, sync=0.036 s, total=0.150 s; sync files=301, longest=0.002 s, average=0.001 s; distance=4239 kB, estimate=4239 kB
-meeting_db        | 2026-01-04 14:47:20.188 CST [40] LOG:  database system is shut down
-meeting_db        |  done
-meeting_db        | server stopped
-meeting_db        | 
-meeting_db        | PostgreSQL init process complete; ready for start up.
-meeting_db        | 
-meeting_db        | 2026-01-04 14:47:20.322 CST [1] LOG:  starting PostgreSQL 15.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
-meeting_db        | 2026-01-04 14:47:20.322 CST [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
-meeting_db        | 2026-01-04 14:47:20.322 CST [1] LOG:  listening on IPv6 address "::", port 5432
-meeting_db        | 2026-01-04 14:47:20.326 CST [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
-meeting_db        | 2026-01-04 14:47:20.338 CST [56] LOG:  database system was shut down at 2026-01-04 14:47:20 CST
-meeting_db        | 2026-01-04 14:47:20.360 CST [1] LOG:  database system is ready to accept connections
-meeting_db        | 2026-01-04 14:47:26.004 CST [63] ERROR:  duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_db        | 2026-01-04 14:47:26.004 CST [63] DETAIL:  Key (relname, relnamespace)=(user_id_seq, 2200) already exists.
-meeting_db        | 2026-01-04 14:47:26.004 CST [63] STATEMENT:  
-meeting_db        |     CREATE TABLE "user" (
-meeting_db        |             name VARCHAR NOT NULL, 
-meeting_db        |             email VARCHAR, 
-meeting_db        |             phone VARCHAR, 
-meeting_db        |             district VARCHAR, 
-meeting_db        |             department VARCHAR, 
-meeting_db        |             position VARCHAR, 
-meeting_db        |             role VARCHAR NOT NULL, 
-meeting_db        |             is_active BOOLEAN NOT NULL, 
-meeting_db        |             password VARCHAR, 
-meeting_db        |             last_login TIMESTAMP WITHOUT TIME ZONE, 
-meeting_db        |             id SERIAL NOT NULL, 
-meeting_db        |             PRIMARY KEY (id)
-meeting_db        |     )
-meeting_db        | 
-meeting_db        | 
-meeting_db        | 2026-01-04 14:47:26.006 CST [61] ERROR:  duplicate key value violates unique constraint "pg_type_typname_nsp_index"
-meeting_db        | 2026-01-04 14:47:26.006 CST [61] DETAIL:  Key (typname, typnamespace)=(user, 2200) already exists.
-meeting_db        | 2026-01-04 14:47:26.006 CST [61] STATEMENT:  
-meeting_db        |     CREATE TABLE "user" (
-meeting_db        |             name VARCHAR NOT NULL, 
-meeting_db        |             email VARCHAR, 
-meeting_db        |             phone VARCHAR, 
-meeting_db        |             district VARCHAR, 
-meeting_db        |             department VARCHAR, 
-meeting_db        |             position VARCHAR, 
-meeting_db        |             role VARCHAR NOT NULL, 
-meeting_db        |             is_active BOOLEAN NOT NULL, 
-meeting_db        |             password VARCHAR, 
-meeting_db        |             last_login TIMESTAMP WITHOUT TIME ZONE, 
-meeting_db        |             id SERIAL NOT NULL, 
-meeting_db        |             PRIMARY KEY (id)
-meeting_db        |     )
-meeting_db        | 
-meeting_db        | 
-meeting_db        | 2026-01-04 14:47:26.009 CST [62] ERROR:  duplicate key value violates unique constraint "pg_type_typname_nsp_index"
-meeting_db        | 2026-01-04 14:47:26.009 CST [62] DETAIL:  Key (typname, typnamespace)=(user, 2200) already exists.
-meeting_db        | 2026-01-04 14:47:26.009 CST [62] STATEMENT:  
-meeting_db        |     CREATE TABLE "user" (
-meeting_db        |             name VARCHAR NOT NULL, 
-meeting_db        |             email VARCHAR, 
-meeting_db        |             phone VARCHAR, 
-meeting_db        |             district VARCHAR, 
-meeting_db        |             department VARCHAR, 
-meeting_db        |             position VARCHAR, 
-meeting_db        |             role VARCHAR NOT NULL, 
-meeting_db        |             is_active BOOLEAN NOT NULL, 
-meeting_db        |             password VARCHAR, 
-meeting_db        |             last_login TIMESTAMP WITHOUT TIME ZONE, 
-meeting_db        |             id SERIAL NOT NULL, 
-meeting_db        |             PRIMARY KEY (id)
-meeting_db        |     )
-meeting_db        | 
-meeting_db        | 
-meeting_db        | 2026-01-04 14:52:20.416 CST [54] LOG:  checkpoint starting: time
-meeting_db        | 2026-01-04 14:52:33.374 CST [54] LOG:  checkpoint complete: wrote 132 buffers (0.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=12.949 s, sync=0.005 s, total=12.959 s; sync files=87, longest=0.001 s, average=0.001 s; distance=543 kB, estimate=543 kB
-meeting_db        | 2026-01-04 14:57:20.469 CST [54] LOG:  checkpoint starting: time
-meeting_db        | 2026-01-04 14:57:21.179 CST [54] LOG:  checkpoint complete: wrote 8 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.706 s, sync=0.002 s, total=0.711 s; sync files=6, longest=0.002 s, average=0.001 s; distance=1 kB, estimate=489 kB
-meeting_db        | 2026-01-04 15:02:20.260 CST [54] LOG:  checkpoint starting: time
-meeting_db        | 2026-01-04 15:02:21.068 CST [54] LOG:  checkpoint complete: wrote 9 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.804 s, sync=0.002 s, total=0.808 s; sync files=9, longest=0.001 s, average=0.001 s; distance=6 kB, estimate=441 kB
-meeting_frontend  | 199.45.154.157 - - [04/Jan/2026:15:39:46 +0800] "\x16\x03\x01\x00\xEE\x01\x00\x00\xEA\x03\x033/\x17\xB1\xBB\x09\x22D\xCD\xEE\xCC\x10\xE60\xDA\xCF\x89\x05P \x1E9c\x8B\xB5\xF2\xD9h\x91\xA3\x17r \x92\xCE.\x01<\xD3\xC8s$4\xB5\xAE\xB2\xEAkb\x22\xC7Z5\xC4\xA3\xC0\xF0e\x9FOe\x96l\xC7$\x00&\xCC\xA8\xCC\xA9\xC0/\xC00\xC0+\xC0,\xC0\x13\xC0\x09\xC0\x14\xC0" 400 157 "-" "-" "-"
+meeting_backend   | [2026-01-05 16:35:09 +0800] [9] [INFO] Starting gunicorn 23.0.0
+meeting_backend   | [2026-01-05 16:35:09 +0800] [9] [INFO] Listening at: http://0.0.0.0:8000 (9)
+meeting_backend   | [2026-01-05 16:35:09 +0800] [9] [INFO] Using worker: uvicorn.workers.UvicornWorker
+meeting_backend   | [2026-01-05 16:35:09 +0800] [10] [INFO] Booting worker with pid: 10
+meeting_backend   | [2026-01-05 16:35:09 +0800] [11] [INFO] Booting worker with pid: 11
+meeting_backend   | [2026-01-05 16:35:09 +0800] [12] [INFO] Booting worker with pid: 12
+meeting_backend   | [2026-01-05 16:35:09 +0800] [13] [INFO] Booting worker with pid: 13
+meeting_backend   | [2026-01-05 16:35:16 +0800] [11] [INFO] Started server process [11]
+meeting_backend   | [2026-01-05 16:35:16 +0800] [11] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:17 +0800] [10] [INFO] Started server process [10]
+meeting_backend   | [2026-01-05 16:35:17 +0800] [10] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:17 +0800] [12] [INFO] Started server process [12]
+meeting_backend   | [2026-01-05 16:35:17 +0800] [12] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:17 +0800] [13] [INFO] Started server process [13]
+meeting_backend   | [2026-01-05 16:35:17 +0800] [13] [INFO] Waiting for application startup.
+meeting_backend   | [2026-01-05 16:35:17 +0800] [10] [INFO] Application startup complete.
+meeting_backend   | [2026-01-05 16:35:17 +0800] [11] [INFO] Application startup complete.
+meeting_backend   | [2026-01-05 16:35:17 +0800] [12] [INFO] Application startup complete.
+meeting_backend   | 172.18.0.4:52590 - "GET /devices/ HTTP/1.0" 200
+meeting_backend   | [2026-01-05 16:35:17 +0800] [13] [INFO] Application startup complete.
+meeting_backend   | 172.18.0.4:44952 - "GET /updates/latest HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:44962 - "GET /meeting_types/ HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:44978 - "GET /meetings/ HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:52978 - "GET /updates/latest HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:52986 - "GET /devices/ HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:53184 - "POST /devices/heartbeat HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:53196 - "POST /devices/heartbeat HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:53200 - "POST /auth/login HTTP/1.0" 200
+meeting_backend   | [DEBUG] Filtering start_date >= 2026-01-05 00:00:00
+meeting_backend   | [DEBUG] Filtering end_date <= 2026-01-05 23:59:59
+meeting_backend   | 172.18.0.4:53202 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-05&end_date=2026-01-05 HTTP/1.0" 200
+meeting_backend   | [DEBUG] Filtering start_date >= 2026-01-05 00:00:00
+meeting_backend   | [DEBUG] Filtering end_date <= 2026-01-05 23:59:59
+meeting_backend   | 172.18.0.4:53212 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-05&end_date=2026-01-05 HTTP/1.0" 200
+meeting_backend   | 172.18.0.4:36512 - "GET /devices/ HTTP/1.0" 200

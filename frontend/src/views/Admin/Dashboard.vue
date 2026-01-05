@@ -40,6 +40,10 @@
             <el-icon><List /></el-icon>
             <template #title>类型管理</template>
           </el-menu-item>
+          <el-menu-item index="/admin/devices">
+            <el-icon><Cellphone /></el-icon>
+            <template #title>设备管理</template>
+          </el-menu-item>
           <el-menu-item index="/admin/followup">
             <el-icon><Notebook /></el-icon>
             <template #title>笔记</template>
@@ -61,7 +65,7 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting, Notebook } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting, Notebook, Cellphone } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import { ref, onMounted, onUnmounted } from 'vue'
 

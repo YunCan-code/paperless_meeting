@@ -30,6 +30,11 @@ class MainActivity : ComponentActivity() {
                 AppRoot()
             }
         }
+        
+        // Trigger immediate heartbeat when app opens to update status
+        val authRequest = androidx.work.OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.HeartbeatWorker>()
+            .build()
+        androidx.work.WorkManager.getInstance(this).enqueue(authRequest)
     }
 }
 
