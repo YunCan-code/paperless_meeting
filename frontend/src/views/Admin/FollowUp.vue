@@ -2,8 +2,21 @@
   <div class="follow-up-page">
     <div class="page-header">
       <div class="header-left">
-        <h1 class="page-title">笔记</h1>
-        <p class="page-subtitle">记录会议纪要后续跟进任务</p>
+        <el-button 
+          class="collapse-btn" 
+          link 
+          @click="toggleSidebar"
+        >
+          <el-icon size="24" color="#64748b">
+            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+          </el-icon>
+        </el-button>
+        <el-divider direction="vertical" class="header-divider" />
+
+        <div class="title-group">
+          <h1 class="page-title">笔记</h1>
+          <p class="page-subtitle">记录会议纪要后续跟进任务</p>
+        </div>
       </div>
       <div class="header-right">
         <el-button type="primary" @click="openCreate">
@@ -70,9 +83,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus, MoreFilled } from '@element-plus/icons-vue'
+import { Plus, MoreFilled, Fold, Expand } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useSidebar } from '@/composables/useSidebar'
+
+const { isCollapse, toggleSidebar } = useSidebar()
 
 const notes = ref([])
 const dialogVisible = ref(false)
@@ -150,9 +166,16 @@ onMounted(fetchNotes)
 
 <style scoped>
 .follow-up-page { padding: 0 10px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding: 0 4px; }
-.page-title { margin: 0; font-size: 24px; color: var(--text-main); font-weight: 700; }
-.page-subtitle { margin: 4px 0 0; color: var(--text-secondary); font-size: 13px; }
+
+/* Page Header */
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; padding: 0 4px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.collapse-btn { padding: 8px; border-radius: 8px; transition: background-color 0.2s; height: auto; }
+.collapse-btn:hover { background-color: var(--bg-main, #f8fafc); }
+.header-divider { height: 24px; border-color: var(--border-color, #e2e8f0); margin: 0 4px; }
+.title-group { display: flex; flex-direction: column; }
+.page-title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-main, #0f172a); line-height: 1.2; }
+.page-subtitle { margin: 4px 0 0; color: var(--text-secondary, #64748b); font-size: 14px; line-height: 1.4; }
 
 .notes-grid {
     display: grid;

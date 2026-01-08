@@ -304,7 +304,7 @@ onMounted(fetchTypes)
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 32px;
+  /* margin-bottom: 32px; REMOVED */
   padding: 0 4px;
 }
 

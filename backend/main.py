@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 # 导入数据库初始化函数和路由模块
 from database import create_db_and_tables
-from routes import users, meetings, auth, meeting_types, notes, devices, app_updates
+from routes import users, meetings, auth, meeting_types, notes, devices, app_updates, system_settings
 
 
 
@@ -65,6 +65,7 @@ app.include_router(meeting_types.router)
 app.include_router(notes.router)
 app.include_router(devices.router)
 app.include_router(app_updates.router)
+app.include_router(system_settings.router)
 
 @app.get("/")
 def read_root():

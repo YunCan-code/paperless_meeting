@@ -5,6 +5,8 @@ from typing import Optional
 from database import get_session
 from models import User
 
+from datetime import datetime
+
 # 创建路由器，前缀为 /auth
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -52,6 +54,12 @@ def login(request: LoginRequest, session: Session = Depends(get_session)):
     else:
         # 只有一个匹配
         user = results[0]
+
+    # Update last_login
+    user.last_login = datetime.now()
+    session.add(user)
+    session.commit()
+    session.refresh(user)
 
     return LoginResponse(
         user_id=user.id,

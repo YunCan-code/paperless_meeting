@@ -18,7 +18,7 @@ class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val meetingId: String = checkNotNull(savedStateHandle["meetingId"])
+    private val meetingId: String? = savedStateHandle["meetingId"]
     
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -29,16 +29,21 @@ class DetailViewModel @Inject constructor(
 
     private fun loadMeeting() {
         viewModelScope.launch {
-            val id = meetingId.toIntOrNull()
-            if (id == null) {
-                _uiState.value = DetailUiState.Error("Invalid Meeting ID")
-                return@launch
-            }
-            val meeting = repository.getMeetingById(id)
-            if (meeting != null) {
-                _uiState.value = DetailUiState.Success(meeting)
-            } else {
-                _uiState.value = DetailUiState.Error("Meeting not found")
+            try {
+                val id = meetingId?.toIntOrNull()
+                if (id == null) {
+                    _uiState.value = DetailUiState.Error("Invalid Meeting ID")
+                    return@launch
+                }
+                val meeting = repository.getMeetingById(id)
+                if (meeting != null) {
+                    _uiState.value = DetailUiState.Success(meeting)
+                } else {
+                    _uiState.value = DetailUiState.Error("Meeting not found")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.value = DetailUiState.Error("Error: ${e.message}")
             }
         }
     }

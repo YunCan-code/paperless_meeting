@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlmodel import Session, select, SQLModel
+from sqlalchemy import func
 from typing import List, Optional
 import shutil
 from pathlib import Path
@@ -34,55 +35,118 @@ def create_meeting(meeting: Meeting, session: Session = Depends(get_session)):
     session.refresh(meeting)
     return meeting
 
+
 @router.get("/stats")
 def get_meeting_stats(session: Session = Depends(get_session)):
     """
-    获取会议统计数据 (本年/本月/本周/存储)
+    获取会议统计数据 (本年/本月/本周/存储) + 环比数据
+    (使用中国标准时间 CST UTC+8 计算边界)
     """
-    now = datetime.now()
+    from datetime import timezone
     
-    # 1. Calculate Date Ranges
-    # Year
-    start_of_year = datetime(now.year, 1, 1)
-    # End of Year (Start of next year)
-    end_of_year = datetime(now.year + 1, 1, 1)
+    # 1. Define CST Timezone
+    cst_tz = timezone(timedelta(hours=8))
     
-    # Month
-    start_of_month = datetime(now.year, now.month, 1)
-    # End of Month (Start of next month)
-    if now.month == 12:
-        end_of_month = datetime(now.year + 1, 1, 1)
-    else:
-        end_of_month = datetime(now.year, now.month + 1, 1)
+    # Get Now in CST
+    now_cst = datetime.now(cst_tz)
     
-    # Week (Start from Monday)
-    start_of_week = now - timedelta(days=now.weekday())
-    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
-    # End of Week (Next Monday)
-    end_of_week = start_of_week + timedelta(days=7)
-    
-    # Importing func here to avoid extensive imports change on top if not present
-    from sqlalchemy import func, and_
-    
-    def count_in_range(start_dt, end_dt):
+    # Helper to count in range (Input DB assumes UTC)
+    def count_in_range(start_dt_cst, end_dt_cst):
+        if not start_dt_cst or not end_dt_cst: return 0
+        
+        # Convert CST bounds to UTC for DB Query
+        start_utc = start_dt_cst.astimezone(timezone.utc)
+        end_utc = end_dt_cst.astimezone(timezone.utc)
+        
         return session.exec(
             select(func.count(Meeting.id))
-            .where(Meeting.start_time >= start_dt)
-            .where(Meeting.start_time < end_dt)
+            .where(Meeting.start_time >= start_utc)
+            .where(Meeting.start_time < end_utc)
         ).one()
-        
-    yearly_count = count_in_range(start_of_year, end_of_year)
-    monthly_count = count_in_range(start_of_month, end_of_month)
+
+    # --- 1. Annual (Yearly) ---
+    # Current Year (CST)
+    current_year_start = datetime(now_cst.year, 1, 1, tzinfo=cst_tz)
+    current_year_end = datetime(now_cst.year + 1, 1, 1, tzinfo=cst_tz)
+    yearly_count = count_in_range(current_year_start, current_year_end)
+    
+    # Previous Year (YoY)
+    last_year_start = datetime(now_cst.year - 1, 1, 1, tzinfo=cst_tz)
+    last_year_end = datetime(now_cst.year, 1, 1, tzinfo=cst_tz)
+    last_yearly_count = count_in_range(last_year_start, last_year_end)
+    
+    yearly_growth = 0.0
+    if last_yearly_count > 0:
+        yearly_growth = ((yearly_count - last_yearly_count) / last_yearly_count) * 100
+    
+    # --- 2. Monthly ---
+    # Current Month (CST)
+    current_month_start = datetime(now_cst.year, now_cst.month, 1, tzinfo=cst_tz)
+    if now_cst.month == 12:
+        current_month_end = datetime(now_cst.year + 1, 1, 1, tzinfo=cst_tz)
+    else:
+        current_month_end = datetime(now_cst.year, now_cst.month + 1, 1, tzinfo=cst_tz)
+    monthly_count = count_in_range(current_month_start, current_month_end)
+    
+    # Previous Month (MoM)
+    last_month_date = current_month_start - timedelta(days=1)
+    last_month_start = datetime(last_month_date.year, last_month_date.month, 1, tzinfo=cst_tz)
+    last_month_end = current_month_start
+    last_monthly_count = count_in_range(last_month_start, last_month_end)
+    
+    monthly_growth = 0.0
+    if last_monthly_count > 0:
+        monthly_growth = ((monthly_count - last_monthly_count) / last_monthly_count) * 100
+    
+    # --- 3. Weekly ---
+    # Current Week (CST)
+    # weekday(): Mon=0, Sun=6
+    start_of_week = now_cst - timedelta(days=now_cst.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_week = start_of_week + timedelta(days=7)
+    
     weekly_count = count_in_range(start_of_week, end_of_week)
     
-    # 3. Calculate Storage
+    # Previous Week
+    start_of_last_week = start_of_week - timedelta(days=7)
+    end_of_last_week = start_of_week
+    last_weekly_count = count_in_range(start_of_last_week, end_of_last_week)
+    
+    weekly_growth = 0.0
+    if last_weekly_count > 0:
+        weekly_growth = ((weekly_count - last_weekly_count) / last_weekly_count) * 100
+    
+    # --- 4. Storage ---
+    # Total now
     total_bytes = session.exec(select(func.sum(Attachment.file_size))).one() or 0
     
+    # Total Month Ago
+    # Use current_month_start (CST) -> UTC
+    current_month_start_utc = current_month_start.astimezone(timezone.utc)
+    
+    total_bytes_start_of_month = session.exec(
+        select(func.sum(Attachment.file_size))
+        .where(Attachment.uploaded_at < current_month_start_utc)
+    ).one() or 0
+    
+    storage_growth = 0.0
+    if total_bytes_start_of_month > 0:
+        storage_growth = ((total_bytes - total_bytes_start_of_month) / total_bytes_start_of_month) * 100
+    elif total_bytes > 0:
+        storage_growth = 100.0
+        
     return {
         "yearly_count": yearly_count,
+        "yearly_growth": round(yearly_growth, 1),
+        
         "monthly_count": monthly_count,
+        "monthly_growth": round(monthly_growth, 1),
+        
         "weekly_count": weekly_count,
-        "total_storage_bytes": total_bytes
+        "weekly_growth": round(weekly_growth, 1),
+        
+        "total_storage_bytes": total_bytes,
+        "storage_growth": round(storage_growth, 1)
     }
 
 import random
@@ -143,6 +207,7 @@ def read_meetings(
     sort: Optional[str] = "desc", # asc, desc
     start_date: Optional[str] = None, # YYYY-MM-DD
     end_date: Optional[str] = None, # YYYY-MM-DD
+    force_show_all: bool = False, # Admin flag to ignore visibility timeout
     session: Session = Depends(get_session)
 ):
     """
@@ -152,11 +217,17 @@ def read_meetings(
     if status:
         query = query.where(Meeting.status == status)
     
-    # Date Filtering
+    # Date Filtering (Using CST - China Standard Time)
+    # The Android client sends dates in CST, so we need to match
+    from datetime import timezone
+    cst_tz = timezone(timedelta(hours=8))
+    
     if start_date:
         try:
-            # Parse start of day
+            # Parse start of day in CST, then convert to naive datetime for DB comparison
             s_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            # If server is in UTC, the DB stores naive datetimes which are effectively CST
+            # So we compare directly without conversion
             print(f"[DEBUG] Filtering start_date >= {s_dt}")
             query = query.where(Meeting.start_time >= s_dt)
         except ValueError as e:
@@ -178,6 +249,24 @@ def read_meetings(
         query = query.order_by(Meeting.start_time.asc())
     else:
         query = query.order_by(Meeting.start_time.desc())
+
+    # [Start] Visibility Timeout Logic - MUST BE BEFORE offset/limit
+    # 默认过滤掉超时的会议，除非显式请求 force_show_all
+    if not force_show_all:
+        from models import SystemSetting
+        hide_after_hours_setting = session.get(SystemSetting, "meeting_visibility_hide_after_hours")
+        if hide_after_hours_setting and hide_after_hours_setting.value:
+            try:
+                hours = int(hide_after_hours_setting.value)
+                if hours > 0:
+                     # Calculate threshold time
+                     now = datetime.now()
+                     threshold = now - timedelta(hours=hours)
+                     # Show only meetings where start_time > threshold
+                     query = query.where(Meeting.start_time > threshold)
+            except ValueError:
+                pass
+    # [End] Visibility Timeout Logic
 
     query = query.offset(skip).limit(limit)
     meetings = session.exec(query).all()

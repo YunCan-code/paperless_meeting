@@ -31,5 +31,6 @@ gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --access-logfile - \
     --error-logfile - \
+    --forwarded-allow-ips "*" \
     --timeout 120 \
     --keep-alive 5

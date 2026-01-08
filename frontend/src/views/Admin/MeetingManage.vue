@@ -34,8 +34,14 @@
             </div>
             <div class="stat-info">
               <div class="stat-label">{{ stat.title }}</div>
-              <div class="stat-value">{{ stat.value }}</div>
-              <div class="stat-desc">{{ stat.subtitle }}</div>
+              <div class="stat-value">
+                {{ stat.value }}
+                <span class="stat-trend" :class="stat.trend >= 0 ? 'up' : 'down'" v-if="stat.trend !== undefined">
+                  <el-icon><component :is="stat.trend >= 0 ? 'Top' : 'Bottom'" /></el-icon>
+                  {{ Math.abs(stat.trend) }}%
+                </span>
+              </div>
+              <!-- <div class="stat-desc">{{ stat.subtitle }}</div> -->
             </div>
           </div>
         </el-card>
@@ -406,16 +412,24 @@ const currentSelectedDate = ref(new Date())
 // Stats State
 const stats = ref({
   yearly_count: 0,
+  yearly_growth: 0,
   monthly_count: 0,
+  monthly_growth: 0,
   weekly_count: 0,
-  total_storage_bytes: 0
+  weekly_growth: 0,
+  total_storage_bytes: 0,
+  storage_growth: 0
 })
 
 const fetchStats = async () => {
   try {
     const res = await request.get('/meetings/stats')
-    stats.value = res
-  } catch(e) { console.error('Failed to fetch stats', e) }
+    if (res) {
+      stats.value = res
+    }
+  } catch(e) { 
+    console.error('Failed to fetch stats', e)
+  }
 }
 
 onMounted(async () => {
@@ -427,6 +441,8 @@ onMounted(async () => {
 
 
 const statsData = computed(() => {
+  if (!stats.value) return []
+  
   const formatBytesSimple = (bytes) => {
       const k = 1024
       const sizes = ['B', 'KB', 'MB', 'GB']
@@ -438,15 +454,17 @@ const statsData = computed(() => {
 
   return [
     { 
-      title: '本年会议数', // Replaced "User Online"
+      title: '本年会议数', 
       value: stats.value.yearly_count, 
-      icon: 'DataAnalysis', // Changed icon
+      trend: stats.value.yearly_growth || 0,
+      icon: 'DataAnalysis', 
       bgClass: 'bg-purple-50', 
       textClass: 'text-purple-500' 
     },
     { 
       title: '本月会议数', 
       value: stats.value.monthly_count, 
+      trend: stats.value.monthly_growth || 0,
       icon: 'Calendar', 
       bgClass: 'bg-blue-50', 
       textClass: 'text-blue-500' 
@@ -454,6 +472,7 @@ const statsData = computed(() => {
     { 
       title: '本周会议数', 
       value: stats.value.weekly_count, 
+      trend: stats.value.weekly_growth || 0,
       icon: 'CollectionTag', 
       bgClass: 'bg-orange-50', 
       textClass: 'text-orange-500' 
@@ -461,6 +480,7 @@ const statsData = computed(() => {
     { 
       title: '文件存储', 
       value: storageStr, 
+      trend: stats.value.storage_growth || 0,
       icon: 'FolderOpened', 
       bgClass: 'bg-green-50', 
       textClass: 'text-green-500',
@@ -483,7 +503,7 @@ const formatSize = (bytes) => {
 // Fetch
 const fetchMeetings = async () => {
   loading.value = true
-  try { meetings.value = await request.get('/meetings/') } finally { loading.value = false }
+  try { meetings.value = await request.get('/meetings/', { params: { force_show_all: true } }) } finally { loading.value = false }
 }
 const fetchMeetingTypes = async () => {
   try { meetingTypes.value = await request.get('/meeting_types/') } catch (e) {}
@@ -749,7 +769,12 @@ onMounted(async () => {
 .stat-icon { padding: 12px; border-radius: 12px; margin-right: 16px; display: flex; align-items: center; justify-content: center; }
 .stat-info { flex: 1; }
 .stat-label { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
-.stat-value { font-size: 24px; font-weight: 700; color: var(--text-main); margin: 4px 0; }
+.stat-value { 
+    font-size: 24px; font-weight: 700; color: var(--text-main); margin: 4px 0; 
+    display: flex; align-items: flex-end; gap: 8px; /* Added flex for trend alignment */
+}
+.stat-trend { font-size: 13px; font-weight: 600; display: flex; align-items: center; margin-bottom: 3px; }
+.stat-trend.up { color: #10b981; } .stat-trend.down { color: #ef4444; }
 .stat-desc { font-size: 12px; color: var(--text-secondary); }
 
 /* Dialog Styles */

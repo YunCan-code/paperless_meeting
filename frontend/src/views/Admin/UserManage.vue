@@ -1,6 +1,27 @@
 <template>
   <div class="user-manage-container">
     
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-left">
+        <el-button 
+          class="collapse-btn" 
+          link 
+          @click="toggleSidebar"
+        >
+          <el-icon size="24" color="#64748b">
+            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+          </el-icon>
+        </el-button>
+        <el-divider direction="vertical" class="header-divider" />
+        
+        <div class="title-group">
+          <h1 class="page-title">人员管理</h1>
+          <p class="page-subtitle">管理系统用户、角色与权限</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Stats Row -->
     <div class="stats-row">
       <el-row :gutter="20">
@@ -13,10 +34,6 @@
               <div class="stat-label">{{ stat.label }}</div>
               <div class="stat-value">
                 {{ stat.value }}
-                <span class="stat-trend" :class="stat.trend > 0 ? 'up' : 'down'">
-                  <el-icon><component :is="stat.trend > 0 ? 'Top' : 'Bottom'" /></el-icon>
-                  {{ Math.abs(stat.trend) }}%
-                </span>
               </div>
             </div>
             <div class="stat-bg-decoration"></div>
@@ -28,12 +45,6 @@
     <div class="main-card">
       <div class="toolbar-header">
         <div class="toolbar-left">
-          <el-button class="collapse-btn" link @click="toggleSidebar" style="margin-right: 12px; height: auto; padding: 4px;">
-            <el-icon size="24" color="#64748b">
-              <component :is="isCollapse ? 'Expand' : 'Fold'" />
-            </el-icon>
-          </el-button>
-
           <el-input
             v-model="searchQuery"
             placeholder="搜索用户名、姓名、手机号..."
@@ -350,10 +361,10 @@ const districtOptions = ['市辖区', '高新区', '呈贡区', '盘龙区', '�
 
 // Stats (Reactive)
 const statsData = ref([
-  { label: '总用户数', value: '-', trend: 12, icon: 'User', color: 'blue', key: 'total' },
-  { label: '主讲人', value: '-', trend: 5.4, icon: 'DataLine', color: 'green', key: 'speakers' },
-  { label: '参会人员', value: '-', trend: -1.2, icon: 'UserFilled', color: 'purple', key: 'attendees' },
-  { label: '今日登录', value: '-', trend: 8.5, icon: 'Trophy', color: 'orange', key: 'active_today' },
+  { label: '总用户数', value: '-', icon: 'User', color: 'blue', key: 'total' },
+  { label: '主讲人', value: '-', icon: 'DataLine', color: 'green', key: 'speakers' },
+  { label: '参会人员', value: '-', icon: 'UserFilled', color: 'purple', key: 'attendees' },
+  { label: '今日登录', value: '-', icon: 'Trophy', color: 'orange', key: 'active_today' },
 ])
 
 const fetchStats = async () => {
@@ -618,6 +629,16 @@ onMounted(() => {
      I'll set padding to 0 or small. 
   */
 }
+
+/* Page Header */
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px; /* margin-bottom removed to prevent double gap */ }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.collapse-btn { padding: 8px; border-radius: 8px; transition: background-color 0.2s; height: auto; }
+.collapse-btn:hover { background-color: var(--bg-main, #f8fafc); }
+.header-divider { height: 24px; border-color: var(--border-color, #e2e8f0); margin: 0 4px; }
+.title-group { display: flex; flex-direction: column; }
+.page-title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-main, #0f172a); line-height: 1.2; }
+.page-subtitle { margin: 4px 0 0; color: var(--text-secondary, #64748b); font-size: 14px; line-height: 1.4; }
 
 /* Stats */
 .stat-card {

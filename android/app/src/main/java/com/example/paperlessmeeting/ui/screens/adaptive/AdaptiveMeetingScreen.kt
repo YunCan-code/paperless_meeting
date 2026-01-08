@@ -24,6 +24,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -180,14 +181,29 @@ fun AdaptiveMeetingScreen(
                     val displayMeeting = fullMeeting ?: selectedMeeting
                     
                     if (displayMeeting != null) {
-                        MeetingDetailContent(
-                            meeting = displayMeeting,
-                            onAttachmentClick = { url, name ->
-                                 val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
-                                 val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-                                 navController.navigate("reader?url=$encodedUrl&name=$encodedName")
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+                            MeetingDetailContent(
+                                meeting = displayMeeting,
+                                onAttachmentClick = { url, name ->
+                                     val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+                                     val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
+                                     navController.navigate("reader?url=$encodedUrl&name=$encodedName")
+                                }
+                            )
+                            // Close Button Overlay (Top Right)
+                            androidx.compose.material3.IconButton(
+                                onClick = { viewModel.selectMeeting(null) },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                                    contentDescription = "关闭详情",
+                                    tint = androidx.compose.ui.graphics.Color.White
+                                )
                             }
-                        )
+                        }
                     } else {
                         EmptyDetailView()
                     }

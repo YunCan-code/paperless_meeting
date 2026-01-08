@@ -22,6 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,25 +59,7 @@ fun DetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White // Assume dark overlay
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         // We ignore innerPadding for the top image behind status bar effect
         Box(modifier = Modifier.fillMaxSize()) {
             when (val state = uiState) {
@@ -82,7 +67,18 @@ fun DetailScreen(
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
                 is DetailUiState.Error -> {
-                    Text("Error: ${state.message}", modifier = Modifier.align(Alignment.Center))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Error: ${state.message}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                 }
                 is DetailUiState.Success -> {
                     MeetingDetailContent(
@@ -95,6 +91,24 @@ fun DetailScreen(
                     )
                 }
             }
+
+            // Overlay Navigation Buttons (Back & Close)
+            // Placed at the end to render ON TOP of the content/image
+            TopAppBar(
+                title = { },
+                actions = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
+            )
         }
     }
 }
@@ -107,7 +121,6 @@ fun MeetingDetailContent(
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize()) {
         // Hero Image Area
-        // Fallback logic similar to MeetingCard if url missing (should stick to backend though)
         val bgImage = meeting.cardImageUrl ?: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
         
         Box(
@@ -128,55 +141,100 @@ fun MeetingDetailContent(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Black.copy(alpha = 0.3f), Color.Black.copy(alpha = 0.8f))
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.2f),
+                                Color.Black.copy(alpha = 0.1f),
+                                Color.Black.copy(alpha = 0.6f)
+                            )
                         )
                     )
             )
 
+            // TOP LEFT: Status + Type Badges
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MeetingStatusBadge(status = meeting.getUiStatus())
+                if (!meeting.meetingTypeName.isNullOrEmpty()) {
+                    androidx.compose.material3.Surface(
+                       color = Color.White.copy(alpha = 0.2f),
+                       shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                    ) {
+                         Text(
+                             text = meeting.meetingTypeName,
+                             style = MaterialTheme.typography.labelMedium,
+                             color = Color.White,
+                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                         )
+                    }
+                }
+            }
+
+            // BOTTOM: Title + Location + Time
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
+                    .fillMaxWidth()
                     .padding(24.dp)
             ) {
-                // Status + Type Row
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MeetingStatusBadge(status = meeting.getUiStatus())
-                    Spacer(modifier = Modifier.width(8.dp))
-                    if (!meeting.meetingTypeName.isNullOrEmpty()) {
-                        androidx.compose.material3.Surface(
-                           color = Color.White.copy(alpha = 0.2f),
-                           shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                        ) {
-                             Text(
-                                 text = meeting.meetingTypeName,
-                                 style = MaterialTheme.typography.labelSmall,
-                                 color = Color.White,
-                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                             )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
+                // Title
                 Text(
                     text = meeting.title,
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     color = Color.White,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
-                // Location & Host
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Menu, contentDescription=null, tint=Color.White.copy(alpha=0.8f), modifier=Modifier.size(16.dp)) 
-                    Text(
-                        text = meeting.location ?: "地点待定",
-                        color = Color.White.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                // Location & Time Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Location
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = meeting.location ?: "地点待定",
+                            color = Color.White.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    // Time
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = try {
+                                java.time.LocalDateTime.parse(meeting.startTime.substringBefore("."))
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                            } catch (e: Exception) {
+                                meeting.startTime.substringBefore("T")
+                            },
+                            color = Color.White.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
         }

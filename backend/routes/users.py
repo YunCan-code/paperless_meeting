@@ -30,11 +30,19 @@ def get_user_stats(session: Session = Depends(get_session)):
     speakers = session.exec(select(func.count(User.id)).where(User.role == "主讲人")).one()
     attendees = session.exec(select(func.count(User.id)).where(User.role == "参会人员")).one()
     
+    # Calculate active_today
+    # Logic: last_login >= today 00:00
+    from datetime import datetime
+    now = datetime.now()
+    today_start = datetime(now.year, now.month, now.day)
+    
+    active_today = session.exec(select(func.count(User.id)).where(User.last_login >= today_start)).one()
+    
     return {
         "total": total,
         "speakers": speakers,
         "attendees": attendees,
-        "active_today": 45 # Mock
+        "active_today": active_today
     }
 
 @router.get("/template")

@@ -11,10 +11,23 @@ import dagger.hilt.android.HiltAndroidApp
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import okhttp3.OkHttpClient
+
 @HiltAndroidApp
-class PaperlessApp : Application(), Configuration.Provider {
+class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
     
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    
+    @Inject lateinit var okHttpClient: OkHttpClient
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .okHttpClient(okHttpClient)
+            .crossfade(true)
+            .build()
+    }
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()

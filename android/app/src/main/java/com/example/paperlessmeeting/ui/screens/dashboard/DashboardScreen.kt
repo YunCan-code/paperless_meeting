@@ -15,6 +15,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.HowToVote
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -212,6 +215,47 @@ fun DashboardContent(
              }
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Quick Actions Card
+        Text(
+            text = "快捷功能",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                QuickActionButton(
+                    icon = Icons.Default.SupportAgent,
+                    label = "会务",
+                    onClick = { /* TODO */ }
+                )
+                QuickActionButton(
+                    icon = androidx.compose.material.icons.Icons.Default.HowToVote,
+                    label = "投票",
+                    onClick = { /* TODO */ }
+                )
+                QuickActionButton(
+                    icon = androidx.compose.material.icons.Icons.Default.Casino,
+                    label = "抽签",
+                    onClick = { /* TODO */ }
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         // 3. Recent Reading (Using reading progress)
@@ -319,5 +363,38 @@ fun RecentFileCard(file: com.example.paperlessmeeting.domain.model.Attachment) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun QuickActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(8.dp)
+    ) {
+        FilledTonalIconButton(
+            onClick = onClick,
+            modifier = Modifier.size(56.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }

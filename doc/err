@@ -1,420 +1,76 @@
-meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [10] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [ERROR] Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend   |     self.dialect.do_execute(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend   |     cursor.execute(statement, parameters)
-meeting_backend   | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
-meeting_backend   | 
-meeting_backend   | 
-meeting_backend   | The above exception was the direct cause of the following exception:
-meeting_backend   | 
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
-meeting_backend   |     async with self.lifespan_context(app) as maybe_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/app/main.py", line 23, in lifespan
-meeting_backend   |     create_db_and_tables()
-meeting_backend   |   File "/app/database.py", line 47, in create_db_and_tables
-meeting_backend   |     SQLModel.metadata.create_all(engine)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
-meeting_backend   |     bind._run_ddl_visitor(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
-meeting_backend   |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
-meeting_backend   |     ).traverse_single(element)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend   |     return meth(obj, **kw)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
-meeting_backend   |     self.traverse_single(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend   |     return meth(obj, **kw)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
-meeting_backend   |     )._invoke_with(self.connection)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
-meeting_backend   |     return bind.execute(self)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-meeting_backend   |     return meth(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
-meeting_backend   |     return connection._execute_ddl(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
-meeting_backend   |     ret = self._execute_context(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-meeting_backend   |     return self._exec_single_context(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-meeting_backend   |     self._handle_dbapi_exception(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-meeting_backend   |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend   |     self.dialect.do_execute(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend   |     cursor.execute(statement, parameters)
-meeting_backend   | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
-meeting_backend   | 
-meeting_backend   | [SQL: 
-meeting_backend   | CREATE TABLE devicecommand (
-meeting_backend   |     device_id VARCHAR NOT NULL, 
-meeting_backend   |     command_type VARCHAR NOT NULL, 
-meeting_backend   |     payload VARCHAR, 
-meeting_backend   |     status VARCHAR NOT NULL, 
-meeting_backend   |     id SERIAL NOT NULL, 
-meeting_backend   |     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
-meeting_backend   |     acked_at TIMESTAMP WITHOUT TIME ZONE, 
-meeting_backend   |     PRIMARY KEY (id)
-meeting_backend   | )
-meeting_backend   | 
-meeting_backend   | ]
-meeting_backend   | (Background on this error at: https://sqlalche.me/e/20/gkpj)
-meeting_backend   | 
-meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [ERROR] Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend   |     self.dialect.do_execute(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend   |     cursor.execute(statement, parameters)
-meeting_backend   | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
-meeting_backend   | 
-meeting_backend   | 
-meeting_backend   | The above exception was the direct cause of the following exception:
-meeting_backend   | 
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
-meeting_backend   |     async with self.lifespan_context(app) as maybe_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/app/main.py", line 23, in lifespan
-meeting_backend   |     create_db_and_tables()
-meeting_backend   |   File "/app/database.py", line 47, in create_db_and_tables
-meeting_backend   |     SQLModel.metadata.create_all(engine)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
-meeting_backend   |     bind._run_ddl_visitor(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
-meeting_backend   |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
-meeting_backend   |     ).traverse_single(element)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend   |     return meth(obj, **kw)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
-meeting_backend   |     self.traverse_single(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend   |     return meth(obj, **kw)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
-meeting_backend   |     )._invoke_with(self.connection)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
-meeting_backend   |     return bind.execute(self)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-meeting_backend   |     return meth(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
-meeting_backend   |     return connection._execute_ddl(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
-meeting_backend   |     ret = self._execute_context(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-meeting_backend   |     return self._exec_single_context(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-meeting_backend   |     self._handle_dbapi_exception(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-meeting_backend   |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend   |     self.dialect.do_execute(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend   |     cursor.execute(statement, parameters)
-meeting_backend   | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
-meeting_backend   | 
-meeting_backend   | [SQL: 
-meeting_backend   | CREATE TABLE devicecommand (
-meeting_backend   |     device_id VARCHAR NOT NULL, 
-meeting_backend   |     command_type VARCHAR NOT NULL, 
-meeting_backend   |     payload VARCHAR, 
-meeting_backend   |     status VARCHAR NOT NULL, 
-meeting_backend   |     id SERIAL NOT NULL, 
-meeting_backend   |     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
-meeting_backend   |     acked_at TIMESTAMP WITHOUT TIME ZONE, 
-meeting_backend   |     PRIMARY KEY (id)
-meeting_backend   | )
-meeting_backend   | 
-meeting_backend   | ]
-meeting_backend   | (Background on this error at: https://sqlalche.me/e/20/gkpj)
-meeting_backend   | 
-meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [ERROR] Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend   |     self.dialect.do_execute(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend   |     cursor.execute(statement, parameters)
-meeting_backend   | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
-meeting_backend   | 
-meeting_backend   | 
-meeting_backend   | The above exception was the direct cause of the following exception:
-meeting_backend   | 
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/starlette/routing.py", line 694, in lifespan
-meeting_backend   |     async with self.lifespan_context(app) as maybe_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/fastapi/routing.py", line 153, in merged_lifespan
-meeting_backend   |     async with original_context(app) as maybe_original_state:
-meeting_backend   |   File "/usr/local/lib/python3.10/contextlib.py", line 199, in __aenter__
-meeting_backend   |     return await anext(self.gen)
-meeting_backend   |   File "/app/main.py", line 23, in lifespan
-meeting_backend   |     create_db_and_tables()
-meeting_backend   |   File "/app/database.py", line 47, in create_db_and_tables
-meeting_backend   |     SQLModel.metadata.create_all(engine)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5928, in create_all
-meeting_backend   |     bind._run_ddl_visitor(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3260, in _run_ddl_visitor
-meeting_backend   |     conn._run_ddl_visitor(visitorcallable, element, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2467, in _run_ddl_visitor
-meeting_backend   |     ).traverse_single(element)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend   |     return meth(obj, **kw)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
-meeting_backend   |     self.traverse_single(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
-meeting_backend   |     return meth(obj, **kw)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
-meeting_backend   |     )._invoke_with(self.connection)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
-meeting_backend   |     return bind.execute(self)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
-meeting_backend   |     return meth(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
-meeting_backend   |     return connection._execute_ddl(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
-meeting_backend   |     ret = self._execute_context(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-meeting_backend   |     return self._exec_single_context(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-meeting_backend   |     self._handle_dbapi_exception(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
-meeting_backend   |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-meeting_backend   |     self.dialect.do_execute(
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
-meeting_backend   |     cursor.execute(statement, parameters)
-meeting_backend   | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "pg_class_relname_nsp_index"
-meeting_backend   | DETAIL:  Key (relname, relnamespace)=(devicecommand_id_seq, 2200) already exists.
-meeting_backend   | 
-meeting_backend   | [SQL: 
-meeting_backend   | CREATE TABLE devicecommand (
-meeting_backend   |     device_id VARCHAR NOT NULL, 
-meeting_backend   |     command_type VARCHAR NOT NULL, 
-meeting_backend   |     payload VARCHAR, 
-meeting_backend   |     status VARCHAR NOT NULL, 
-meeting_backend   |     id SERIAL NOT NULL, 
-meeting_backend   |     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
-meeting_backend   |     acked_at TIMESTAMP WITHOUT TIME ZONE, 
-meeting_backend   |     PRIMARY KEY (id)
-meeting_backend   | )
-meeting_backend   | 
-meeting_backend   | ]
-meeting_backend   | (Background on this error at: https://sqlalche.me/e/20/gkpj)
-meeting_backend   | 
-meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [ERROR] Application startup failed. Exiting.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [ERROR] Application startup failed. Exiting.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [ERROR] Application startup failed. Exiting.
-meeting_backend   | [2026-01-05 16:35:06 +0800] [9] [INFO] Worker exiting (pid: 9)
-meeting_backend   | [2026-01-05 16:35:06 +0800] [11] [INFO] Worker exiting (pid: 11)
-meeting_backend   | [2026-01-05 16:35:06 +0800] [12] [INFO] Worker exiting (pid: 12)
-meeting_backend   | [2026-01-05 16:35:06 +0800] [10] [INFO] Application startup complete.
-meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Worker (pid:12) exited with code 3
-meeting_backend   | --- Logging error ---
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1103, in emit
-meeting_backend   |     stream.write(msg + self.terminator)
-meeting_backend   | RuntimeError: reentrant call inside <_io.BufferedWriter name='<stderr>'>
-meeting_backend   | 
-meeting_backend   | During handling of the above exception, another exception occurred:
-meeting_backend   | 
-meeting_backend   | Traceback (most recent call last):
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1103, in emit
-meeting_backend   |     stream.write(msg + self.terminator)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 241, in handle_chld
-meeting_backend   |     self.reap_workers()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 526, in reap_workers
-meeting_backend   |     self.log.error('Worker (pid:%s) exited with code %s', wpid, exitcode)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/glogging.py", line 271, in error
-meeting_backend   |     self.error_log.error(msg, *args, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1506, in error
-meeting_backend   |     self._log(ERROR, msg, args, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1624, in _log
-meeting_backend   |     self.handle(record)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1634, in handle
-meeting_backend   |     self.callHandlers(record)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1696, in callHandlers
-meeting_backend   |     hdlr.handle(record)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 968, in handle
-meeting_backend   |     self.emit(record)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1108, in emit
-meeting_backend   |     self.handleError(record)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1021, in handleError
-meeting_backend   |     sys.stderr.write('--- Logging error ---\n')
-meeting_backend   | RuntimeError: reentrant call inside <_io.BufferedWriter name='<stderr>'>
-meeting_backend   | Call stack:
-meeting_backend   |   File "/usr/local/bin/gunicorn", line 8, in <module>
-meeting_backend   |     sys.exit(run())
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/app/wsgiapp.py", line 66, in run
-meeting_backend   |     WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]", prog=prog).run()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/app/base.py", line 235, in run
-meeting_backend   |     super().run()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/app/base.py", line 71, in run
-meeting_backend   |     Arbiter(self).run()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 208, in run
-meeting_backend   |     self.sleep()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 359, in sleep
-meeting_backend   |     ready = select.select([self.PIPE[0]], [], [], 1.0)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 241, in handle_chld
-meeting_backend   |     self.reap_workers()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 526, in reap_workers
-meeting_backend   |     self.log.error('Worker (pid:%s) exited with code %s', wpid, exitcode)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/glogging.py", line 271, in error
-meeting_backend   |     self.error_log.error(msg, *args, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1506, in error
-meeting_backend   |     self._log(ERROR, msg, args, **kwargs)
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1622, in _log
-meeting_backend   |     record = self.makeRecord(self.name, level, fn, lno, msg, args,
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 1591, in makeRecord
-meeting_backend   |     rv = _logRecordFactory(name, level, fn, lno, msg, args, exc_info, func,
-meeting_backend   |   File "/usr/local/lib/python3.10/logging/__init__.py", line 317, in __init__
-meeting_backend   |     self.filename = os.path.basename(pathname)
-meeting_backend   |   File "/usr/local/lib/python3.10/posixpath.py", line 143, in basename
-meeting_backend   |     sep = _get_sep(p)
-meeting_backend   |   File "/usr/local/lib/python3.10/posixpath.py", line 41, in _get_sep
-meeting_backend   |     def _get_sep(path):
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 241, in handle_chld
-meeting_backend   |     self.reap_workers()
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/arbiter.py", line 526, in reap_workers
-meeting_backend   |     self.log.error('Worker (pid:%s) exited with code %s', wpid, exitcode)
-meeting_backend   |   File "/usr/local/lib/python3.10/site-packages/gunicorn/glogging.py", line 271, in error
-meeting_backend   |     self.error_log.error(msg, *args, **kwargs)
-meeting_backend   | Message: 'Worker (pid:%s) exited with code %s'
-meeting_backend   | Arguments: (12, 3)
-meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Shutting down
-meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Waiting for application shutdown.
-meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Application shutdown complete.
-meeting_backend   | [2026-01-05 16:35:08 +0800] [10] [INFO] Finished server process [10]
-meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Worker (pid:10) was sent SIGTERM!
-meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Shutting down: Master
-meeting_backend   | [2026-01-05 16:35:08 +0800] [8] [ERROR] Reason: Worker failed to boot.
-meeting_backend   | Starting Paperless Meeting Backend with 4 workers...
-meeting_backend   | [2026-01-05 16:35:09 +0800] [9] [INFO] Starting gunicorn 23.0.0
-meeting_backend   | [2026-01-05 16:35:09 +0800] [9] [INFO] Listening at: http://0.0.0.0:8000 (9)
-meeting_backend   | [2026-01-05 16:35:09 +0800] [9] [INFO] Using worker: uvicorn.workers.UvicornWorker
-meeting_backend   | [2026-01-05 16:35:09 +0800] [10] [INFO] Booting worker with pid: 10
-meeting_backend   | [2026-01-05 16:35:09 +0800] [11] [INFO] Booting worker with pid: 11
-meeting_backend   | [2026-01-05 16:35:09 +0800] [12] [INFO] Booting worker with pid: 12
-meeting_backend   | [2026-01-05 16:35:09 +0800] [13] [INFO] Booting worker with pid: 13
-meeting_backend   | [2026-01-05 16:35:16 +0800] [11] [INFO] Started server process [11]
-meeting_backend   | [2026-01-05 16:35:16 +0800] [11] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:17 +0800] [10] [INFO] Started server process [10]
-meeting_backend   | [2026-01-05 16:35:17 +0800] [10] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:17 +0800] [12] [INFO] Started server process [12]
-meeting_backend   | [2026-01-05 16:35:17 +0800] [12] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:17 +0800] [13] [INFO] Started server process [13]
-meeting_backend   | [2026-01-05 16:35:17 +0800] [13] [INFO] Waiting for application startup.
-meeting_backend   | [2026-01-05 16:35:17 +0800] [10] [INFO] Application startup complete.
-meeting_backend   | [2026-01-05 16:35:17 +0800] [11] [INFO] Application startup complete.
-meeting_backend   | [2026-01-05 16:35:17 +0800] [12] [INFO] Application startup complete.
-meeting_backend   | 172.18.0.4:52590 - "GET /devices/ HTTP/1.0" 200
-meeting_backend   | [2026-01-05 16:35:17 +0800] [13] [INFO] Application startup complete.
-meeting_backend   | 172.18.0.4:44952 - "GET /updates/latest HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:44962 - "GET /meeting_types/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:44978 - "GET /meetings/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:52978 - "GET /updates/latest HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:52986 - "GET /devices/ HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53184 - "POST /devices/heartbeat HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53196 - "POST /devices/heartbeat HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:53200 - "POST /auth/login HTTP/1.0" 200
-meeting_backend   | [DEBUG] Filtering start_date >= 2026-01-05 00:00:00
-meeting_backend   | [DEBUG] Filtering end_date <= 2026-01-05 23:59:59
-meeting_backend   | 172.18.0.4:53202 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-05&end_date=2026-01-05 HTTP/1.0" 200
-meeting_backend   | [DEBUG] Filtering start_date >= 2026-01-05 00:00:00
-meeting_backend   | [DEBUG] Filtering end_date <= 2026-01-05 23:59:59
-meeting_backend   | 172.18.0.4:53212 - "GET /meetings/?skip=0&limit=100&sort=asc&start_date=2026-01-05&end_date=2026-01-05 HTTP/1.0" 200
-meeting_backend   | 172.18.0.4:36512 - "GET /devices/ HTTP/1.0" 200
+INFO:     127.0.0.1:6195 - "GET /meetings/stats HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Python3.13\Lib\site-packages\uvicorn\protocols\http\h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Python3.13\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\fastapi\applications.py", line 1139, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "D:\Python3.13\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "D:\Python3.13\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\Python3.13\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Python3.13\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\fastapi\routing.py", line 120, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "D:\Python3.13\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "D:\Python3.13\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Python3.13\Lib\site-packages\fastapi\routing.py", line 106, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\fastapi\routing.py", line 430, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "D:\Python3.13\Lib\site-packages\fastapi\routing.py", line 318, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\starlette\concurrency.py", line 32, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\anyio\to_thread.py", line 61, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Python3.13\Lib\site-packages\anyio\_backends\_asyncio.py", line 2525, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "D:\Python3.13\Lib\site-packages\anyio\_backends\_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+  File "D:\ProgramData\paperless_meeting\backend\routes\meetings.py", line 60, in get_meeting_stats
+    yearly_count = count_in_range(current_year_start, current_year_end)
+  File "D:\ProgramData\paperless_meeting\backend\routes\meetings.py", line 51, in count_in_range
+    select(func.count(Meeting.id))
+           ^^^^
+NameError: name 'func' is not defined

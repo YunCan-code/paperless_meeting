@@ -99,6 +99,13 @@ class Note(NoteBase, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
+# 系统设置模型 (Key-Value)
+class SystemSetting(SQLModel, table=True):
+    key: str = Field(primary_key=True)
+    value: str # JSON encoded value or simple string
+    description: Optional[str] = None
+
+
 class NoteRead(NoteBase):
     id: int
     created_at: datetime
