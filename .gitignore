@@ -82,10 +82,16 @@ logs/
 *.sqlite
 *.sqlite3
 
+# Exclude specific sensitive/large directories
+doc/
+backend/uploads/
+*.apk
+pgdata/
+
 # =========================
-# 上传文件（可选：根据需要决定是否忽略）
+# Uploaded files
 # =========================
-# uploads/
+uploads/
 
 # =========================
 # 环境配置文件

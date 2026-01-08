@@ -49,6 +49,16 @@
             <template #title>笔记</template>
           </el-menu-item>
           <div class="menu-divider"></div>
+          
+          <!-- Theme Toggle Button -->
+          <div class="theme-toggle-wrapper" @click="toggleDark">
+            <el-icon :size="20">
+              <MoonNight v-if="!isDark" />
+              <Sunrise v-else />
+            </el-icon>
+            <span v-show="!isCollapse" class="theme-toggle-label">{{ isDark ? '浅色模式' : '深色模式' }}</span>
+          </div>
+          
           <el-menu-item index="/admin/settings">
             <el-icon><Setting /></el-icon>
             <template #title>系统设置</template>
@@ -65,12 +75,16 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting, Notebook, Cellphone } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting, Notebook, Cellphone, MoonNight, Sunrise } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
+import { useTheme } from '@/composables/useTheme'
 import { ref, onMounted, onUnmounted } from 'vue'
 
 // 使用全局侧边栏状态，与子页面共享
 const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
+
+// 使用主题切换
+const { isDark, toggleDark } = useTheme()
 
 const isMobile = ref(false)
 
@@ -275,5 +289,39 @@ onUnmounted(() => {
 }
 
 /* Main Content Styles Removed Duplicate */
+
+/* Theme Toggle Button - Match el-menu-item exactly */
+.theme-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 20px;
+  margin: 0 0 2px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-slate-600);
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.theme-toggle-wrapper .el-icon {
+  margin-right: 10px;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.theme-toggle-wrapper:hover {
+  background-color: var(--color-slate-100);
+  color: var(--color-slate-900);
+}
+.custom-aside.collapsed .theme-toggle-wrapper {
+  justify-content: center;
+  padding: 0;
+}
+.custom-aside.collapsed .theme-toggle-wrapper .el-icon {
+  margin-right: 0;
+}
+.theme-toggle-label {
+  white-space: nowrap;
+}
 
 </style>

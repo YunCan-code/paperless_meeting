@@ -7,6 +7,20 @@ import App from './App.vue'
 import router from './router'
 
 import './style.css'
+import './dark_theme.css'
+
+// Initialize theme before app mounts
+const initTheme = () => {
+    const saved = localStorage.getItem('vueuse-color-scheme')
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    
+    if (saved === 'dark' || (!saved && systemDark)) {
+        document.documentElement.classList.add('dark')
+    } else {
+        document.documentElement.classList.remove('dark')
+    }
+}
+initTheme()
 
 const app = createApp(App)
 

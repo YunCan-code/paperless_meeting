@@ -3,44 +3,325 @@ html.dark {
     /* Base Backgrounds - Not Pure Black */
     --color-slate-50: #0f172a;  /* Very Dark Blue (Body Bg) */
     --color-slate-100: #1e293b; /* Panel Bg (Lighter) */
-    --color-slate-200: #334155; /* Boarders */
+    --color-slate-200: #334155; /* Borders */
     --color-slate-300: #475569;
     --color-slate-400: #94a3b8;
     --color-slate-500: #64748b;
     --color-slate-600: #cbd5e1; /* Secondary Text */
     --color-slate-700: #e2e8f0; 
     --color-slate-800: #f1f5f9; /* Main Text */
-    --color-slate-900: #f8fafc; /* Inverted for Dark Mode logic if used directly */
+    --color-slate-900: #f8fafc; /* Inverted for Dark Mode */
 
-    --bg-color: #0b1121; /* Deepest Background */
+    /* Semantic Colors */
+    --bg-color: #0b1121;
+    --bg-sidebar: #111827;
+    --bg-main: #0f172a;
+    --card-bg: #1e293b;
     --text-main: #e2e8f0;
     --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --border-color-layout: #1f2937;
 
-    /* Element Plus Overrides */
-    --el-bg-color: #111827; /* Gray-900 for Cards/Dialogs */
-    --el-bg-color-overlay: #1f2937; /* Gray-800 for Dropdowns/Tooltips */
+    color-scheme: dark;
+
+    /* Element Plus Core Overrides */
+    --el-bg-color: #111827;
+    --el-bg-color-page: #0f172a;
+    --el-bg-color-overlay: #1f2937;
     --el-text-color-primary: #f3f4f6;
     --el-text-color-regular: #d1d5db;
     --el-text-color-secondary: #9ca3af;
+    --el-text-color-placeholder: #6b7280;
     --el-border-color: #374151;
     --el-border-color-light: #4b5563;
+    --el-border-color-lighter: #374151;
+    --el-border-color-dark: #4b5563;
+    --el-fill-color: #1f2937;
+    --el-fill-color-light: #374151;
+    --el-fill-color-lighter: #1f2937;
     --el-fill-color-blank: #111827;
+    
+    /* Shadows */
+    --el-box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.3);
+    --el-box-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-/* Card Overrides for Dark Mode */
-html.dark .el-card {
-    background-color: #111827;
-    border-color: #374151;
-    color: var(--el-text-color-primary);
+/* Body & App */
+html.dark body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
 }
+
+/* Sidebar */
+html.dark .custom-aside {
+    background: var(--bg-sidebar);
+    border-right-color: var(--border-color-layout);
+}
+
+html.dark .sidebar-header {
+    border-bottom-color: var(--border-color-layout);
+}
+
+html.dark .logo-text h1 {
+    color: var(--text-main);
+}
+
+html.dark .logo-text p {
+    color: var(--text-secondary);
+}
+
+/* Menu Items */
+html.dark .el-menu {
+    background-color: transparent;
+}
+
+html.dark .el-menu-item {
+    color: var(--text-secondary);
+}
+
+html.dark .el-menu-item:hover {
+    background-color: var(--color-slate-100) !important;
+    color: var(--text-main);
+}
+
+html.dark .el-menu-item.is-active {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #60a5fa !important;
+    box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+/* Theme Toggle */
+html.dark .theme-toggle-wrapper {
+    color: var(--text-secondary);
+}
+
+html.dark .theme-toggle-wrapper:hover {
+    background-color: var(--color-slate-100);
+    color: var(--text-main);
+}
+
+/* Card Overrides */
+html.dark .el-card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
 html.dark .el-card__header {
-    border-bottom-color: #374151;
+    border-bottom-color: var(--border-color);
 }
 
 /* Table Overrides */
 html.dark .el-table {
-    --el-table-tr-bg-color: #111827;
+    --el-table-bg-color: var(--card-bg);
+    --el-table-tr-bg-color: var(--card-bg);
     --el-table-header-bg-color: #1f2937;
     --el-table-row-hover-bg-color: #374151;
-    --el-table-border: 1px solid #374151;
+    --el-table-border-color: var(--border-color);
+    --el-table-text-color: var(--text-main);
+    --el-table-header-text-color: var(--text-secondary);
+    background-color: transparent;
+}
+
+html.dark .el-table th.el-table__cell {
+    background-color: #1f2937;
+}
+
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Input & Form */
+html.dark .el-input__wrapper {
+    background-color: var(--card-bg);
+    box-shadow: 0 0 0 1px var(--border-color) inset;
+}
+
+html.dark .el-input__wrapper:hover {
+    box-shadow: 0 0 0 1px var(--el-border-color-light) inset;
+}
+
+html.dark .el-input__inner {
+    color: var(--text-main);
+}
+
+html.dark .el-input__inner::placeholder {
+    color: var(--el-text-color-placeholder);
+}
+
+html.dark .el-textarea__inner {
+    background-color: var(--card-bg);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+html.dark .el-select__wrapper {
+    background-color: var(--card-bg);
+    box-shadow: 0 0 0 1px var(--border-color) inset;
+}
+
+/* Button Overrides */
+html.dark .el-button--default {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
+html.dark .el-button--default:hover {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: var(--text-main);
+}
+
+/* Dialog */
+html.dark .el-dialog {
+    background-color: var(--card-bg);
+}
+
+html.dark .el-dialog__header {
+    border-bottom: 1px solid var(--border-color);
+}
+
+html.dark .el-dialog__title {
+    color: var(--text-main);
+}
+
+html.dark .el-dialog__footer {
+    border-top: 1px solid var(--border-color);
+}
+
+/* Dropdown & Popover */
+html.dark .el-dropdown-menu {
+    background-color: var(--el-bg-color-overlay);
+    border-color: var(--border-color);
+}
+
+html.dark .el-dropdown-menu__item {
+    color: var(--text-main);
+}
+
+html.dark .el-dropdown-menu__item:hover {
+    background-color: #374151;
+}
+
+html.dark .el-popover.el-popper {
+    background-color: var(--el-bg-color-overlay);
+    border-color: var(--border-color);
+}
+
+/* Tabs */
+html.dark .el-tabs__header {
+    border-bottom-color: var(--border-color);
+}
+
+html.dark .el-tabs__item {
+    color: var(--text-secondary);
+}
+
+html.dark .el-tabs__item.is-active {
+    color: #60a5fa;
+}
+
+/* Loading */
+html.dark .el-loading-mask {
+    background-color: rgba(15, 23, 42, 0.9);
+}
+
+/* Message Box */
+html.dark .el-message-box {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+html.dark .el-message-box__title {
+    color: var(--text-main);
+}
+
+html.dark .el-message-box__message {
+    color: var(--text-secondary);
+}
+
+/* Pagination */
+html.dark .el-pagination {
+    --el-pagination-bg-color: var(--card-bg);
+    --el-pagination-button-bg-color: var(--card-bg);
+    --el-pagination-hover-color: #60a5fa;
+}
+
+html.dark .el-pagination button:disabled {
+    background-color: var(--card-bg);
+}
+
+/* Tag */
+html.dark .el-tag {
+    --el-tag-bg-color: rgba(59, 130, 246, 0.15);
+    --el-tag-border-color: rgba(59, 130, 246, 0.3);
+    --el-tag-text-color: #60a5fa;
+}
+
+/* Empty State */
+html.dark .el-empty__description {
+    color: var(--text-secondary);
+}
+
+/* Calendar */
+html.dark .el-calendar {
+    --el-calendar-bg-color: var(--card-bg);
+    --el-calendar-border: 1px solid var(--border-color);
+}
+
+/* DatePicker */
+html.dark .el-date-picker {
+    background-color: var(--el-bg-color-overlay);
+}
+
+/* Scrollbar */
+html.dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 4px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+    background: #4b5563;
+}
+
+/* Page Header & Title styles */
+html.dark .page-title {
+    color: var(--text-main);
+}
+
+html.dark .section-title {
+    color: var(--text-main);
+}
+
+/* Stats Cards in Dark Mode */
+html.dark .stat-card,
+html.dark .stats-card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+/* Grid Card */
+html.dark .grid-card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+/* Settings page specific */
+html.dark .settings-card {
+    background-color: var(--card-bg);
+}
+
+/* Main content area */
+html.dark .custom-main {
+    background-color: var(--bg-main);
 }
