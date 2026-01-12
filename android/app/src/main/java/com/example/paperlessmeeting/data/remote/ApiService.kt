@@ -41,4 +41,30 @@ interface ApiService {
     @retrofit2.http.Streaming
     @retrofit2.http.GET
     suspend fun downloadApk(@retrofit2.http.Url url: String): okhttp3.ResponseBody
+
+    // Sync API
+    @GET("sync/{meetingId}/sync_state")
+    suspend fun getSyncState(@retrofit2.http.Path("meetingId") meetingId: Int): com.example.paperlessmeeting.domain.model.MeetingSyncState
+
+    @retrofit2.http.POST("sync/{meetingId}/sync_state")
+    suspend fun updateSyncState(
+        @retrofit2.http.Path("meetingId") meetingId: Int,
+        @retrofit2.http.Query("file_id") fileId: Int,
+        @retrofit2.http.Query("page_number") pageNumber: Int,
+        @retrofit2.http.Query("is_syncing") isSyncing: Boolean,
+        @retrofit2.http.Query("file_url") fileUrl: String?
+    ): com.example.paperlessmeeting.domain.model.MeetingSyncState
+
+    // Vote API
+    @GET("vote/meeting/{meetingId}/active")
+    suspend fun getActiveVote(@retrofit2.http.Path("meetingId") meetingId: Int): com.example.paperlessmeeting.domain.model.Vote?
+
+    @retrofit2.http.POST("vote/{voteId}/submit")
+    suspend fun submitVote(
+        @retrofit2.http.Path("voteId") voteId: Int,
+        @retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.VoteSubmitRequest
+    ): Map<String, Any>
+
+    @GET("vote/{voteId}/result")
+    suspend fun getVoteResult(@retrofit2.http.Path("voteId") voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult
 }

@@ -347,6 +347,8 @@
         </div>
       </template>
     </el-dialog>
+
+
   </div>
 </template>
 
@@ -361,6 +363,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import SessionCalendar from './components/SessionCalendar.vue'
+
 import TodayMeetings from './components/TodayMeetings.vue'
 import MeetingHistory from './components/MeetingHistory.vue'
 
@@ -510,6 +513,8 @@ const fetchMeetingTypes = async () => {
 }
 const handleUploadClick = (meeting) => {}
 const handleUploadSuccess = () => { fetchMeetings() }
+
+
 
 // Details
 const viewDetails = async (row) => {

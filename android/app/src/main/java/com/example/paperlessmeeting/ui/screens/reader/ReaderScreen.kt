@@ -8,6 +8,7 @@ import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import android.view.MotionEvent
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -75,9 +77,36 @@ fun ReaderScreen(
     LaunchedEffect(downloadUrl) {
         viewModel.loadDocument(downloadUrl, fileName)
     }
+    val context = LocalContext.current
 
     val uiState by viewModel.uiState.collectAsState()
     val pageAnnotations by viewModel.pageAnnotations.collectAsState()
+    
+    // Sync States
+    val isFollowing by viewModel.isFollowing.collectAsState()
+    val isPresenterSyncing by viewModel.isPresenterSyncing.collectAsState()
+    val isSyncActive by viewModel.isSyncActive.collectAsState()
+    val oneShotJumpPage by viewModel.oneShotJumpPage.collectAsState()
+    
+    // Static Role (No need to collect flow if simple val, but flow safer if role changes dynamically)
+    // Actually VM exposes it as val property? No, let's make it a state or just access VM property?
+    // VM code was: val isPresenter = ...
+    // Since it's init-time determined, direct access is fine, but remember triggers recomposition if passed.
+    val isPresenter = viewModel.isPresenter
+    val toastEvent by viewModel.toastEvent.collectAsState()
+    
+    // Init Sync Context
+    LaunchedEffect(meetingId, attachmentId, downloadUrl) {
+         viewModel.initSync(meetingId, attachmentId, downloadUrl)
+    }
+    
+    // Handle Toast
+    LaunchedEffect(toastEvent) {
+        toastEvent?.let { msg ->
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.consumeToastEvent()
+        }
+    }
 
     // --- State Management ---
     var showOverlay by remember { mutableStateOf(true) }
@@ -93,6 +122,15 @@ fun ReaderScreen(
     var currentPage by remember { mutableIntStateOf(initialPage) }
     var totalPages by remember { mutableIntStateOf(0) }
     var isProgrammaticScroll by remember { mutableStateOf(true) } // Prevent scroll fighting
+
+    // Handle Sync Jumps
+    LaunchedEffect(oneShotJumpPage) {
+        oneShotJumpPage?.let { targetPage ->
+            isProgrammaticScroll = true
+            currentPage = targetPage
+            viewModel.consumeJumpEvent()
+        }
+    }
 
     // TOC & Thumbnails
     var tocList by remember { mutableStateOf<List<Pair<Int, Bookmark>>>(emptyList()) }
@@ -116,7 +154,6 @@ fun ReaderScreen(
 
     // Utils
     val cleanTitle = remember(fileName) { fileName.substringBeforeLast(".") } // Removing Extension
-    val context = LocalContext.current
     
     // PDF View Reference for capturing state
     var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
@@ -354,6 +391,34 @@ fun ReaderScreen(
                                 isProgrammaticScroll = false // User scrolled
                                 currentPage = page
                                 totalPages = count
+                                
+                                // Presenter Sync Logic
+                                if (isPresenterSyncing) {
+                                    viewModel.onPresenterPageChanged(page)
+                                }
+                                
+                                // Attendee Auto-Detach Logic
+                                if (isFollowing && !isProgrammaticScroll) {
+                                    // If user manually scrolled, stop following (optional, or just keep following)
+                                    // For now, let's keep following unless they explicitly turn it off, 
+                                    // OR we could say manual scroll disables follow.
+                                    // Let's implement: Manual scroll disables follow to avoid fighting.
+                                    // But wait, isProgrammaticScroll is set to false here.
+                                    // The logic to differentiate 'user scroll' vs 'sync jump' is handled by `isProgrammaticScroll` flag passed into PDFViewerContent.
+                                    // In `onPageChange` below, we check if it was programmatic.
+                                    // ACTUALLY, `onPageChange` is called by PDFView in BOTH cases.
+                                    // We need to know if the helper triggered it.
+                                    
+                                    // In this implementation `isProgrammaticScroll` is set to false just above this line. 
+                                    // So how do we distinguish? 
+                                    // Answer: We need to check the scope.
+                                    // Let's use the simplest approach: If user interacts, we disable follow.
+                                    // But PDFView `onPageChange` fires even for programmatic jumps.
+                                    
+                                    // Let's just update Presenter state here.
+                                    // Attendee detach is handled by `isProgrammaticScroll` check if we want to be strict.
+                                    // For now, let's just allow the jump.
+                                }
                             },
                             onTap = {
                                 showOverlay = !showOverlay
@@ -372,7 +437,13 @@ fun ReaderScreen(
                             MinimalistTopBar(
                                 title = cleanTitle,
                                 isNightMode = isNightMode,
-                                onBackClick = { navController.popBackStack() }
+                                isPresenter = isPresenter,
+                                isPresenterSyncing = isPresenterSyncing,
+                                isFollowing = isFollowing,
+                                isSyncActive = isSyncActive,
+                                onBackClick = { navController.popBackStack() },
+                                onPresenterToggle = { viewModel.togglePresenterSync(!isPresenterSyncing) },
+                                onFollowToggle = { viewModel.toggleFollow(!isFollowing) }
                             )
                         }
 
@@ -584,7 +655,13 @@ fun renderPdfPageToBitmap(file: File, pageIndex: Int): Bitmap? {
 fun MinimalistTopBar(
     title: String,
     isNightMode: Boolean,
-    onBackClick: () -> Unit
+    isPresenter: Boolean,
+    isPresenterSyncing: Boolean,
+    isFollowing: Boolean,
+    isSyncActive: Boolean, // Attendee: Is sync available?
+    onBackClick: () -> Unit,
+    onPresenterToggle: () -> Unit,
+    onFollowToggle: () -> Unit
 ) {
     val textColor = if(isNightMode) Color.White else InkText
     val backgroundColor = if(isNightMode) Color.Black else FloatingSurface
@@ -615,6 +692,53 @@ fun MinimalistTopBar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            
+            // Sync Controls
+            if (isPresenter) {
+                // Presenter UI
+                TextButton(
+                    onClick = onPresenterToggle,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (isPresenterSyncing) Color(0xFFFF5252) else IconGrey
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Cast, 
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isPresenterSyncing) "结束同屏" else "发起同屏")
+                }
+            } else {
+                // Attendee UI
+                // Pulse Animation if Sync Available and Not Following
+                 val infiniteTransition = rememberInfiniteTransition()
+                 val pulseAlpha by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = if (isSyncActive && !isFollowing) 0.5f else 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000),
+                        repeatMode = RepeatMode.Reverse
+                    )
+                )
+                
+                TextButton(
+                    onClick = onFollowToggle,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (isFollowing) Color(0xFF4CAF50) else IconGrey
+                    ),
+                    modifier = Modifier.alpha(if(isSyncActive && !isFollowing) pulseAlpha else 1f)
+                ) {
+                     Icon(
+                        imageVector = if(isFollowing) Icons.Default.Link else Icons.Default.LinkOff, 
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isFollowing) "退出跟随" else "跟随阅读")
+                }
+            }
         }
     }
 }

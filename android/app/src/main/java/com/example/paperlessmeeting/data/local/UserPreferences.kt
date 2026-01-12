@@ -19,6 +19,7 @@ class UserPreferences @Inject constructor(
         private const val KEY_USER_DISTRICT = "user_district"
         private const val KEY_USER_PHONE = "user_phone"
         private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_USER_ROLE = "user_role"
     }
 
     fun saveUserId(id: Int) {
@@ -69,6 +70,14 @@ class UserPreferences @Inject constructor(
         return prefs.getString(KEY_USER_EMAIL, null)
     }
     
+    fun saveUserRole(role: String) {
+        prefs.edit().putString(KEY_USER_ROLE, role).apply()
+    }
+
+    fun getUserRole(): String? {
+        return prefs.getString(KEY_USER_ROLE, "user")
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

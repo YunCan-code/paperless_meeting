@@ -8,6 +8,7 @@ data class LoginResponse(
     val user_id: Int,
     val name: String,
     val department: String?,
+    val role: String?,
     val token: String
 )
 

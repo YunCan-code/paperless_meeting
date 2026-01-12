@@ -105,6 +105,15 @@ class SystemSetting(SQLModel, table=True):
     value: str # JSON encoded value or simple string
     description: Optional[str] = None
 
+# 系统的同屏/跟随状态模型
+class MeetingSyncState(SQLModel, table=True):
+    meeting_id: int = Field(primary_key=True)
+    file_id: int 
+    page_number: int
+    file_url: Optional[str] = None # Optional, mainly for client convenience
+    timestamp: float # Unix timestamp to prevent old commands
+    is_syncing: bool = Field(default=False) # Master switch for this meeting
+
 
 class NoteRead(NoteBase):
     id: int
@@ -171,3 +180,56 @@ class DeviceCommandRead(DeviceCommandBase):
     created_at: datetime
     acked_at: Optional[datetime]
 
+
+# ==================== 投票功能模型 ====================
+
+class Vote(SQLModel, table=True):
+    """投票主表"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    meeting_id: int = Field(foreign_key="meeting.id")
+    title: str
+    description: Optional[str] = None
+    is_multiple: bool = Field(default=False)  # 是否多选
+    is_anonymous: bool = Field(default=False)  # 是否匿名
+    max_selections: int = Field(default=1)  # 最多可选数量
+    duration_seconds: int = Field(default=60)  # 投票时长（秒）
+    status: str = Field(default="draft")  # draft/active/closed
+    started_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+
+class VoteOption(SQLModel, table=True):
+    """投票选项"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    vote_id: int = Field(foreign_key="vote.id")
+    content: str
+    sort_order: int = Field(default=0)
+
+class UserVote(SQLModel, table=True):
+    """用户投票记录"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    vote_id: int = Field(foreign_key="vote.id")
+    user_id: int = Field(foreign_key="user.id")
+    option_id: int = Field(foreign_key="voteoption.id")
+    voted_at: datetime = Field(default_factory=datetime.now)
+
+class VoteRead(SQLModel):
+    id: int
+    meeting_id: int
+    title: str
+    description: Optional[str]
+    is_multiple: bool
+    is_anonymous: bool
+    max_selections: int
+    duration_seconds: int
+    status: str
+    started_at: Optional[datetime]
+    created_at: datetime
+    options: List["VoteOptionRead"] = []
+    remaining_seconds: Optional[int] = None  # 计算剩余时间
+
+class VoteOptionRead(SQLModel):
+    id: int
+    content: str
+    sort_order: int
+    vote_count: Optional[int] = None  # 投票结果时使用
+    percent: Optional[float] = None

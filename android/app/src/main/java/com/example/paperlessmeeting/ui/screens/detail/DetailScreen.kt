@@ -109,6 +109,26 @@ fun DetailScreen(
                     containerColor = Color.Transparent
                 )
             )
+
+            // Vote Bottom Sheet
+            val currentVote by viewModel.currentVote.collectAsState()
+            val voteResult by viewModel.voteResult.collectAsState()
+            val hasVoted by viewModel.hasVoted.collectAsState()
+            val showVoteSheet by viewModel.showVoteSheet.collectAsState()
+            
+            if (showVoteSheet && currentVote != null) {
+                com.example.paperlessmeeting.ui.components.VoteBottomSheet(
+                    vote = currentVote!!,
+                    hasVoted = hasVoted,
+                    result = voteResult, // Pass result if available (e.g. after vote end)
+                    onSubmit = { optionIds ->
+                        viewModel.submitVote(optionIds)
+                    },
+                    onDismiss = {
+                        viewModel.dismissVoteSheet()
+                    }
+                )
+            }
         }
     }
 }

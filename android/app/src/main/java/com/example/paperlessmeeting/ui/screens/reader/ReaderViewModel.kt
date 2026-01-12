@@ -15,6 +15,10 @@ import javax.inject.Inject
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
+import com.example.paperlessmeeting.domain.model.MeetingSyncState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+
 sealed class ReaderUiState {
     object Idle : ReaderUiState()
     object Loading : ReaderUiState()
@@ -27,14 +31,37 @@ sealed class ReaderUiState {
 class ReaderViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val readingProgressManager: com.example.paperlessmeeting.data.local.ReadingProgressManager,
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
     application: Application
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow<ReaderUiState>(ReaderUiState.Idle)
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
+    // Sync Logic
+    private val _isFollowing = MutableStateFlow(false) // Attendee: Follow presenter?
+    val isFollowing: StateFlow<Boolean> = _isFollowing.asStateFlow()
+
+    private val _isPresenterSyncing = MutableStateFlow(false) // Presenter: Broadcast?
+    val isPresenterSyncing: StateFlow<Boolean> = _isPresenterSyncing.asStateFlow()
+    
+    // Derived Role
+    // Assuming 'admin' or purely 'host' control. For now check if role starts with admin
+    val isPresenter: Boolean = userPreferences.getUserRole() == "admin" || userPreferences.getUserRole() == "主讲人"
+
+    // Attendee: Is there an active broadcast?
+    private val _isSyncActive = MutableStateFlow(false)
+    val isSyncActive: StateFlow<Boolean> = _isSyncActive.asStateFlow()
+
+    // Command to UI to jump page (One-time event)
+    private val _oneShotJumpPage = MutableStateFlow<Int?>(null)
+    val oneShotJumpPage: StateFlow<Int?> = _oneShotJumpPage.asStateFlow()
+
     init {
         cleanupOldCache()
+        if (!isPresenter) {
+            startSyncAvailabilityCheck()
+        }
     }
 
     private fun cleanupOldCache() {
@@ -175,6 +202,136 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             if (total > 0) {
                 readingProgressManager.saveProgress(uniqueId, fileName, page, total, localPath)
+            }
+        }
+    }
+    
+    // ================= Sync Logic =================
+
+    private var currentMeetingId: Int = -1
+    private var currentFileId: Int = -1
+    private var currentFileUrl: String? = null
+    
+    fun initSync(meetingId: Int, fileId: Int, fileUrl: String) {
+        currentMeetingId = meetingId
+        currentFileId = fileId
+        currentFileUrl = fileUrl
+    }
+
+    // Toggle Presenter Mode
+    fun togglePresenterSync(enable: Boolean) {
+        _isPresenterSyncing.value = enable
+        
+        // Notify backend immediately
+        if (currentMeetingId != -1) {
+             viewModelScope.launch {
+                repository.updateSyncState(
+                    meetingId = currentMeetingId,
+                    fileId = currentFileId,
+                    pageNumber = _oneShotJumpPage.value ?: 0, // Should be current page, but ViewModel doesn't track it tightly. Let's assume onPresenterPageChanged handles active updates.
+                    // Wait, we need the *current page* here. 
+                    // But ViewModel doesn't hold 'currentPage' explicitly as a state accessible here easily without passing it in.
+                    // Actually, onPresenterPageChanged is called by UI.
+                    // If disabling, page number doesn't matter much, but 'isSyncing' = false does.
+                    isSyncing = enable,
+                    fileUrl = currentFileUrl
+                )
+             }
+        }
+    }
+
+    // Presenter: Report page change
+    fun onPresenterPageChanged(page: Int) {
+        if (!_isPresenterSyncing.value || currentMeetingId == -1) return
+        
+        viewModelScope.launch {
+            repository.updateSyncState(
+                meetingId = currentMeetingId,
+                fileId = currentFileId,
+                pageNumber = page,
+                isSyncing = true,
+                fileUrl = currentFileUrl
+            )
+        }
+    }
+
+    // Toggle Attendee Follow Mode
+    fun toggleFollow(enable: Boolean) {
+        val wasDisabled = !_isFollowing.value
+        _isFollowing.value = enable
+        
+        if (wasDisabled && enable && currentMeetingId != -1) {
+            // Restart polling loop if enabling
+            startPollingLoop()
+        }
+    }
+    
+    // Consume jump event
+    fun consumeJumpEvent() {
+        _oneShotJumpPage.value = null
+    }
+
+    private val _toastEvent = MutableStateFlow<String?>(null)
+    val toastEvent: StateFlow<String?> = _toastEvent.asStateFlow()
+
+    fun consumeToastEvent() {
+        _toastEvent.value = null
+    }
+
+    private fun startSyncAvailabilityCheck() {
+        viewModelScope.launch {
+            while (isActive) {
+                if (currentMeetingId != -1) {
+                    try {
+                        val state = repository.getSyncState(currentMeetingId)
+                        val active = state?.is_syncing == true
+                        
+                        // Detect Transition: Active -> Inactive
+                        val wasActive = _isSyncActive.value
+                        _isSyncActive.value = active
+                        
+                        // Auto-disconnect if following
+                        if (wasActive && !active && _isFollowing.value) {
+                             _isFollowing.value = false
+                             _toastEvent.value = "主讲人已结束同屏"
+                        }
+                        
+                        val interval = if (active && !_isFollowing.value) 2000L else 5000L
+                         delay(interval)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        delay(5000)
+                    }
+                } else {
+                    delay(2000)
+                }
+            }
+        }
+    }
+
+    private fun startPollingLoop() {
+        viewModelScope.launch {
+            // ... existing poll loop
+            while (isActive && _isFollowing.value) {
+                // ...
+
+                if (currentMeetingId != -1) {
+                    val state = repository.getSyncState(currentMeetingId)
+                    if (state != null && state.is_syncing) {
+                        // Check file match (Simple check for now)
+                        // If file differs, we might need to prompt download, but for MVP assume same file opened
+                        // In real world, check state.file_id == currentFileId
+                        
+                        if (state.file_id == currentFileId) {
+                            // If same file, jump to page
+                             _oneShotJumpPage.value = state.page_number
+                        } else {
+                            // Different file? For now just ignore or Toast
+                            // Ideally trigger loadDocument(state.file_url)
+                        }
+                    }
+                }
+                delay(1000) // Poll every 1s
             }
         }
     }

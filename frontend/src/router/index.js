@@ -42,6 +42,11 @@ const router = createRouter({
                     path: 'devices',
                     name: 'devices',
                     component: () => import('../views/Admin/DeviceManage.vue')
+                },
+                {
+                    path: 'toolbox',
+                    name: 'toolbox',
+                    component: () => import('../views/Admin/Toolbox.vue')
                 }
             ]
         },
@@ -59,6 +64,11 @@ const router = createRouter({
                     component: () => import('../views/Mobile/Home.vue')
                 }
             ]
+        },
+        {
+            path: '/vote/bigscreen/:id',
+            name: 'vote-bigscreen',
+            component: () => import('../views/BigScreen/VoteBigScreen.vue')
         }
     ]
 })
