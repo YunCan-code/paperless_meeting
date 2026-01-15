@@ -93,7 +93,12 @@ class DashboardViewModel @Inject constructor(
         val voteId = _currentVote.value?.id ?: return
         viewModelScope.launch {
             try {
-                repository.submitVote(voteId, optionIds)
+                val userId = userPreferences.getUserId()
+                if (userId == -1) {
+                    _toastMessage.emit("用户信息无效，请重新登录")
+                    return@launch
+                }
+                repository.submitVote(voteId, userId, optionIds)
                 _hasVoted.value = true
                 _toastMessage.emit("投票提交成功")
             } catch (e: Exception) {

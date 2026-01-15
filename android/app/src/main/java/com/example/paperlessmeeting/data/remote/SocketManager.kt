@@ -4,6 +4,11 @@ import android.util.Log
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteOptionResult
 import com.google.gson.Gson
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
@@ -21,7 +26,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SocketManager @Inject constructor(
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    @ApplicationContext private val context: Context
 ) {
 
     private var socket: Socket? = null
@@ -45,7 +51,7 @@ class SocketManager @Inject constructor(
 
         try {
             val options = IO.Options().apply {
-                transports = arrayOf("websocket")
+                // transports = arrayOf("websocket") // 允许自动升级，提高兼容性
                 reconnection = true
                 reconnectionAttempts = 10
                 reconnectionDelay = 2000
@@ -78,6 +84,11 @@ class SocketManager @Inject constructor(
                     val vote = gson.fromJson(json.toString(), Vote::class.java)
                     _voteStartEvent.tryEmit(vote)
                     Log.d(TAG, "Received vote_start: ${vote.title}")
+                    
+                    // 全局 Toast 通知
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(context, "收到新投票: ${vote.title}", Toast.LENGTH_LONG).show()
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing vote_start", e)
                 }

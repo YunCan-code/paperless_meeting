@@ -27,7 +27,7 @@ interface MeetingRepository {
     // Vote methods
     suspend fun getActiveVote(meetingId: Int): com.example.paperlessmeeting.domain.model.Vote?
     suspend fun getVoteList(meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
-    suspend fun submitVote(voteId: Int, optionIds: List<Int>)
+    suspend fun submitVote(voteId: Int, userId: Int, optionIds: List<Int>)
     suspend fun getVoteResult(voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult?
 }
 
@@ -145,21 +145,8 @@ class MeetingRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun submitVote(voteId: Int, optionIds: List<Int>) {
+    override suspend fun submitVote(voteId: Int, userId: Int, optionIds: List<Int>) {
         try {
-            // Assuming current user ID is available or handled by backend auth session
-            // But API requires user_id. 
-            // In a real app we'd get this from UserPreferences.
-            // For now hardcoding or passing a dummy if UserPrefs not injected.
-            // Wait, Repository needs UserPreferences to get userId.
-            // Let's assume Backend uses token or we pass 1 for now if not available easily.
-            // Actually I should inject UserPreferences.
-            // But let's check ApiService signature: submitVote(voteId, VoteSubmitRequest)
-            // So we need to construct the request here.
-            
-            // HACK: Hardcoded active User ID = 1 for demo purposes as requested by "minimal changes"
-            // In production this should be fetched from DataStore/Prefs
-            val userId = 1 
             val request = com.example.paperlessmeeting.domain.model.VoteSubmitRequest(userId, optionIds)
             api.submitVote(voteId, request)
         } catch (e: Exception) {
