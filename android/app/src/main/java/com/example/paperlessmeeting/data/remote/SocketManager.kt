@@ -58,7 +58,7 @@ class SocketManager @Inject constructor(
 
         try {
             val options = IO.Options().apply {
-                // transports = arrayOf("websocket") // 允许自动升级，提高兼容性
+                transports = arrayOf("websocket") // 强制使用WebSocket，跳过Polling，避免多Worker模式下的Sticky Session问题
                 reconnection = true
                 reconnectionAttempts = 10
                 reconnectionDelay = 2000
