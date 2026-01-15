@@ -10,7 +10,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from database import get_session
-from models import Vote, VoteOption, UserVote, VoteRead, VoteOptionRead
+from models import Vote, VoteOption, UserVote, VoteRead, VoteOptionRead, User
 
 router = APIRouter(prefix="/vote", tags=["vote"])
 
@@ -60,11 +60,11 @@ def create_vote(data: VoteCreate, session: Session = Depends(get_session)):
 @router.get("/{vote_id}", response_model=VoteRead)
 def get_vote(vote_id: int, session: Session = Depends(get_session)):
     """获取投票详情"""
-    return _get_vote_with_options(vote_id, session)
+    return _get_vote_with_options(vote_id, session, include_remaining=True)
 
 
 @router.post("/{vote_id}/start")
-def start_vote(vote_id: int, session: Session = Depends(get_session)):
+async def start_vote(vote_id: int, session: Session = Depends(get_session)):
     """开始投票"""
     vote = session.get(Vote, vote_id)
     if not vote:
@@ -77,12 +77,17 @@ def start_vote(vote_id: int, session: Session = Depends(get_session)):
     session.add(vote)
     session.commit()
     
-    # TODO: 通过 WebSocket 广播 vote_start 事件
+    # 广播 vote_start
+    await broadcast_vote_start(vote.meeting_id, {
+        "id": vote.id, 
+        "title": vote.title,
+        "duration_seconds": vote.duration_seconds
+    })
     return {"success": True, "vote_id": vote_id}
 
 
 @router.post("/{vote_id}/close")
-def close_vote(vote_id: int, session: Session = Depends(get_session)):
+async def close_vote(vote_id: int, session: Session = Depends(get_session)):
     """结束投票"""
     vote = session.get(Vote, vote_id)
     if not vote:
@@ -92,7 +97,10 @@ def close_vote(vote_id: int, session: Session = Depends(get_session)):
     session.add(vote)
     session.commit()
     
-    # TODO: 通过 WebSocket 广播 vote_end 事件
+    # 计算最终结果并广播
+    final_results = _calculate_vote_result(vote_id, session)
+    await broadcast_vote_end(vote.meeting_id, vote_id, final_results)
+    
     return {"success": True, "vote_id": vote_id}
 
 
@@ -132,13 +140,28 @@ def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_s
         session.add(user_vote)
     session.commit()
     
-    # TODO: 通过 WebSocket 广播 vote_update 事件
+    # 广播投票更新
+    import asyncio
+    from socket_manager import broadcast_vote_update
+    asyncio.create_task(broadcast_vote_update(
+        meeting_id=vote.meeting_id,
+        vote_id=vote_id,
+        results=_calculate_vote_result(vote_id, session)['results']
+    ))
+    
     return {"success": True}
 
+
+from socket_manager import broadcast_vote_start, broadcast_vote_end
 
 @router.get("/{vote_id}/result")
 def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
     """获取投票结果"""
+    return _calculate_vote_result(vote_id, session)
+
+
+def _calculate_vote_result(vote_id: int, session: Session):
+    """辅助函数：计算投票结果"""
     vote = session.get(Vote, vote_id)
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
@@ -146,22 +169,38 @@ def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
     # 获取选项
     options = session.exec(select(VoteOption).where(VoteOption.vote_id == vote_id)).all()
     
-    # 统计各选项票数
+    # 统计各选项票数和总人数
     results = []
+    
+    # 总参与人数
     total_votes = session.exec(
         select(func.count(func.distinct(UserVote.user_id))).where(UserVote.vote_id == vote_id)
     ).one()
     
     for opt in options:
+        # 该选项票数
         count = session.exec(
             select(func.count()).select_from(UserVote).where(UserVote.option_id == opt.id)
         ).one()
+        
         percent = (count / total_votes * 100) if total_votes > 0 else 0
+        
+        # 获取投票人姓名 (如果非匿名)
+        # 即使进行中也可以返回，前端根据状态决定是否显示，或者这里加逻辑控制
+        # 用户要求：投票结束后显示。为灵活起见，后端都返回，前端控制。
+        voters = []
+        if not vote.is_anonymous:
+            # Query User.name joined 
+            stmt = select(User.name).join(UserVote, User.id == UserVote.user_id)\
+                   .where(UserVote.option_id == opt.id)
+            voters = session.exec(stmt).all()
+
         results.append({
             "option_id": opt.id,
             "content": opt.content,
             "count": count,
-            "percent": round(percent, 1)
+            "percent": round(percent, 1),
+            "voters": voters
         })
     
     return {

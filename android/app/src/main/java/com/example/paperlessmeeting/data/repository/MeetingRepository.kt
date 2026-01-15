@@ -26,6 +26,7 @@ interface MeetingRepository {
 
     // Vote methods
     suspend fun getActiveVote(meetingId: Int): com.example.paperlessmeeting.domain.model.Vote?
+    suspend fun getVoteList(meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
     suspend fun submitVote(voteId: Int, optionIds: List<Int>)
     suspend fun getVoteResult(voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult?
 }
@@ -132,6 +133,15 @@ class MeetingRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    override suspend fun getVoteList(meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote> {
+        return try {
+            api.getVoteList(meetingId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
         }
     }
 

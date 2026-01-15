@@ -67,4 +67,7 @@ interface ApiService {
 
     @GET("vote/{voteId}/result")
     suspend fun getVoteResult(@retrofit2.http.Path("voteId") voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult
+
+    @GET("vote/meeting/{meetingId}/list")
+    suspend fun getVoteList(@retrofit2.http.Path("meetingId") meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
 }

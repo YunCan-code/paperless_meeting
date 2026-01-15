@@ -76,7 +76,8 @@ class HomeViewModel @Inject constructor(
             allMeetings.clear()
             
             try {
-                val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "asc")
+                // Use sort=desc to get most recent meetings first (today/future will be at the top)
+                val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "desc")
                 // Prevention against duplicate keys (crash cause)
                 allMeetings.addAll(meetings.distinctBy { it.id })
                 hasMoreData = meetings.size >= pageSize
@@ -106,7 +107,7 @@ class HomeViewModel @Inject constructor(
             
             try {
                 val skip = allMeetings.size
-                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize, sort = "asc")
+                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize, sort = "desc")
                 
                 if (newMeetings.isEmpty()) {
                     hasMoreData = false

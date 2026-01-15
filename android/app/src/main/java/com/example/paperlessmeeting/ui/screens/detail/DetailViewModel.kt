@@ -161,6 +161,12 @@ class DetailViewModel @Inject constructor(
         _showVoteSheet.value = false
     }
 
+    fun openVoteSheet() {
+        if (_currentVote.value != null) {
+            _showVoteSheet.value = true
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         socketManager.disconnect()

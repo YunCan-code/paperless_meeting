@@ -71,7 +71,7 @@
     <!-- Version History Drawer -->
     <el-drawer v-model="historyDrawerVisible" title="APP 版本历史管理" size="600px">
         <el-table :data="versionList" stripe>
-            <el-table-column prop="version_name" label="版本名" width="100">
+            <el-table-column prop="version_name" label="版本名" min-width="120">
                 <template #default="{ row }">
                    <div style="font-weight: bold;">{{ row.version_name }}</div>
                    <div style="font-size: 12px; color: #999;">Code: {{ row.version_code }}</div>
@@ -87,7 +87,7 @@
                      <el-tag size="small" :type="row.is_force_update ? 'danger' : 'info'">{{ row.is_force_update ? '是' : '否' }}</el-tag>
                  </template>
             </el-table-column>
-             <el-table-column label="操作" width="100" fixed="right">
+             <el-table-column label="操作" width="100">
                 <template #default="{ row }">
                     <el-button type="danger" link :icon="Delete" @click="deleteVersion(row)">删除</el-button>
                 </template>
@@ -790,10 +790,10 @@ onMounted(() => {
 
 .v-notes-box { 
     flex: 1; 
-    background: #f8fafc; 
+    background: var(--el-fill-color-lighter); 
     border-radius: 8px; 
     padding: 12px 16px; 
-    border-left: 3px solid #cbd5e1;
+    border-left: 3px solid var(--el-border-color);
     min-height: 50px;
     display: flex; flex-direction: column; justify-content: center;
 }

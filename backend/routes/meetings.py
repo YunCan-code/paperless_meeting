@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
-from sqlmodel import Session, select, SQLModel
+from sqlmodel import Session, select, SQLModel, delete
 from sqlalchemy import func
 from typing import List, Optional
 import shutil
@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 from database import get_session
-from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase
+from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase, Vote, VoteOption, UserVote
 
 # 创建路由器，前缀为 /meetings
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -437,7 +437,13 @@ def delete_meeting(meeting_id: int, session: Session = Depends(get_session)):
                 os.remove(attachment.file_path)
         except Exception as e:
             print(f"Error deleting file {attachment.file_path}: {e}")
-            
+    # 手动级联删除关联投票
+    votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id)).all()
+    for vote in votes:
+        session.exec(delete(UserVote).where(UserVote.vote_id == vote.id))
+        session.exec(delete(VoteOption).where(VoteOption.vote_id == vote.id))
+        session.delete(vote)
+
     session.delete(meeting)
     session.commit()
     return {"ok": True}

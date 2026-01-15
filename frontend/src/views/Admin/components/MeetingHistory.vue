@@ -16,7 +16,7 @@
       </div>
     </template>
 
-    <el-table :data="pagedMeetings" style="width: 100%" size="large" :header-cell-style="{ background: '#f8fafc' }">
+    <el-table :data="pagedMeetings" style="width: 100%" size="large">
       <el-table-column type="index" label="序号" width="80" align="center" />
       <el-table-column prop="title" label="会议主题" min-width="180">
          <template #default="{ row }">

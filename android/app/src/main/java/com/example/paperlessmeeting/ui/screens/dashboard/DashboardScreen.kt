@@ -38,6 +38,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     onMeetingClick: (Int) -> Unit,
@@ -46,9 +47,53 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Refresh data when entering screen
+    // Refresh data
     LaunchedEffect(Unit) {
         viewModel.refreshData()
+    }
+    
+    // Toast Handling
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.toastMessage.collect { msg ->
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Vote Sheet Logic
+    val currentVote by viewModel.currentVote.collectAsState()
+    val voteResult by viewModel.voteResult.collectAsState()
+    val hasVoted by viewModel.hasVoted.collectAsState()
+    val showVoteSheet by viewModel.showVoteSheet.collectAsState()
+
+    if (showVoteSheet && currentVote != null) {
+        com.example.paperlessmeeting.ui.components.VoteBottomSheet(
+            vote = currentVote!!,
+            hasVoted = hasVoted,
+            result = voteResult,
+            onSubmit = { optionIds ->
+                viewModel.submitVote(optionIds)
+            },
+            onDismiss = {
+                viewModel.dismissVoteSheet()
+            }
+        )
+    }
+
+    // Vote List Sheet Logic
+    val voteList by viewModel.voteList.collectAsState()
+    val showVoteListSheet by viewModel.showVoteListSheet.collectAsState()
+
+    if (showVoteListSheet && voteList.isNotEmpty()) {
+        com.example.paperlessmeeting.ui.components.VoteListBottomSheet(
+            votes = voteList,
+            onVoteSelected = { vote ->
+                viewModel.selectVoteFromList(vote)
+            },
+            onDismiss = {
+                viewModel.dismissVoteListSheet()
+            }
+        )
     }
 
     when (val state = uiState) {
@@ -63,7 +108,12 @@ fun DashboardScreen(
              }
         }
         is DashboardUiState.Success -> {
-            DashboardContent(state, onMeetingClick, onReadingClick)
+            DashboardContent(
+                state = state, 
+                onMeetingClick = onMeetingClick, 
+                onReadingClick = onReadingClick,
+                onVoteClick = { viewModel.checkAnyActiveVote() }
+            )
         }
     }
 }
@@ -73,7 +123,8 @@ fun DashboardScreen(
 fun DashboardContent(
     state: DashboardUiState.Success, 
     onMeetingClick: (Int) -> Unit, 
-    onReadingClick: (String, String, Int) -> Unit
+    onReadingClick: (String, String, Int) -> Unit,
+    onVoteClick: () -> Unit
 ) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
@@ -246,7 +297,7 @@ fun DashboardContent(
                 QuickActionButton(
                     icon = androidx.compose.material.icons.Icons.Default.HowToVote,
                     label = "投票",
-                    onClick = { /* TODO */ }
+                    onClick = onVoteClick
                 )
                 QuickActionButton(
                     icon = androidx.compose.material.icons.Icons.Default.Casino,

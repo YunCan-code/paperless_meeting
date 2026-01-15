@@ -29,9 +29,21 @@ async def lifespan(app: FastAPI):
             print("初始化默认会议类型...")
             session.add(MeetingType(name="党委会", description="默认类型"))
             session.commit()
-            
+    
+    # 启动自动关闭过期投票的后台任务
+    import asyncio
+    from vote_auto_closer import auto_close_expired_votes
+    auto_close_task = asyncio.create_task(auto_close_expired_votes())
+    print("[STARTUP] 已启动投票自动关闭任务")
+    
     yield
-    # 关闭时执行 (此处暂无操作)
+    
+    # 关闭时取消后台任务
+    auto_close_task.cancel()
+    try:
+        await auto_close_task
+    except asyncio.CancelledError:
+        print("[SHUTDOWN] 投票自动关闭任务已停止")
 
 # 创建 FastAPI 应用实例
 app = FastAPI(title="Paperless Meeting System", lifespan=lifespan)

@@ -233,3 +233,4 @@ class VoteOptionRead(SQLModel):
     sort_order: int
     vote_count: Optional[int] = None  # 投票结果时使用
     percent: Optional[float] = None
+    voters: List[str] = []  # 投票人姓名列表 (非匿名且已结束/查看结果时返回)

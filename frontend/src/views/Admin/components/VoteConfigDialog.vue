@@ -4,7 +4,7 @@
     :title="`投票管理 - ${meetingTitle}`"
     size="700px"
     destroy-on-close
-    @open="fetchVotes"
+    @open="handleOpen"
     @close="handleClose"
   >
     <div class="vote-drawer-content">
@@ -32,15 +32,7 @@
           </div>
           
           <div class="vote-actions">
-            <el-button 
-              v-if="vote.status === 'draft'"
-              type="primary" 
-              link
-              @click="handleStartVote(vote)"
-            >
-              启动
-            </el-button>
-            <el-tooltip content="打开全屏结果" placement="top">
+            <el-tooltip content="全屏" placement="top">
               <el-button 
                  link 
                  type="primary" 
@@ -49,14 +41,6 @@
                  <el-icon size="18"><Monitor /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-button 
-              v-if="vote.status === 'active'"
-              type="danger" 
-              link
-              @click="handleCloseVote(vote)"
-            >
-              结束
-            </el-button>
             <el-button link type="info" @click="handleViewResult(vote)">
               查看结果
             </el-button>
@@ -219,14 +203,60 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val)
 })
 
-const handleClose = () => {
-  voteList.value = []
-}
+import { io } from 'socket.io-client'
+
+// ... existing code ...
 
 // State
 const voteList = ref([])
 const loading = ref(false)
 const creating = ref(false)
+const socket = ref(null)
+
+// Init Socket
+const initSocket = () => {
+    if (socket.value) return
+    const url = import.meta.env.VITE_API_URL || window.location.origin
+    socket.value = io(url, {
+        path: '/socket.io',
+        transports: ['websocket']
+    })
+    
+    socket.value.on('connect', () => {
+        if (props.meetingId) {
+             socket.value.emit('join_meeting', { meeting_id: props.meetingId })
+        }
+    })
+
+    socket.value.on('vote_start', (data) => {
+        const target = voteList.value.find(v => v.id === data.id)
+        if (target) {
+            target.status = 'active'
+        }
+    })
+
+    socket.value.on('vote_end', (data) => {
+        const target = voteList.value.find(v => v.id === data.vote_id)
+        if (target) {
+            target.status = 'closed'
+        }
+    })
+}
+
+// Dialog Open/Close
+const handleOpen = () => {
+    fetchVotes()
+    initSocket()
+}
+
+const handleClose = () => {
+  voteList.value = []
+  if (socket.value) {
+      socket.value.disconnect()
+      socket.value = null
+  }
+}
+
 
 // Dialogs
 const createDialogVisible = ref(false)

@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 
 sealed class DashboardUiState {
@@ -28,15 +30,114 @@ sealed class DashboardUiState {
 class DashboardViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
-    private val readingProgressManager: com.example.paperlessmeeting.data.local.ReadingProgressManager
+    private val readingProgressManager: com.example.paperlessmeeting.data.local.ReadingProgressManager,
+    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    // Vote State
+    private val _currentVote = MutableStateFlow<com.example.paperlessmeeting.domain.model.Vote?>(null)
+    val currentVote: StateFlow<com.example.paperlessmeeting.domain.model.Vote?> = _currentVote.asStateFlow()
+
+    private val _voteResult = MutableStateFlow<com.example.paperlessmeeting.domain.model.VoteResult?>(null)
+    val voteResult: StateFlow<com.example.paperlessmeeting.domain.model.VoteResult?> = _voteResult.asStateFlow()
+
+    private val _hasVoted = MutableStateFlow(false)
+    val hasVoted: StateFlow<Boolean> = _hasVoted.asStateFlow()
+
+    private val _showVoteSheet = MutableStateFlow(false)
+    val showVoteSheet: StateFlow<Boolean> = _showVoteSheet.asStateFlow()
+
+    // Vote List State
+    private val _voteList = MutableStateFlow<List<com.example.paperlessmeeting.domain.model.Vote>>(emptyList())
+    val voteList: StateFlow<List<com.example.paperlessmeeting.domain.model.Vote>> = _voteList.asStateFlow()
+
+    private val _showVoteListSheet = MutableStateFlow(false)
+    val showVoteListSheet: StateFlow<Boolean> = _showVoteListSheet.asStateFlow()
+
+    private val _toastMessage = MutableSharedFlow<String>()
+    val toastMessage = _toastMessage.asSharedFlow()
+
+    fun checkAnyActiveVote() {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            if (currentState is DashboardUiState.Success) {
+                // 收集所有今日会议的投票
+                val allVotes = mutableListOf<com.example.paperlessmeeting.domain.model.Vote>()
+                for (meeting in currentState.activeMeetings) {
+                    try {
+                        val votes = repository.getVoteList(meeting.id)
+                        allVotes.addAll(votes)
+                    } catch (e: Exception) {
+                        continue
+                    }
+                }
+                
+                if (allVotes.isEmpty()) {
+                    _toastMessage.emit("当前没有进行中的投票")
+                } else if (allVotes.size == 1) {
+                    // 只有一个投票，直接打开
+                    loadVoteDetails(allVotes.first())
+                } else {
+                    // 多个投票，显示列表
+                    _voteList.value = allVotes
+                    _showVoteListSheet.value = true
+                }
+            }
+        }
+    }
+
+    fun submitVote(optionIds: List<Int>) {
+        val voteId = _currentVote.value?.id ?: return
+        viewModelScope.launch {
+            try {
+                repository.submitVote(voteId, optionIds)
+                _hasVoted.value = true
+                _toastMessage.emit("投票提交成功")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.emit("提交失败: ${e.message}")
+            }
+        }
+    }
+
+    fun dismissVoteSheet() {
+        _showVoteSheet.value = false
+        _currentVote.value = null
+    }
+
+    fun selectVoteFromList(vote: com.example.paperlessmeeting.domain.model.Vote) {
+        _showVoteListSheet.value = false
+        viewModelScope.launch {
+            loadVoteDetails(vote)
+        }
+    }
+
+    private suspend fun loadVoteDetails(vote: com.example.paperlessmeeting.domain.model.Vote) {
+        _currentVote.value = vote
+        _showVoteSheet.value = true
+        _hasVoted.value = false // TODO: 如果API支持，这里应该检查用户是否已投票
+        
+        if (vote.status == "closed") {
+            _voteResult.value = repository.getVoteResult(vote.id)
+        } else {
+            _voteResult.value = null
+        }
+    }
+
+    fun dismissVoteListSheet() {
+        _showVoteListSheet.value = false
+        _voteList.value = emptyList()
+    }
+
     init {
         loadData()
     }
+    
+    // ... existing ... 
+
 
     fun refreshData() {
         loadData()
@@ -95,8 +196,36 @@ class DashboardViewModel @Inject constructor(
                     initialPageIndex = startIndex,
                     userName = userName
                 )
+                
+                // 初始化 Socket 连接并监听投票事件
+                setupSocket(todayMeetings)
             } catch (e: Exception) {
                 _uiState.value = DashboardUiState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+    private fun setupSocket(meetings: List<Meeting>) {
+        viewModelScope.launch {
+            try {
+                // 连接 WebSocket 服务器
+                socketManager.connect("https://coso.top") // 使用配置的服务器地址
+                
+                // 加入所有会议房间
+                meetings.forEach { meeting ->
+                    socketManager.joinMeeting(meeting.id)
+                }
+                
+                // 监听投票开始事件
+                launch {
+                    socketManager.voteStartEvent.collect { vote ->
+                        _toastMessage.emit("收到新投票: ${vote.title}")
+                        //自动刷新投票状态
+                        checkAnyActiveVote()
+                    }
+                }
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

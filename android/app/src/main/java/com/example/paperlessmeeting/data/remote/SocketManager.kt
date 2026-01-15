@@ -7,6 +7,7 @@ import com.google.gson.Gson
 import io.socket.client.IO
 import io.socket.client.Socket
 import io.socket.emitter.Emitter
+import okhttp3.OkHttpClient
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -19,7 +20,9 @@ import javax.inject.Singleton
  * 用于实时投票等 WebSocket 通信
  */
 @Singleton
-class SocketManager @Inject constructor() {
+class SocketManager @Inject constructor(
+    private val okHttpClient: OkHttpClient
+) {
 
     private var socket: Socket? = null
     private val gson = Gson()
@@ -46,6 +49,10 @@ class SocketManager @Inject constructor() {
                 reconnection = true
                 reconnectionAttempts = 10
                 reconnectionDelay = 2000
+                
+                // 使用配置好SSL信任的 Shared OkHttpClient
+                callFactory = okHttpClient
+                webSocketFactory = okHttpClient
             }
 
             socket = IO.socket("$serverUrl/socket.io", options)
