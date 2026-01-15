@@ -238,11 +238,24 @@ class DashboardViewModel @Inject constructor(
                 // 监听投票结束事件
                 launch {
                     socketManager.voteEndEvent.collect { data ->
+                        android.util.Log.d("DashboardVM", "=== vote_end received: vote_id=${data.vote_id}, title=${data.title}")
                         _toastMessage.emit("投票已结束: ${data.title}")
                         // 如果当前正在显示这个投票，刷新结果
-                        if (_currentVote.value?.id == data.vote_id) {
-                            _voteResult.value = repository.getVoteResult(data.vote_id)
-                            _currentVote.value = _currentVote.value?.copy(status = "closed")
+                        val currentVoteId = _currentVote.value?.id
+                        android.util.Log.d("DashboardVM", "Current vote id: $currentVoteId, received: ${data.vote_id}")
+                        if (currentVoteId == data.vote_id) {
+                            android.util.Log.d("DashboardVM", "Fetching vote result...")
+                            try {
+                                val result = repository.getVoteResult(data.vote_id)
+                                android.util.Log.d("DashboardVM", "Got result: $result")
+                                _voteResult.value = result
+                                _currentVote.value = _currentVote.value?.copy(status = "closed")
+                                android.util.Log.d("DashboardVM", "Updated _voteResult and _currentVote status")
+                            } catch (e: Exception) {
+                                android.util.Log.e("DashboardVM", "Error fetching result", e)
+                            }
+                        } else {
+                            android.util.Log.d("DashboardVM", "Vote id mismatch, not updating")
                         }
                     }
                 }
