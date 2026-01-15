@@ -23,6 +23,7 @@ import javax.inject.Inject
 class DetailViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val socketManager: SocketManager,
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -148,8 +149,11 @@ class DetailViewModel @Inject constructor(
         // Let's pass to repository
         viewModelScope.launch {
             try {
-                repository.submitVote(voteId, optionIds)
-                _hasVoted.value = true
+                val userId = userPreferences.getUserId()
+                if (userId != -1) {
+                    repository.submitVote(voteId, userId, optionIds)
+                    _hasVoted.value = true
+                }
             } catch (e: Exception) {
                 // Handle error
                 e.printStackTrace()
