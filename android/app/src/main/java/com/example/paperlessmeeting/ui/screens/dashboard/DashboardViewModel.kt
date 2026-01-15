@@ -215,9 +215,15 @@ class DashboardViewModel @Inject constructor(
                 // 连接 WebSocket 服务器
                 socketManager.connect("https://coso.top") // 使用配置的服务器地址
                 
-                // 加入所有会议房间
-                meetings.forEach { meeting ->
-                    socketManager.joinMeeting(meeting.id)
+                // 等待连接成功后再加入房间
+                launch {
+                    socketManager.connectionState.collect { connected ->
+                        if (connected) {
+                            meetings.forEach { meeting ->
+                                socketManager.joinMeeting(meeting.id)
+                            }
+                        }
+                    }
                 }
                 
                 // 监听投票开始事件

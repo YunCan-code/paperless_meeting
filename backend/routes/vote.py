@@ -140,14 +140,13 @@ async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends
         session.add(user_vote)
     session.commit()
     
-    # 广播投票更新 (异步，不阻塞返回)
-    import asyncio
+    # 广播投票更新 (直接await确保执行)
     from socket_manager import broadcast_vote_update
-    asyncio.create_task(broadcast_vote_update(
+    await broadcast_vote_update(
         meeting_id=vote.meeting_id,
         vote_id=vote_id,
         results=_calculate_vote_result(vote_id, session)['results']
-    ))
+    )
     
     return {"success": True}
 
