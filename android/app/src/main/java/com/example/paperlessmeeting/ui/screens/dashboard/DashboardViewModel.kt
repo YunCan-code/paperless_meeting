@@ -229,6 +229,18 @@ class DashboardViewModel @Inject constructor(
                     }
                 }
                 
+                // 监听投票结束事件
+                launch {
+                    socketManager.voteEndEvent.collect { data ->
+                        _toastMessage.emit("投票已结束: ${data.title}")
+                        // 如果当前正在显示这个投票，刷新结果
+                        if (_currentVote.value?.id == data.vote_id) {
+                            _voteResult.value = repository.getVoteResult(data.vote_id)
+                            _currentVote.value = _currentVote.value?.copy(status = "closed")
+                        }
+                    }
+                }
+                
             } catch (e: Exception) {
                 e.printStackTrace()
             }
