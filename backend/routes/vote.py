@@ -115,7 +115,7 @@ def get_active_vote(meeting_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/{vote_id}/submit")
-def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_session)):
+async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_session)):
     """提交投票（Android端）"""
     vote = session.get(Vote, vote_id)
     if not vote:
@@ -140,7 +140,7 @@ def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_s
         session.add(user_vote)
     session.commit()
     
-    # 广播投票更新
+    # 广播投票更新 (异步，不阻塞返回)
     import asyncio
     from socket_manager import broadcast_vote_update
     asyncio.create_task(broadcast_vote_update(
@@ -215,7 +215,7 @@ def _calculate_vote_result(vote_id: int, session: Session):
 def list_meeting_votes(meeting_id: int, session: Session = Depends(get_session)):
     """获取会议所有投票"""
     votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id)).all()
-    return [_get_vote_with_options(v.id, session) for v in votes]
+    return [_get_vote_with_options(v.id, session, include_remaining=True) for v in votes]
 
 
 def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False) -> VoteRead:

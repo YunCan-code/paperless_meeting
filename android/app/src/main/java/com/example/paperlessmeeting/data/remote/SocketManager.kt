@@ -61,7 +61,7 @@ class SocketManager @Inject constructor(
                 webSocketFactory = okHttpClient
             }
 
-            socket = IO.socket("$serverUrl/socket.io", options)
+            socket = IO.socket(serverUrl, options)
 
             socket?.on(Socket.EVENT_CONNECT) {
                 Log.d(TAG, "Socket connected")
