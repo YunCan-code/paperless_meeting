@@ -13,18 +13,16 @@
 # 进入后端目录
 cd "$(dirname "$0")"
 
-# Worker 数量说明:
-# 由于使用了 Socket.IO（WebSocket），需要保持长连接状态
-# 多 Worker 模式下 Socket.IO 会话不共享，会导致连接不稳定
-# 因此这里使用单 Worker 模式
-# 如果需要多 Worker，需要配置 Redis 作为 Socket.IO 的消息队列
-WORKERS=1
+# Worker 数量建议: CPU核数 * 2 + 1
+# 例如 4 核 CPU 使用 9 个 Worker
+# 使用 Redis 作为 Socket.IO 消息队列，支持多 Worker 模式
+WORKERS=${WORKERS:-4}
 
-echo "Starting Paperless Meeting Backend with $WORKERS worker (Socket.IO mode)..."
+echo "Starting Paperless Meeting Backend with $WORKERS workers..."
 
 # 使用 gunicorn 启动 uvicorn worker
 # --bind: 绑定地址和端口
-# --workers: 工作进程数（Socket.IO 需要单进程或配合 Redis）
+# --workers: 工作进程数
 # --worker-class: 使用 uvicorn 的异步 worker
 # --access-logfile: 访问日志
 # --error-logfile: 错误日志
@@ -39,4 +37,3 @@ gunicorn main:app \
     --forwarded-allow-ips "*" \
     --timeout 300 \
     --keep-alive 120
-

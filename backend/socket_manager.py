@@ -3,15 +3,32 @@ Socket.IO 实时通信管理器
 用于投票等实时功能的 WebSocket 通信
 """
 import socketio
+import os
 from typing import Dict, Set
 
+# 获取 Redis URL (用于多 Worker 模式下的跨进程通信)
+REDIS_URL = os.environ.get('REDIS_URL')
+
 # 创建 Socket.IO 服务器实例 (ASGI模式)
-sio = socketio.AsyncServer(
-    async_mode='asgi',
-    cors_allowed_origins='*',
-    logger=True,
-    engineio_logger=True
-)
+# 如果配置了 Redis，使用 Redis 作为消息管理器，支持多 Worker
+if REDIS_URL:
+    mgr = socketio.AsyncRedisManager(REDIS_URL)
+    sio = socketio.AsyncServer(
+        async_mode='asgi',
+        cors_allowed_origins='*',
+        client_manager=mgr,
+        logger=True,
+        engineio_logger=True
+    )
+    print(f"[Socket.IO] Using Redis manager: {REDIS_URL}")
+else:
+    sio = socketio.AsyncServer(
+        async_mode='asgi',
+        cors_allowed_origins='*',
+        logger=True,
+        engineio_logger=True
+    )
+    print("[Socket.IO] Using in-memory manager (single worker only)")
 
 # 会议房间管理
 meeting_rooms: Dict[int, Set[str]] = {}  # meeting_id -> set of sid

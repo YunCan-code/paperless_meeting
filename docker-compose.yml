@@ -14,6 +14,14 @@ services:
       - POSTGRES_DB=paperless_meeting
       - TZ=Asia/Shanghai
 
+  # === Redis 服务 (用于 Socket.IO 多 Worker 支持) ===
+  redis:
+    image: redis:7-alpine
+    container_name: meeting_redis
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+
   # === 后端服务 ===
   backend:
     build: ./backend
@@ -26,10 +34,13 @@ services:
       # - ./backend/database.db:/app/database.db
     depends_on:
       - db
+      - redis
     environment:
       - TZ=Asia/Shanghai
       # 连接到名为 'db' 的服务
       - DATABASE_URL=postgresql://paperless:123456@db:5432/paperless_meeting
+      # Redis 连接 (用于 Socket.IO 跨 Worker 通信)
+      - REDIS_URL=redis://redis:6379
 
   # === 前端服务 ===
   frontend:

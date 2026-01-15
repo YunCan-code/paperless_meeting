@@ -11,3 +11,4 @@ openpyxl
 gunicorn              # 多Worker进程管理
 psycopg2-binary       # PostgreSQL 驱动 (如使用PostgreSQL)
 python-socketio       # WebSocket 实时通信 (投票功能)
+redis                 # Redis 客户端 (Socket.IO 多 Worker 支持)
