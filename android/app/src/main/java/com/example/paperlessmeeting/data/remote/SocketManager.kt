@@ -47,7 +47,14 @@ class SocketManager @Inject constructor(
     val connectionState: SharedFlow<Boolean> = _connectionState.asSharedFlow()
 
     fun connect(serverUrl: String) {
-        if (socket?.connected() == true) return
+        // 如果 socket 已经初始化过，不要重复创建
+        if (socket != null) {
+            // 如果已经连接或正在连接，直接返回
+            if (socket?.connected() == true) return
+            // 如果 socket 存在但未连接，尝试重连
+            socket?.connect()
+            return
+        }
 
         try {
             val options = IO.Options().apply {
