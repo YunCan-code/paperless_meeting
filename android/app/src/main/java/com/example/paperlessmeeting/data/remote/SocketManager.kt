@@ -19,6 +19,15 @@ import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.example.paperlessmeeting.MainActivity
+import com.example.paperlessmeeting.R
 
 /**
  * Socket.IO 客户端管理器
@@ -32,6 +41,10 @@ class SocketManager @Inject constructor(
 
     private var socket: Socket? = null
     private val gson = Gson()
+
+    init {
+        createNotificationChannel()
+    }
 
     // 事件流
     private val _voteStartEvent = MutableSharedFlow<Vote>(extraBufferCapacity = 1)
@@ -94,7 +107,8 @@ class SocketManager @Inject constructor(
                     
                     // 全局 Toast 通知
                     Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(context, "收到新投票: ${vote.title}", Toast.LENGTH_LONG).show()
+                        // Toast.makeText(context, "收到新投票: ${vote.title}", Toast.LENGTH_LONG).show()
+                        sendVoteNotification(vote)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing vote_start", e)
@@ -147,8 +161,50 @@ class SocketManager @Inject constructor(
         socket = null
     }
 
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "投票通知"
+            val descriptionText = "当有新的投票开始时通知"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager: NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun sendVoteNotification(vote: Vote) {
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingIntent: PendingIntent = PendingIntent.getActivity(
+                context, 0, intent, PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("新投票开启")
+                .setContentText(vote.title)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+
+            with(NotificationManagerCompat.from(context)) {
+                notify(vote.id, builder.build())
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Notification permission missing", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing notification", e)
+        }
+    }
+
     companion object {
         private const val TAG = "SocketManager"
+        private const val CHANNEL_ID = "vote_channel"
     }
 }
 

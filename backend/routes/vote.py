@@ -6,29 +6,87 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from sqlalchemy import func
 from typing import List, Optional
-from datetime import datetime
-from pydantic import BaseModel
+from datetime import datetime, timedelta
 
 from database import get_session
-from models import Vote, VoteOption, UserVote, VoteRead, VoteOptionRead, User
+from models import Vote, VoteCreate, VoteRead, VoteOption, VoteOptionRead, VoteResult, VoteOptionResult, VoteOptionContent, VoteStatusUpdate, VoteSubmit, User, UserVote
+from socket_manager import broadcast_vote_start, broadcast_vote_end, broadcast_vote_update
 
-router = APIRouter(prefix="/vote", tags=["vote"])
+router = APIRouter(prefix="/vote", tags=["投票管理"])
+
+@router.post("/{vote_id}/start")
+async def start_vote(vote_id: int, session: Session = Depends(get_session)):
+    """开始投票"""
+    vote = session.get(Vote, vote_id)
+    if not vote:
+        raise HTTPException(status_code=404, detail="投票不存在")
+    if vote.status != "draft":
+        raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
+    
+    vote.status = "active"
+    # 设置开始时间为当前时间 + 10秒 (倒计时缓冲)
+    vote.started_at = datetime.now() + timedelta(seconds=10)
+    session.add(vote)
+    session.commit()
+    
+    # 广播 vote_start
+    await broadcast_vote_start(vote.meeting_id, {
+        "id": vote.id, 
+        "title": vote.title,
+        "duration_seconds": vote.duration_seconds,
+        "started_at": vote.started_at.isoformat(),
+        "wait_seconds": 10
+    })
+    return {"success": True, "vote_id": vote_id}
+
+# ...
+
+def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False) -> VoteRead:
+    """辅助函数：获取带选项的投票"""
+    vote = session.get(Vote, vote_id)
+    if not vote:
+        raise HTTPException(status_code=404, detail="投票不存在")
+    
+    options = session.exec(
+        select(VoteOption).where(VoteOption.vote_id == vote_id).order_by(VoteOption.sort_order)
+    ).all()
+    
+    remaining = None
+    wait = None
+    if include_remaining and vote.status == "active" and vote.started_at:
+        now = datetime.now()
+        # 计算是否需要等待 (倒计时)
+        diff_start = (vote.started_at - now).total_seconds()
+        
+        if diff_start > 0:
+            # 还在倒计时阶段
+            wait = int(diff_start) + 1 # 向上取整
+            remaining = vote.duration_seconds # 还没开始消耗时间
+        else:
+            # 已经开始
+            wait = 0
+            elapsed = (now - vote.started_at).total_seconds()
+            remaining = max(0, vote.duration_seconds - int(elapsed))
+    
+    return VoteRead(
+        id=vote.id,
+        meeting_id=vote.meeting_id,
+        title=vote.title,
+        description=vote.description,
+        is_multiple=vote.is_multiple,
+        is_anonymous=vote.is_anonymous,
+        max_selections=vote.max_selections,
+        duration_seconds=vote.duration_seconds,
+        status=vote.status,
+        started_at=vote.started_at,
+        created_at=vote.created_at,
+        options=[VoteOptionRead(id=o.id, content=o.content, sort_order=o.sort_order) for o in options],
+        remaining_seconds=remaining,
+        wait_seconds=wait
+    )
 
 
-class VoteCreate(BaseModel):
-    meeting_id: int
-    title: str
-    description: Optional[str] = None
-    is_multiple: bool = False
-    is_anonymous: bool = False
-    max_selections: int = 1
-    duration_seconds: int = 60
-    options: List[str]  # 选项内容列表
 
-
-class VoteSubmit(BaseModel):
-    user_id: int
-    option_ids: List[int]
 
 
 @router.post("/", response_model=VoteRead)
@@ -213,7 +271,7 @@ def _calculate_vote_result(vote_id: int, session: Session):
 @router.get("/meeting/{meeting_id}/list", response_model=List[VoteRead])
 def list_meeting_votes(meeting_id: int, session: Session = Depends(get_session)):
     """获取会议所有投票"""
-    votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id)).all()
+    votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
     return [_get_vote_with_options(v.id, session, include_remaining=True) for v in votes]
 
 

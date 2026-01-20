@@ -26,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteOption
 import com.example.paperlessmeeting.domain.model.VoteResult
@@ -50,20 +53,63 @@ fun VoteBottomSheet(
     result: VoteResult?,
     onSubmit: (List<Int>) -> Unit,
     onDismiss: () -> Unit,
+    onFetchResult: (Int) -> Unit = {},
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 ) {
+    // Observe vote status changes to fetch result when closed
+    LaunchedEffect(vote.status, vote.id) {
+        if (vote.status == "closed" && result == null) {
+            onFetchResult(vote.id)
+        }
+    }
     // 倒计时
-    var remainingSeconds by remember { mutableIntStateOf(vote.remaining_seconds ?: vote.duration_seconds) }
-    val isActive = vote.status == "active" && remainingSeconds > 0
+    // 使用单一总时长来管理（等待时间 + 投票时间），避免时间叠加问题
+    // 添加 vote.id 和 vote.status 作为 key，确保切换投票或状态变更时重置倒计时
+    // 修复同步问题：优先使用 started_at 计算绝对剩余时间
+    val calculatedTotalSeconds = remember(vote.id, vote.started_at, vote.status) {
+        try {
+            if (vote.started_at != null) {
+                // 后端通常返回 "yyyy-MM-dd HH:mm:ss" 或 ISO 格式
+                val cleanTime = vote.started_at.replace(" ", "T")
+                val startTime = java.time.LocalDateTime.parse(cleanTime)
+                val totalDuration = (vote.duration_seconds) + (vote.wait_seconds ?: 0)
+                val endTime = startTime.plusSeconds(totalDuration.toLong())
+                val now = java.time.LocalDateTime.now()
+                val diff = java.time.temporal.ChronoUnit.SECONDS.between(now, endTime).toInt()
+                // 如果已经过时，diff可能为负，UI会显示已结束
+                maxOf(0, diff)
+            } else {
+                vote.remaining_seconds ?: ((vote.duration_seconds) + (vote.wait_seconds ?: 0))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // 解析失败降级处理
+            vote.remaining_seconds ?: ((vote.duration_seconds) + (vote.wait_seconds ?: 0))
+        }
+    }
 
-    // 选中的选项
-    var selectedOptions by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var totalSeconds by remember(vote.id, vote.status) { 
+        mutableIntStateOf(calculatedTotalSeconds) 
+    }
+    val durationSeconds = vote.duration_seconds
+
+    val isWaiting = vote.status == "active" && totalSeconds > durationSeconds
+    val waitingSeconds = if (isWaiting) totalSeconds - durationSeconds else 0
+    val remainingSeconds = if (isWaiting) durationSeconds else totalSeconds
+    
+    val isActive = vote.status == "active" && totalSeconds > 0
+
+    // 选中的选项 - 切换投票时重置
+    var selectedOptions by remember(vote.id) { mutableStateOf<Set<Int>>(emptySet()) }
 
     // 倒计时逻辑
-    LaunchedEffect(isActive) {
-        while (isActive && remainingSeconds > 0) {
-            delay(1000)
-            remainingSeconds--
+    LaunchedEffect(vote.status) {
+        if (vote.status == "active") {
+            while (totalSeconds > 0) {
+                delay(1000)
+                totalSeconds--
+            }
+            onFetchResult(vote.id)
         }
     }
 
@@ -79,6 +125,26 @@ fun VoteBottomSheet(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp)
         ) {
+            // 顶部提示文案
+            Text(
+                text = buildAnnotatedString {
+                    append("可在 ")
+                    withStyle(style = SpanStyle(
+                        color = PrimaryBlue,
+                        fontWeight = FontWeight.Bold
+                    )) {
+                        append("首页-投票")
+                    }
+                    append(" 中查看")
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                textAlign = TextAlign.Center
+            )
+
             // Header - 使用卡片背景提升视觉层次
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -99,7 +165,8 @@ fun VoteBottomSheet(
                                 .size(48.dp)
                                 .background(
                                     brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                                        colors = listOf(PrimaryBlue, PrimaryBlueLight)
+                                        colors = if (isWaiting) listOf(WarningOrange, Color(0xFFFF6F00)) 
+                                                 else listOf(PrimaryBlue, PrimaryBlueLight)
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 ),
@@ -118,13 +185,15 @@ fun VoteBottomSheet(
                                 text = vote.title,
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                             )
-                            vote.description?.let { desc ->
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = desc,
-                                    color = Color.Gray,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                            if (!isWaiting) {
+                                vote.description?.let { desc ->
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = desc,
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
                             }
                         }
                     }
@@ -132,11 +201,16 @@ fun VoteBottomSheet(
                     Spacer(Modifier.height(12.dp))
                     
                     // 倒计时或状态
-                    if (isActive) {
-                        // 投票进行中，始终显示倒计时
+                    if (vote.status == "active") {
+                        // 投票进行中 (含准备阶段)
                         Column {
-                            CountdownBadge(remainingSeconds)
-                            if (hasVoted) {
+                            if (isWaiting) {
+                                WaitingBadge(waitingSeconds)
+                            } else {
+                                CountdownBadge(remainingSeconds)
+                            }
+
+                            if (hasVoted && !isWaiting) {
                                 Spacer(Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -170,7 +244,7 @@ fun VoteBottomSheet(
             if (result != null) {
                 // ===== 结果视图 =====
                 VoteResultView(result)
-            } else if (hasVoted) {
+            } else if (hasVoted && !isWaiting) {
                 // 已投票等待结果
                 Box(
                     modifier = Modifier.fillMaxWidth().height(200.dp),
@@ -185,29 +259,46 @@ fun VoteBottomSheet(
                 }
             } else {
                 // ===== 投票视图 =====
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.heightIn(max = 400.dp)
-                ) {
-                    items(vote.options) { option ->
-                        VoteOptionCard(
-                            option = option,
-                            isSelected = option.id in selectedOptions,
-                            enabled = isActive,
-                            onClick = {
-                                selectedOptions = if (vote.is_multiple) {
-                                    if (option.id in selectedOptions) {
-                                        selectedOptions - option.id
-                                    } else if (selectedOptions.size < vote.max_selections) {
-                                        selectedOptions + option.id
+                // 如果正在等待，显示遮罩或禁用状态
+                Box(contentAlignment = Alignment.Center) {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.heightIn(max = 400.dp).then(if(isWaiting) Modifier.graphicsLayer { alpha = 0.5f } else Modifier)
+                    ) {
+                        items(vote.options) { option ->
+                            VoteOptionCard(
+                                option = option,
+                                isSelected = option.id in selectedOptions,
+                                enabled = isActive && !isWaiting, // 准备期间禁用
+                                onClick = {
+                                    selectedOptions = if (vote.is_multiple) {
+                                        if (option.id in selectedOptions) {
+                                            selectedOptions - option.id
+                                        } else if (selectedOptions.size < vote.max_selections) {
+                                            selectedOptions + option.id
+                                        } else {
+                                            selectedOptions
+                                        }
                                     } else {
-                                        selectedOptions
+                                        setOf(option.id)
                                     }
-                                } else {
-                                    setOf(option.id)
                                 }
-                            }
-                        )
+                            )
+                        }
+                    }
+                    
+                    if (isWaiting) {
+                         Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                        ) {
+                            Icon(Icons.Default.Timer, contentDescription = null, tint = WarningOrange, modifier = Modifier.size(48.dp))
+                            Spacer(Modifier.height(16.dp))
+                            Text("请稍候，投票即将开始", style = MaterialTheme.typography.titleMedium, color = WarningOrange)
+                        }
                     }
                 }
 
@@ -221,28 +312,63 @@ fun VoteBottomSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(56.dp) // 这里可能有行号不一致问题，需要仔细定位代码段
                         .clip(RoundedCornerShape(16.dp))
                         .background(
-                            if (selectedOptions.isNotEmpty() && isActive) buttonGradient 
+                            if (selectedOptions.isNotEmpty() && isActive && !isWaiting) buttonGradient 
                             else androidx.compose.ui.graphics.Brush.horizontalGradient(
                                 colors = listOf(Color.Gray.copy(alpha = 0.3f), Color.Gray.copy(alpha = 0.3f))
                             )
                         )
                         .clickable(
-                            enabled = selectedOptions.isNotEmpty() && isActive,
+                            enabled = selectedOptions.isNotEmpty() && isActive && !isWaiting,
                             onClick = { onSubmit(selectedOptions.toList()) }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "提交投票",
+                        text = if (isWaiting) "等待开始" else "提交投票",
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (selectedOptions.isNotEmpty() && isActive) Color.White else Color.Gray,
+                        color = if (selectedOptions.isNotEmpty() && isActive && !isWaiting) Color.White else Color.Gray,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WaitingBadge(seconds: Int) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                 androidx.compose.ui.graphics.Brush.linearGradient(
+                    colors = listOf(WarningOrange, Color(0xFFFF6F00))
+                )
+            )
+            .padding(vertical = 12.dp, horizontal = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Timer,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "距离开始还有 ${seconds} 秒",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
         }
     }
 }
@@ -385,7 +511,7 @@ private fun VoteOptionCard(
                 onClick()
             },
         color = Color.Transparent,
-        shadowElevation = if (isSelected) 4.dp else 1.dp
+        shadowElevation = 0.dp
     ) {
         Box(
             modifier = Modifier

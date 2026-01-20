@@ -103,7 +103,7 @@ fun ReaderScreen(
     // Handle Toast
     LaunchedEffect(toastEvent) {
         toastEvent?.let { msg ->
-            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            // android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             viewModel.consumeToastEvent()
         }
     }

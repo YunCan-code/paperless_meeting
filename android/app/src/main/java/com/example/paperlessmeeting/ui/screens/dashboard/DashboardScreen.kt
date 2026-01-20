@@ -56,7 +56,7 @@ fun DashboardScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
-            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            // android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -76,6 +76,9 @@ fun DashboardScreen(
             },
             onDismiss = {
                 viewModel.dismissVoteSheet()
+            },
+            onFetchResult = { voteId ->
+                viewModel.fetchVoteResult(voteId)
             }
         )
     }

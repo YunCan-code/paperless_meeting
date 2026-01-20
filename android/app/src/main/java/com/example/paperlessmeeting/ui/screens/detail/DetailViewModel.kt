@@ -171,6 +171,21 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    fun fetchVoteResult(voteId: Int) {
+        viewModelScope.launch {
+            try {
+                val result = repository.getVoteResult(voteId)
+                if (_currentVote.value?.id == voteId) {
+                    _voteResult.value = result
+                    _currentVote.value = _currentVote.value?.copy(status = "closed")
+                    _showVoteSheet.value = true
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         socketManager.disconnect()

@@ -35,7 +35,7 @@ fun LoginScreen(
                 onLoginSuccess()
             }
             is LoginUiState.Error -> {
-                snackbarHostState.showSnackbar(state.message)
+                // snackbarHostState.showSnackbar(state.message)
             }
             else -> {}
         }

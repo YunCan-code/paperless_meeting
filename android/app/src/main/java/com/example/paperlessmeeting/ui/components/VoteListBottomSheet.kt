@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,12 +78,16 @@ fun VoteListBottomSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            // 投票列表
+            // 投票列表 (进行中置顶)
+            val sortedVotes = remember(votes) {
+                votes.sortedByDescending { it.status == "active" }
+            }
+
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.heightIn(max = 500.dp)
             ) {
-                items(votes) { vote ->
+                items(sortedVotes) { vote ->
                     VoteListItem(
                         vote = vote,
                         onClick = { onVoteSelected(vote) }
@@ -127,7 +132,7 @@ private fun VoteListItem(
             )
             .clickable(onClick = onClick),
         color = if (vote.status == "active") PrimaryBlue.copy(alpha = 0.05f) else CardBackground,
-        shadowElevation = if (vote.status == "active") 2.dp else 1.dp
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(20.dp),

@@ -226,6 +226,7 @@ class VoteRead(SQLModel):
     created_at: datetime
     options: List["VoteOptionRead"] = []
     remaining_seconds: Optional[int] = None  # 计算剩余时间
+    wait_seconds: Optional[int] = None # 距离开始因该等待的秒数 (倒计时)
 
 class VoteOptionRead(SQLModel):
     id: int
@@ -234,3 +235,36 @@ class VoteOptionRead(SQLModel):
     vote_count: Optional[int] = None  # 投票结果时使用
     percent: Optional[float] = None
     voters: List[str] = []  # 投票人姓名列表 (非匿名且已结束/查看结果时返回)
+
+class VoteCreate(SQLModel):
+    meeting_id: int
+    title: str
+    description: Optional[str] = None
+    is_multiple: bool = False
+    is_anonymous: bool = False
+    max_selections: int = 1
+    duration_seconds: int = 60
+    options: List[str]  # 选项内容列表
+
+class VoteOptionResult(SQLModel):
+    option_id: int
+    content: str
+    count: int
+    percent: float
+    voters: List[str] = []
+
+class VoteResult(SQLModel):
+    vote_id: int
+    title: str
+    total_voters: int
+    results: List[VoteOptionResult]
+
+class VoteOptionContent(SQLModel):
+    content: str
+
+class VoteStatusUpdate(SQLModel):
+    status: str
+
+class VoteSubmit(SQLModel):
+    user_id: int
+    option_ids: List[int]

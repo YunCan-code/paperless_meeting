@@ -105,7 +105,7 @@ fun SettingsScreen(
                         subtitle = state.cacheSize,
                         onClick = { 
                             viewModel.clearCache()
-                            Toast.makeText(context, "缓存已清理", Toast.LENGTH_SHORT).show()
+                            // Toast.makeText(context, "缓存已清理", Toast.LENGTH_SHORT).show()
                         }
                     )
                     SettingsItem(
@@ -115,7 +115,7 @@ fun SettingsScreen(
                         onClick = { 
                             viewModel.checkForUpdate(
                                 onNoUpdate = {
-                                    Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                                    // Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
                                 },
                                 onUpdateAvailable = { version, notes ->
                                     android.app.AlertDialog.Builder(context)
@@ -123,13 +123,13 @@ fun SettingsScreen(
                                         .setMessage(notes.ifBlank { "有新版本可用，是否立即下载？" })
                                         .setPositiveButton("立即更新") { _, _ ->
                                             viewModel.triggerAppUpdate()
-                                            Toast.makeText(context, "正在下载更新...", Toast.LENGTH_SHORT).show()
+                                            // Toast.makeText(context, "正在下载更新...", Toast.LENGTH_SHORT).show()
                                         }
                                         .setNegativeButton("稍后再说", null)
                                         .show()
                                 },
                                 onError = { msg ->
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    // Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             )
                         }
@@ -199,7 +199,7 @@ fun SettingsScreen(
                     onSave = { dept, district, phone, email ->
                         viewModel.updateProfile(dept, district, phone, email) {
                              showProfileSheet = false
-                             Toast.makeText(context, "个人信息已更新", Toast.LENGTH_SHORT).show()
+                             // Toast.makeText(context, "个人信息已更新", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )

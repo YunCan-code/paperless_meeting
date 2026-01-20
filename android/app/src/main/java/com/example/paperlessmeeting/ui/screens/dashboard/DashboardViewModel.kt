@@ -69,7 +69,7 @@ class DashboardViewModel @Inject constructor(
                 for (meeting in currentState.activeMeetings) {
                     try {
                         val votes = repository.getVoteList(meeting.id)
-                        allVotes.addAll(votes)
+                        allVotes.addAll(votes.filter { it.status != "draft" })
                     } catch (e: Exception) {
                         continue
                     }
@@ -260,6 +260,19 @@ class DashboardViewModel @Inject constructor(
                     }
                 }
                 
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    fun fetchVoteResult(voteId: Int) {
+        viewModelScope.launch {
+            try {
+                val result = repository.getVoteResult(voteId)
+                if (_currentVote.value?.id == voteId) {
+                    _voteResult.value = result
+                    _currentVote.value = _currentVote.value?.copy(status = "closed")
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

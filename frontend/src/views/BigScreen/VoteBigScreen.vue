@@ -44,13 +44,13 @@
       <!-- 倒计时/控制区 -->
       <div class="control-zone" v-if="voteData.id">
         <!-- 大号倒计时 -->
-        <div v-if="voteData.status === 'active' && remainingTime > 0" 
+        <div v-if="voteData.status === 'active'" 
              class="countdown-display" 
-             :class="{ 'countdown-urgent': remainingTime <= 10 }">
-          <div class="countdown-label">剩余时间</div>
-          <div class="countdown-value">{{ formatTimeDisplay(remainingTime) }}</div>
+             :class="{ 'countdown-urgent': remainingTime <= 10 && waitingTime === 0, 'countdown-waiting': waitingTime > 0 }">
+          <div class="countdown-label">{{ waitingTime > 0 ? '距开始还有' : '剩余时间' }}</div>
+          <div class="countdown-value">{{ waitingTime > 0 ? waitingTime + 's' : formatTimeDisplay(remainingTime) }}</div>
           <div class="countdown-progress">
-            <div class="progress-bar" :style="{ width: (remainingTime / voteData.duration_seconds * 100) + '%' }"></div>
+            <div class="progress-bar" :style="{ width: (waitingTime > 0 ? (waitingTime/10*100) : (remainingTime / voteData.duration_seconds * 100)) + '%' }"></div>
           </div>
         </div>
 
@@ -165,165 +165,69 @@ const results = ref([])
 const totalVoters = ref(0)
 const socket = ref(null)
 const remainingTime = ref(0)
+const waitingTime = ref(0) // 准备倒计时
 const starting = ref(false)
 let timerInterval = null
+let waitInterval = null
 
 // View Mode: 'list' | 'pie' | 'bar'
 const viewMode = ref('list')
 const chartRef = ref(null)
 let myChart = null
 
+// ... (computed, helpers)
 const sortedResults = computed(() => {
+  if (!Array.isArray(results.value)) return []
   return [...results.value].sort((a, b) => b.count - a.count)
 })
 
-const colorGradients = [
-  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-  'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-  'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
-  'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-  'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)'
-]
+const showFinishedBanner = ref(false)
 
-const chartColors = [
-  '#667eea', '#f093fb', '#4facfe', '#43e97b', 
-  '#fa709a', '#30cfd0', '#a8edea', '#ff9a9e'
-]
-
-const getGradient = (index) => colorGradients[index % colorGradients.length]
-
-const getStatusLabel = (s) => {
-  const labels = { draft: '未开始', active: '进行中', closed: '已结束' }
-  return labels[s] || s
+// 状态标签转换
+const getStatusLabel = (status) => {
+  const labels = {
+    'draft': '未开始',
+    'active': '进行中',
+    'closed': '已结束'
+  }
+  return labels[status] || status
 }
 
+// 时间格式化显示
 const formatTimeDisplay = (seconds) => {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-// Chart Logic
-const initChart = () => {
-  if (!chartRef.value) return
-  myChart = echarts.init(chartRef.value, 'dark')
-  updateChart()
-  
-  window.addEventListener('resize', handleResize)
-}
-
-const handleResize = () => {
-    myChart && myChart.resize()
-}
-
-const updateChart = () => {
-  if (!myChart || viewMode.value === 'list') return
-
-  const data = sortedResults.value.map(item => ({
-    name: item.content,
-    value: item.count
-  }))
-
-  const option = {
-    backgroundColor: 'transparent',
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: {c} ({d}%)'
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
-      textStyle: { color: '#ccc' }
-    },
-    series: []
+  if (seconds >= 60) {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
-
-  if (viewMode.value === 'pie') {
-    option.series = [{
-      name: '投票结果',
-      type: 'pie',
-      radius: ['40%', '70%'],
-      avoidLabelOverlap: true,
-      itemStyle: {
-        borderRadius: 10,
-        borderColor: '#1e293b',
-        borderWidth: 2
-      },
-      label: {
-        show: true,
-        formatter: '{b}\n{c}票 ({d}%)',
-        color: '#fff'
-      },
-      emphasis: {
-        label: { show: true, fontSize: 20, fontWeight: 'bold' },
-        itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
-      },
-      data: data,
-      color: chartColors
-    }]
-  } else if (viewMode.value === 'bar') {
-    option.xAxis = {
-      type: 'category',
-      data: data.map(d => d.name),
-      axisLabel: { color: '#ccc', interval: 0, rotate: 30 }
-    }
-    option.yAxis = {
-      type: 'value',
-      axisLabel: { color: '#ccc' }
-    }
-    option.grid = {
-      top: 40, bottom: 60, left: 60, right: 40, containLabel: true
-    }
-    option.series = [{
-      data: data.map((d, i) => ({
-        value: d.value,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: chartColors[i % chartColors.length] },
-            { offset: 1, color: '#1e293b' }
-          ])
-        }
-      })),
-      type: 'bar',
-      showBackground: true,
-      backgroundStyle: { color: 'rgba(255, 255, 255, 0.05)' },
-      label: { show: true, position: 'top', color: '#fff' }
-    }]
-  }
-
-  myChart.setOption(option, true)
+  return `${seconds}s`
 }
 
-// Watchers
-watch([results, viewMode], () => {
-  if (viewMode.value !== 'list') {
-    nextTick(() => {
-      // Re-init if destroyed or hidden
-      if (!myChart) {
-          initChart()
-      } else {
-          updateChart()
-      }
-    })
-  }
-})
+// 渐变色数组
+const gradients = [
+  'linear-gradient(90deg, #667eea, #764ba2)',
+  'linear-gradient(90deg, #f093fb, #f5576c)',
+  'linear-gradient(90deg, #4facfe, #00f2fe)',
+  'linear-gradient(90deg, #43e97b, #38f9d7)',
+  'linear-gradient(90deg, #fa709a, #fee140)',
+  'linear-gradient(90deg, #a8edea, #fed6e3)'
+]
 
+const getGradient = (index) => {
+  return gradients[index % gradients.length]
+}
+
+// 视图模式切换
 const switchMode = (mode) => {
   viewMode.value = mode
-  if (mode !== 'list') {
-    nextTick(() => {
-       if (!myChart) initChart()
-       else {
-           myChart.resize()
-           updateChart()
-       }
-    })
-  }
 }
 
+// 窗口大小调整处理
+const handleResize = () => {
+  if (myChart) {
+    myChart.resize()
+  }
+}
 
 const fetchResults = async () => {
   try {
@@ -334,15 +238,42 @@ const fetchResults = async () => {
     totalVoters.value = res.total_voters
     results.value = res.results
 
-    if (detail.status === 'active' && detail.remaining_seconds) {
-      remainingTime.value = detail.remaining_seconds
-      startTimer()
+    if (detail.status === 'active') {
+        if (detail.wait_seconds && detail.wait_seconds > 0) {
+            // 进入准备倒计时
+            waitingTime.value = detail.wait_seconds
+            remainingTime.value = detail.duration_seconds
+            startWaitTimer()
+        } else {
+            // 直接进入投票倒计时
+            waitingTime.value = 0
+            if (detail.remaining_seconds) {
+                remainingTime.value = detail.remaining_seconds
+                startTimer()
+            }
+        }
     }
   } catch (e) {
     console.error('Fetch error:', e)
     voteData.value = { title: '加载失败: ' + (e.message || '未知错误') }
+    results.value = [] // 确保即使出错也保持为空数组
     ElMessage.error('无法加载: ' + e.message)
   }
+}
+
+const startWaitTimer = () => {
+    if (waitInterval) clearInterval(waitInterval)
+    waitInterval = setInterval(() => {
+        if (waitingTime.value > 0) {
+            waitingTime.value--
+        } else {
+            clearInterval(waitInterval)
+            // 倒计时结束，正式开始
+            waitingTime.value = 0
+            startTimer()
+            ElMessage.success('投票正式开始')
+        }
+    }, 1000)
 }
 
 const startTimer = () => {
@@ -373,13 +304,14 @@ const handleStart = async () => {
   starting.value = true
   try {
     await request.post(`/vote/${voteId}/start`)
-    ElMessage.success('投票已启动')
+    // ElMessage.success('投票已启动') // Removed duplicate toast
     
     // Optimistic update
     voteData.value.status = 'active'
     if (voteData.value.duration_seconds) {
         remainingTime.value = voteData.value.duration_seconds
-        startTimer()
+        waitingTime.value = 10 // Optimistic wait time
+        startWaitTimer()
     }
   } catch(e) {
     console.error('Start error:', e)
@@ -411,8 +343,16 @@ const initSocket = () => {
       voteData.value.status = 'active'
       voteData.value.duration_seconds = data.duration_seconds
       remainingTime.value = data.duration_seconds
-      startTimer()
-      ElMessage.success('投票已开始')
+      
+      // Check for wait_seconds or calculate from started_at
+      if (data.wait_seconds) {
+          waitingTime.value = data.wait_seconds
+          startWaitTimer()
+          ElMessage.warning(`投票将在 ${data.wait_seconds} 秒后开始`)
+      } else {
+          startTimer()
+          ElMessage.success('投票已开始')
+      }
     }
   })
 
@@ -430,13 +370,13 @@ const initSocket = () => {
       results.value = data.results
       totalVoters.value = data.total_voters
       if (timerInterval) clearInterval(timerInterval)
+      if (waitInterval) clearInterval(waitInterval)
       remainingTime.value = 0
+      waitingTime.value = 0
       
       // Show finished banner and hide after 5s
       showFinishedBanner.value = true
       setTimeout(() => { showFinishedBanner.value = false }, 5000)
-      
-      ElMessage.info('投票已结束')
     }
   })
 }
@@ -684,6 +624,14 @@ onUnmounted(() => {
 
 .countdown-urgent .countdown-value {
   color: #fca5a5;
+}
+
+.countdown-waiting .countdown-value {
+  color: #fbbf24; /* Amber for waiting */
+}
+
+.countdown-waiting .progress-bar {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
 }
 
 .countdown-progress {

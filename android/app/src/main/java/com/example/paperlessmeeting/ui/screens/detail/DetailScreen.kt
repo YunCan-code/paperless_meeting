@@ -1,6 +1,7 @@
 package com.example.paperlessmeeting.ui.screens.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -100,20 +102,40 @@ fun DetailScreen(
                 actions = {
                     val currentVote by viewModel.currentVote.collectAsState()
                     if (currentVote != null) {
-                        IconButton(onClick = { viewModel.openVoteSheet() }) {
+                        // Vote Button with Glassy Style
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Color.Black.copy(alpha = 0.3f))
+                                .clickable { viewModel.openVoteSheet() },
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Poll, // Use Poll or HowToVote
+                                imageVector = Icons.Default.Poll,
                                 contentDescription = "Vote",
-                                tint = Color.White
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
 
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    // Close Button with Glassy Style
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 16.dp)
+                            .size(40.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(Color.Black.copy(alpha = 0.3f))
+                            .clickable { navController.popBackStack() },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Color.White
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 },
@@ -138,6 +160,9 @@ fun DetailScreen(
                     },
                     onDismiss = {
                         viewModel.dismissVoteSheet()
+                    },
+                    onFetchResult = { voteId ->
+                        viewModel.fetchVoteResult(voteId)
                     }
                 )
             }
@@ -281,12 +306,33 @@ fun MeetingDetailContent(
             val isWideScreen = maxWidth > 700.dp
             
             // Define sections as local composables to reuse logic
+            // Define sections as local composables to reuse logic
+            val EmptySection: @Composable (String) -> Unit = { text ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Inbox,
+                        contentDescription = null,
+                        tint = Color.LightGray.copy(alpha = 0.5f),
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(text, color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
             val InfoSectionContent: @Composable () -> Unit = {
                 SectionHeader(title = "参会信息")
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text(meeting.speaker ?: "未指定")
+                if (!meeting.speaker.isNullOrEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(meeting.speaker)
+                    }
+                } else {
+                    EmptySection("暂无主讲人信息")
                 }
             }
             
@@ -294,10 +340,10 @@ fun MeetingDetailContent(
                  val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
                  val hasValidDescription = !meeting.description.isNullOrEmpty()
                  
+                 SectionHeader(title = "会议内容 / 议程")
+                 Spacer(modifier = Modifier.height(8.dp))
+
                  if (hasValidAgenda || hasValidDescription) {
-                    SectionHeader(title = "会议内容 / 议程")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
                     if (hasValidAgenda) {
                         val agendaItems = parseAgenda(meeting.agenda!!)
                         if (agendaItems.isNotEmpty()) {
@@ -340,6 +386,8 @@ fun MeetingDetailContent(
                             lineHeight = 24.sp
                         )
                     }
+                 } else {
+                     EmptySection("暂无议程安排")
                  }
             }
             
