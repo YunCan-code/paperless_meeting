@@ -70,12 +70,15 @@ class LotteryViewModel @Inject constructor(
     private fun fetchActiveMeetings() {
         viewModelScope.launch {
             try {
-                // Fetch upcoming/active meetings.
-                // Assuming status 1 is 'In Progress' or getting today's meetings like Dashboard logic.
-                // For simplicity, reusing getMeetings with no date filter and filtering in memory, 
-                // or ideally use similar logic to Dashboard to get "Today's Active".
-                // Here we fetch a broader list and filter.
-                val all = repository.getMeetings(limit = 20, sort = "desc")
+                // Fetch today's active meetings
+                val todayStr = java.time.LocalDate.now().toString()
+
+                val all = repository.getMeetings(
+                    limit = 100, 
+                    sort = "desc",
+                    startDate = todayStr,
+                    endDate = todayStr
+                )
                 // Filter for active/upcoming meetings using UI helper
                 _meetings.value = all.filter { 
                     it.getUiStatus() == com.example.paperlessmeeting.domain.model.MeetingStatus.Ongoing ||

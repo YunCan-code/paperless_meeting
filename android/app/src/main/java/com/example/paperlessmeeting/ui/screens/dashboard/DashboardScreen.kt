@@ -57,7 +57,7 @@ fun DashboardScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
-            // android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -117,7 +117,7 @@ fun DashboardScreen(
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
                 onVoteClick = { viewModel.checkAnyActiveVote() },
-                onLotteryClick = onLotteryClick
+                onLotteryClick = { viewModel.checkLotteryStatus(onLotteryClick) }
             )
         }
     }

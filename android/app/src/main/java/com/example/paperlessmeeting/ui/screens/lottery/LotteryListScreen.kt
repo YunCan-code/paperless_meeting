@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.paperlessmeeting.domain.model.Meeting
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +79,7 @@ fun LotteryMeetingCard(meeting: Meeting, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "会议时间: ${meeting.startTime}",
+                text = "会议时间: ${formatTime(meeting.startTime)}",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -92,6 +94,21 @@ fun LotteryMeetingCard(meeting: Meeting, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+        }
+    }
+}
+
+fun formatTime(timeStr: String): String {
+    return try {
+        val clean = timeStr.replace(" ", "T")
+        val parsed = LocalDateTime.parse(clean)
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        parsed.format(formatter)
+    } catch (e: Exception) {
+        if (timeStr.length >= 16) {
+             timeStr.replace("T", " ").substring(0, 16)
+        } else {
+             timeStr
         }
     }
 }

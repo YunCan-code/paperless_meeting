@@ -76,7 +76,7 @@ class DashboardViewModel @Inject constructor(
                 }
                 
                 if (allVotes.isEmpty()) {
-                    _toastMessage.emit("当前没有进行中的投票")
+                    _toastMessage.emit("今日会议无投票")
                 } else if (allVotes.size == 1) {
                     // 只有一个投票，直接打开
                     loadVoteDetails(allVotes.first())
@@ -85,6 +85,19 @@ class DashboardViewModel @Inject constructor(
                     _voteList.value = allVotes
                     _showVoteListSheet.value = true
                 }
+            }
+        }
+    }
+
+    fun checkLotteryStatus(onAvailable: () -> Unit) {
+        val currentState = _uiState.value
+        if (currentState is DashboardUiState.Success) {
+            if (currentState.activeMeetings.isEmpty()) {
+                viewModelScope.launch {
+                    _toastMessage.emit("今日会议无抽签")
+                }
+            } else {
+                onAvailable()
             }
         }
     }
