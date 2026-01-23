@@ -39,7 +39,7 @@
       align-center
     >
       <div class="meeting-select-content">
-        <p class="select-tip">请选择通过哪个会议发起投票：</p>
+        <p class="select-tip">{{ selectTip }}</p>
         <el-select 
           v-model="selectedMeetingId" 
           placeholder="搜索或选择会议" 
@@ -76,6 +76,13 @@
       :meeting-title="currentMeeting?.title"
     />
 
+    <!-- Lottery Manager Drawer -->
+    <LotteryManagerDrawer
+      v-model="lotteryDialogVisible"
+      :meeting-id="currentMeeting?.id"
+      :meeting-title="currentMeeting?.title"
+    />
+
   </div>
 </template>
 
@@ -87,6 +94,7 @@ import {
 } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import VoteConfigDialog from '@/views/Admin/components/VoteConfigDialog.vue'
+import LotteryManagerDrawer from '@/views/Admin/components/LotteryManagerDrawer.vue'
 import { ElMessage } from 'element-plus'
 
 // Tools Configuration
@@ -101,8 +109,8 @@ const tools = [
   },
   {
     id: 'lottery',
-    title: '幸运抽奖',
-    desc: '随机抽取幸运参会人员 (开发中)',
+    title: '抽签',
+    desc: '随机抽取参会人员',
     icon: 'Trophy',
     bgColor: '#fff7ed', // orange-50
     color: '#f97316'    // orange-500
@@ -128,23 +136,33 @@ const tools = [
 // Logic
 const meetingSelectVisible = ref(false)
 const voteDialogVisible = ref(false)
+const lotteryDialogVisible = ref(false)
 const meetings = ref([])
 const loadingMeetings = ref(false)
 const selectedMeetingId = ref(null)
+const activeToolId = ref(null)
+
+const selectTip = computed(() => {
+  if (activeToolId.value === 'lottery') {
+    return '请选择通过哪个会议发起抽签：'
+  }
+  return '请选择通过哪个会议发起投票：'
+})
 
 const currentMeeting = computed(() => {
   return meetings.value.find(m => m.id === selectedMeetingId.value)
 })
 
 const handleToolClick = (tool) => {
-  if (tool.id === 'vote') {
-    openVoteTool()
+  if (tool.id === 'vote' || tool.id === 'lottery') {
+    activeToolId.value = tool.id
+    openMeetingSelect()
   } else {
     ElMessage.info('该功能正在开发中，敬请期待')
   }
 }
 
-const openVoteTool = async () => {
+const openMeetingSelect = async () => {
   selectedMeetingId.value = null
   meetingSelectVisible.value = true
   if (meetings.value.length === 0) {
@@ -175,7 +193,12 @@ const fetchMeetings = async () => {
 const confirmMeetingSelect = () => {
   if (!selectedMeetingId.value) return
   meetingSelectVisible.value = false
-  voteDialogVisible.value = true
+  
+  if (activeToolId.value === 'vote') {
+    voteDialogVisible.value = true
+  } else if (activeToolId.value === 'lottery') {
+    lotteryDialogVisible.value = true
+  }
 }
 
 const formatDate = (str) => {

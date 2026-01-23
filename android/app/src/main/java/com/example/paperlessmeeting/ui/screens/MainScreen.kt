@@ -121,7 +121,35 @@ fun MainScreen() {
                             val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                             val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
                             navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$page")
+                        },
+                        onLotteryClick = {
+                            navController.navigate(Screen.LotteryList.route)
                         }
+                    )
+                }
+                
+                composable(Screen.LotteryList.route) {
+                    com.example.paperlessmeeting.ui.screens.lottery.LotteryListScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToDetail = { meetingId, title ->
+                            navController.navigate(Screen.LotteryDetail.createRoute(meetingId, title))
+                        }
+                    )
+                }
+
+                composable(
+                    route = Screen.LotteryDetail.route,
+                    arguments = listOf(
+                        androidx.navigation.navArgument("meetingId") { type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("title") { type = androidx.navigation.NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val meetingId = backStackEntry.arguments?.getInt("meetingId") ?: 0
+                    val title = backStackEntry.arguments?.getString("title") ?: "抽签"
+                    com.example.paperlessmeeting.ui.screens.lottery.LotteryDetailScreen(
+                        meetingId = meetingId,
+                        meetingTitle = title,
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable(

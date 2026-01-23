@@ -833,4 +833,22 @@ onMounted(async () => {
 .file-name { font-weight: 600; color: var(--text-main); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-meeting { font-size: 13px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-date { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+/* Dark Mode Overrides for Meeting Detail */
+html.dark .meta-card {
+    background-color: #2d3748;
+    border-color: #4a5568;
+}
+html.dark .meta-card:hover {
+    background-color: #374151;
+}
+html.dark .detail-main-title {
+    color: #f1f5f9;
+}
+html.dark .meta-label {
+    color: #a0aec0;
+}
+html.dark .meta-value {
+    color: #e2e8f0;
+}
 </style>

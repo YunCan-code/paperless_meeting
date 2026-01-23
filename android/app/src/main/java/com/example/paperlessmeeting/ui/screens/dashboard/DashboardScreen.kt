@@ -43,6 +43,7 @@ import java.util.Locale
 fun DashboardScreen(
     onMeetingClick: (Int) -> Unit,
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
+    onLotteryClick: () -> Unit,
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -115,7 +116,8 @@ fun DashboardScreen(
                 state = state, 
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
-                onVoteClick = { viewModel.checkAnyActiveVote() }
+                onVoteClick = { viewModel.checkAnyActiveVote() },
+                onLotteryClick = onLotteryClick
             )
         }
     }
@@ -127,7 +129,8 @@ fun DashboardContent(
     state: DashboardUiState.Success, 
     onMeetingClick: (Int) -> Unit, 
     onReadingClick: (String, String, Int) -> Unit,
-    onVoteClick: () -> Unit
+    onVoteClick: () -> Unit,
+    onLotteryClick: () -> Unit
 ) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
@@ -305,7 +308,7 @@ fun DashboardContent(
                 QuickActionButton(
                     icon = androidx.compose.material.icons.Icons.Default.Casino,
                     label = "抽签",
-                    onClick = { /* TODO */ }
+                    onClick = onLotteryClick
                 )
             }
         }
