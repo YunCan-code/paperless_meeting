@@ -44,7 +44,12 @@ def create_db_and_tables():
     创建数据库和表结构
     如果没有表会自动创建，有的话会跳过
     """
-    SQLModel.metadata.create_all(engine)
+    try:
+        SQLModel.metadata.create_all(engine)
+    except Exception as e:
+        # 在多 worker 启动时，可能会遇到并发创建表的竞争条件
+        # 如果甚至 "UniqueViolation" 等错误，通常意味着另一个 worker 已经创建了表
+        print(f"[WARN] Database creation warning (likely race condition): {e}")
 
 def get_session():
     """
