@@ -155,24 +155,28 @@ async def lottery_action(sid, data):
     # 1. 准备/配置本轮
     if action == 'prepare':
         lottery_id = data.get('lottery_id')
+        title = None
+        count = 1
+        allow_repeat = False
         
-        # 如果指定了 lottery_id (从预设列表启动)
+        # A. 如果指定了 lottery_id (从预设列表启动)
         if lottery_id:
-            with get_db_session() as session:
-                lot = session.get(Lottery, lottery_id)
-                if lot:
-                    title = lot.title
-                    count = lot.count
-                    allow_repeat = lot.allow_repeat
-                    # 更新内存中的当前配置
-                    state['current_config'] = {
-                        'lottery_id': lot.id,
-                        'title': title,
-                        'count': count,
-                        'allow_repeat': allow_repeat
-                    }
+            try:
+                with get_db_session() as session:
+                    lot = session.get(Lottery, lottery_id)
+                    if lot:
+                        title = lot.title
+                        count = lot.count
+                        allow_repeat = lot.allow_repeat
+                        # 立即更新状态为 active
+                        lot.status = "active"
+                        session.add(lot)
+                        session.commit()
+            except Exception as e:
+                print(f"[Lottery] Prepare preset error: {e}")
+        
+        # B. 临时新建 (无ID)
         else:
-            # 临时新建 (旧逻辑)
             with get_db_session() as session:
                 count_stmt = select(Lottery).where(Lottery.meeting_id == meeting_id)
                 existing_count = len(session.exec(count_stmt).all())
@@ -182,11 +186,30 @@ async def lottery_action(sid, data):
             count = data.get('count', 1)
             allow_repeat = data.get('allow_repeat', False)
             
-            state['current_config'] = {
-                'title': title,
-                'count': count,
-                'allow_repeat': allow_repeat
-            }
+            # 立即创建并标记为 active
+            try:
+                with get_db_session() as session:
+                    new_lot = Lottery(
+                        meeting_id=meeting_id,
+                        title=title,
+                        count=count,
+                        allow_repeat=allow_repeat,
+                        status="active"
+                    )
+                    session.add(new_lot)
+                    session.commit()
+                    session.refresh(new_lot)
+                    lottery_id = new_lot.id
+            except Exception as e:
+                print(f"[Lottery] Prepare temp error: {e}")
+
+        # 更新内存配置，务必保存 lottery_id
+        state['current_config'] = {
+            'lottery_id': lottery_id, 
+            'title': title,
+            'count': count,
+            'allow_repeat': allow_repeat
+        }
         
         # 计算连接池 (通用逻辑)
         cfg = state['current_config']
@@ -336,7 +359,7 @@ async def lottery_action(sid, data):
         count = config.get('count', 1)
         allow_repeat = config.get('allow_repeat', False)
         title = config.get('title', '新一轮抽签')
-        pre_id = config.get('id') # 如果是预设的
+        lottery_id = config.get('lottery_id')
         
         candidates = list(state['participants'].values())
         if not allow_repeat:
@@ -352,17 +375,14 @@ async def lottery_action(sid, data):
             try:
                 with get_db_session() as session:
                     lottery = None
-                    # 如果是预设的Pending轮次，更新它
-                    if pre_id:
-                        lottery = session.get(Lottery, pre_id)
+                    # 如果有 lottery_id，更新它为 finished
+                    if lottery_id:
+                        lottery = session.get(Lottery, lottery_id)
                         if lottery:
                             lottery.status = "finished"
-                            lottery.created_at = timestamp # Update finish time? Or keep create time? 
-                            # Usually keep create time, maybe add finished_at? 
-                            # Re-using created_at as 'event time' for now.
                             session.add(lottery)
                     
-                    # 如果不是预设，或者是临时轮次
+                    # 容错: 如果找不到记录 (不应发生)，则新建并直接结束
                     if not lottery:
                         lottery = Lottery(
                             meeting_id=meeting_id,

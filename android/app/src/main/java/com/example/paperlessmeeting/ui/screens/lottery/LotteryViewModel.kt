@@ -70,22 +70,12 @@ class LotteryViewModel @Inject constructor(
     private fun fetchActiveMeetings() {
         viewModelScope.launch {
             try {
-                // Fetch today's active meetings
-                val todayStr = java.time.LocalDate.now().toString()
-
-                val all = repository.getMeetings(
-                    limit = 100, 
-                    sort = "desc",
-                    startDate = todayStr,
-                    endDate = todayStr
-                )
-                // Filter for active/upcoming meetings using UI helper
-                _meetings.value = all.filter { 
-                    it.getUiStatus() == com.example.paperlessmeeting.domain.model.MeetingStatus.Ongoing ||
-                    it.getUiStatus() == com.example.paperlessmeeting.domain.model.MeetingStatus.Upcoming
-                } 
+                // Fetch meetings with ACTIVE/PENDING lottery (from Backend API)
+                val activeMeetings = repository.getActiveLotteryMeetings()
+                _meetings.value = activeMeetings
             } catch (e: Exception) {
                 e.printStackTrace()
+                _meetings.value = emptyList()
             }
         }
     }
