@@ -71,6 +71,16 @@ async def join_meeting(sid, data):
             meeting_rooms[meeting_id] = set()
         meeting_rooms[meeting_id].add(sid)
         print(f"[Socket.IO] {sid} joined room {room}")
+        
+        # Send current participants list to the joining client (for recovery/refresh)
+        if meeting_id in lottery_states:
+            state = lottery_states[meeting_id]
+            participants_list = list(state['participants'].values())
+            await sio.emit('lottery_players_update', {
+                'count': len(state['participants']),
+                'all_participants': participants_list
+            }, room=sid)
+
         return {"success": True}
     return {"success": False, "error": "missing meeting_id"}
 
@@ -120,29 +130,38 @@ def get_db_session():
     return SQLSession(engine)
 
 
+def load_history_set(meeting_id: int) -> set:
+    """Helper: Load history winners from DB"""
+    history_set = set()
+    try:
+        with get_db_session() as session:
+            statement = select(LotteryWinner.user_id).join(Lottery).where(Lottery.meeting_id == meeting_id)
+            results = session.exec(statement).all()
+            for uid in results:
+                history_set.add(str(uid))
+    except Exception as e:
+        print(f"[Lottery] Error loading history: {e}")
+    return history_set
+
+
 @sio.event
 async def lottery_action(sid, data):
     """抽签动作处理"""
+    # Debug Logging
+    print(f"[Lottery] Received action from {sid}: {data}")
+    
     action = data.get('action')
     meeting_id = data.get('meeting_id')
     
     if not meeting_id:
+        print(f"[Lottery] Action {action} missing meeting_id from {sid}")
         return
         
     room = f"meeting_{meeting_id}"
     
     # 初始化内存状态 (从DB加载历史中奖者避免重启后重复中奖)
     if meeting_id not in lottery_states:
-        history_set = set()
-        try:
-            with get_db_session() as session:
-                # 加载该会议的所有历史中奖者ID
-                statement = select(LotteryWinner.user_id).join(Lottery).where(Lottery.meeting_id == meeting_id)
-                results = session.exec(statement).all()
-                for uid in results:
-                    history_set.add(uid)
-        except Exception as e:
-            print(f"[Lottery] Error loading history: {e}")
+        history_set = load_history_set(meeting_id)
             
         lottery_states[meeting_id] = {
             'participants': {},
@@ -296,9 +315,14 @@ async def lottery_action(sid, data):
                     if lottery:
                         session.delete(lottery)
                     session.commit()
+
+                
+                # Reload History Memory
+                state['history'] = load_history_set(meeting_id)
+
                 # 广播刷新
                 await sio.emit('lottery_list_update', {}, room=room)
-                print(f"[Lottery] Deleted round {lottery_id}")
+                print(f"[Lottery] Deleted round {lottery_id} and reloaded history")
             except Exception as e:
                 print(f"[Lottery] Delete error: {e}")
 
@@ -325,6 +349,11 @@ async def lottery_action(sid, data):
 
     # 2. 用户报名
     elif action == 'join':
+        # Check lock
+        if state.get('locked', False):
+            await sio.emit('lottery_error', {'message': '抽签进行中，暂停加入'}, room=sid)
+            return
+
         user_info = data.get('user')
         if not user_info:
             return
@@ -334,7 +363,8 @@ async def lottery_action(sid, data):
         
         await sio.emit('lottery_players_update', {
             'count': len(state['participants']),
-            'latest_user': user_info
+            'latest_user': user_info,
+            'all_participants': list(state['participants'].values())
         }, room=room)
         print(f"[Lottery] User {user_id} joined meeting {meeting_id}")
 
@@ -349,12 +379,57 @@ async def lottery_action(sid, data):
             }, room=room)
             print(f"[Lottery] User {user_id} removed from meeting {meeting_id}")
 
-    # 3. 开始滚动
+    # 3. 开始滚动 (锁定列表)
     elif action == 'start':
+        state['locked'] = True
         await sio.emit('lottery_start', {}, room=room)
+
+    # 管理员手动添加
+    elif action == 'admin_add_participant':
+        user_info = data.get('user')
+        if user_info:
+            name = user_info.get('name', 'Guest')
+            dept = user_info.get('department', '')
+            
+            # Create Real DB User for consistency (FK constraints)
+            try:
+                with get_db_session() as session:
+                    new_guest = User(
+                        name=name,
+                        department=dept,
+                        role='guest',
+                        is_active=True
+                    )
+                    session.add(new_guest)
+                    session.commit()
+                    session.refresh(new_guest)
+                    
+                    user_info['id'] = new_guest.id # Use Real Int ID
+            except Exception as e:
+                print(f"[Lottery] Create guest error: {e}")
+                # Fallback to random int (might fail FK, but better than string)
+                if 'id' not in user_info:
+                    user_info['id'] = random.randint(100000, 999999)
+
+            uid = str(user_info['id'])
+            state['participants'][uid] = user_info
+            
+            # Broadcast
+            participants_list = list(state['participants'].values())
+            await sio.emit('lottery_players_update', {
+                'count': len(state['participants']),
+                'latest_user': user_info,
+                'all_participants': participants_list
+            }, room=room)
+            print(f"[Lottery] Admin added user {uid}")
 
     # 4. 停止并生成结果 (写入DB)
     elif action == 'stop':
+        state['locked'] = False # Unlock
+        
+        # Force Reload History to ensure consistency
+        state['history'] = load_history_set(meeting_id)
+        
         config = state.get('current_config', {})
         count = config.get('count', 1)
         allow_repeat = config.get('allow_repeat', False)
@@ -362,12 +437,28 @@ async def lottery_action(sid, data):
         lottery_id = config.get('lottery_id')
         
         candidates = list(state['participants'].values())
+        print(f"[Lottery] Total participants before filter: {len(candidates)}")
+
         if not allow_repeat:
-            candidates = [u for u in candidates if u['id'] not in state['history']]
+            # Candidates check String ID against String History
+            original_count = len(candidates)
+            candidates = [u for u in candidates if str(u['id']) not in state['history']]
+            filtered_count = original_count - len(candidates)
+            if filtered_count > 0:
+                print(f"[Lottery] Filtered {filtered_count} winners from history. History size: {len(state['history'])}", flush=True)
+                print(f"[Lottery] Current History: {state['history']}", flush=True)
+            else:
+                print("[Lottery] No participants filtered by history.", flush=True)
+        else:
+            filtered_count = 0
+            print("[Lottery] Allow repeat is ON, skipping history filter.", flush=True)
             
+        print(f"[Lottery] Final candidates count: {len(candidates)}", flush=True)
+        
         winners = []
         if candidates:
             k = min(len(candidates), count)
+            # ... (selection logic)
             winners = random.sample(candidates, k)
             timestamp = datetime.now()
             
@@ -400,7 +491,7 @@ async def lottery_action(sid, data):
                     # Create Winners
                     for w in winners:
                         # Update memory history
-                        state['history'].add(w['id'])
+                        state['history'].add(str(w['id']))
                         # DB
                         winner_record = LotteryWinner(
                             lottery_id=lottery.id,
@@ -410,11 +501,13 @@ async def lottery_action(sid, data):
                         session.add(winner_record)
                     session.commit()
             except Exception as e:
-                print(f"[Lottery] Save error: {e}")
+                print(f"[Lottery] Save error: {e}", flush=True)
 
         await sio.emit('lottery_stop', {
             'winners': winners,
-            'remaining_candidates': len(candidates) - len(winners)
+            'remaining_candidates': len(candidates) - len(winners),
+            'filtered_count': filtered_count, # Inform frontend about filtered users
+            'total_participants': len(state['participants'])
         }, room=room)
         # 通知列表刷新 (状态变更为finished)
         await sio.emit('lottery_list_update', {}, room=room)
