@@ -254,7 +254,6 @@ async def lottery_action(sid, data):
         state['last_result'] = None # 清空上次结果
         
         await broadcast_state_change(meeting_id, state)
-        await broadcast_state_change(meeting_id, state)
         await broadcast_pool_update(meeting_id, state) # 清空前端列表
         
         # Notify clients to refresh round list (fixes button state lag)
@@ -267,16 +266,23 @@ async def lottery_action(sid, data):
             await sio.emit('lottery_error', {'message': '当前阶段无法加入'}, room=sid)
             return
 
-        user_info = data.get('user')
+        import uuid
         if not user_info: return
         
+        # Ensure ID at backend too
+        if 'id' not in user_info or not user_info['id']:
+             user_info['id'] = str(uuid.uuid4())
+             # If name is missing, give a default
+             if 'name' not in user_info or not user_info['name']:
+                 user_info['name'] = f"Guest-{user_info['id'][:4]}"
+
         uid = str(user_info['id'])
         
-        # 幂等检查
-        if uid not in state['participants']:
-            state['participants'][uid] = user_info
-            await broadcast_pool_update(meeting_id, state)
-            print(f"[Lottery] User {uid} joined pool.")
+        # 幂等检查 (Update logic to allow re-join updates if needed, or keep check)
+        # Using update to ensure info is refresh
+        state['participants'][uid] = user_info
+        await broadcast_pool_update(meeting_id, state)
+        print(f"[Lottery] User {uid} ({user_info.get('name')}) joined pool.")
             
     # Remove participant
     elif action == 'remove_participant':

@@ -66,11 +66,18 @@ class LotteryViewModel @Inject constructor(
     }
     
     private fun loadUserInfo() {
-        val id = userPreferences.getUserId()
+        var id = userPreferences.getUserId()
         if (id != -1) {
             currentUserId = id.toString()
             currentUserName = userPreferences.getUserName() ?: "User"
             currentUserDept = userPreferences.getUserDept() ?: ""
+        } else {
+             // Fallback for Guests or Debug (Random UUID)
+             if (currentUserId.isEmpty()) {
+                 currentUserId = java.util.UUID.randomUUID().toString()
+                 currentUserName = "访客-" + currentUserId.take(4)
+                 currentUserDept = "移动端"
+             }
         }
     }
 
