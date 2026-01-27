@@ -254,7 +254,11 @@ async def lottery_action(sid, data):
         state['last_result'] = None # 清空上次结果
         
         await broadcast_state_change(meeting_id, state)
+        await broadcast_state_change(meeting_id, state)
         await broadcast_pool_update(meeting_id, state) # 清空前端列表
+        
+        # Notify clients to refresh round list (fixes button state lag)
+        await sio.emit('lottery_list_update', {}, room=room)
 
     # 2. 用户加入 (User / Admin / System)
     elif action == 'join':
@@ -279,7 +283,13 @@ async def lottery_action(sid, data):
         user_id = str(data.get('user_id'))
         if user_id in state['participants']:
             del state['participants'][user_id]
-            await broadcast_pool_update(meeting_id, state)
+            # Broadcast update with removed_user_id
+            participants_list = list(state['participants'].values())
+            await sio.emit('lottery_players_update', {
+                'count': len(participants_list),
+                'all_participants': participants_list,
+                'removed_user_id': user_id
+            }, room=room)
 
     # Admin Manual Add
     elif action == 'admin_add_participant':
@@ -291,12 +301,15 @@ async def lottery_action(sid, data):
                 user_info['id'] = str(uuid.uuid4())
             
             uid = str(user_info['id'])
+            # Logic: Update/Insert instead of reset
             state['participants'][uid] = user_info
             
             # Auto-Active if IDLE
             if state['status'] == LotteryState.IDLE:
                  state['status'] = LotteryState.PREPARING
-                 state['current_config'] = {'title': '临时抽签', 'count': 1}
+                 # Ensure default config if missing
+                 if not state.get('current_config'):
+                     state['current_config'] = {'title': '临时抽签', 'count': 1}
                  await broadcast_state_change(meeting_id, state)
                  
             await broadcast_pool_update(meeting_id, state)
@@ -376,10 +389,10 @@ async def lottery_action(sid, data):
             'remaining_count': len(candidates) - len(winners)
         }
         
-        # 广播结果 AND 状态
         # (lottery_stop 兼容旧逻辑，state_change 走新逻辑)
         await sio.emit('lottery_stop', state['last_result'], room=room)
         await broadcast_state_change(meeting_id, state)
+        # Notify list update so draft becomes active/finished in list
         await sio.emit('lottery_list_update', {}, room=room)
 
 
@@ -401,6 +414,7 @@ async def lottery_action(sid, data):
              rounds = data.get('rounds', [])
              with get_db_session() as session:
                  for r in rounds:
+                     # Default status pending
                      session.add(Lottery(
                          meeting_id=meeting_id, title=r['title'], count=r.get('count',1), 
                          allow_repeat=r.get('allow_repeat',False), status='pending'
@@ -408,7 +422,6 @@ async def lottery_action(sid, data):
                  session.commit()
              await sio.emit('lottery_list_update', {}, room=room)
              
-    # History (兼容旧接口)
     # History (兼容旧接口)
     elif action == 'get_history':
         rounds_data = []

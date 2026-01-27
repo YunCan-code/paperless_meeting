@@ -153,6 +153,17 @@ fun LotteryDetailScreen(
                                 )
                             }
                         }
+                        
+                        // --- 新增: 退出按钮 ---
+                        Spacer(modifier = Modifier.height(16.dp))
+                        TextButton(
+                            onClick = { viewModel.quitLottery() },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("退出本次抽签")
+                        }
                     }
                     is ParticipationStatus.Removed -> {
                         Card(

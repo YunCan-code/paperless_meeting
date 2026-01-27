@@ -286,8 +286,16 @@ const initSocket = () => {
       // 但我们主要依赖 state 和 config 切换界面
       syncState(data)
   })
+
+  // 3. 监听列表更新，刷新右上角状态和右侧历史栏
+  socket.on('lottery_list_update', () => {
+      console.log('List updated, fetching history...')
+      socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
+      // 同时也可以重新获取状态以防万一
+      socket.emit('get_lottery_state', { meeting_id: meetingId })
+  })
   
-  // 3. 统一状态处理函数
+  // 4. 统一状态处理函数
   const syncState = (data) => {
       console.log('Sync State:', data)
       

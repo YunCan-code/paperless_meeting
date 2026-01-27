@@ -261,6 +261,20 @@ class LotteryViewModel @Inject constructor(
         myStatus = ParticipationStatus.Joined
     }
 
+    // --- 新增: 退出抽签 ---
+    fun quitLottery() {
+        if (socket == null || !socketConnected) return
+        
+        val data = JSONObject()
+        data.put("action", "remove_participant")
+        data.put("meeting_id", currentMeetingId)
+        data.put("user_id", currentUserId)
+        
+        socket?.emit("lottery_action", data)
+        // 乐观更新状态
+        myStatus = ParticipationStatus.NotJoined
+    }
+
     fun disconnect() {
         socket?.disconnect()
         socket?.off()
