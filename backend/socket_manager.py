@@ -345,13 +345,13 @@ async def lottery_action(sid, data):
         if not allow_repeat:
             state['history'] = load_history_set(meeting_id) # 确保历史最新
             candidates = [u for u in candidates if str(u['id']) not in state['history']]
-            
         winners = []
         if candidates:
-            k = min(len(candidates), count)
-            winners = random.sample(candidates, k)
+            actual_count = min(len(candidates), count)
+            if actual_count > 0:
+                winners = random.sample(candidates, actual_count)
             
-            # DB Persistence
+            # 保存结果到 DB Persistence
             try:
                 with get_db_session() as session:
                     timestamp = datetime.now()

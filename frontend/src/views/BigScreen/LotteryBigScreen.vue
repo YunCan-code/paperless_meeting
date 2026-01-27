@@ -263,9 +263,8 @@ const initSocket = () => {
   socket.on('connect', () => {
     socketConnected.value = true
     socket.emit('join_meeting', { meeting_id: meetingId })
-    // 主动同步完整状态
+    // 主动同步
     socket.emit('get_lottery_state', { meeting_id: meetingId })
-    // 获取历史记录用于右侧显示
     socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
   })
 
@@ -273,102 +272,86 @@ const initSocket = () => {
     socketConnected.value = false
   })
 
-  // 1. 状态同步 (初始化/重连)
-  socket.on('lottery_state_sync', (data) => {
-      // data: { status, participants_count, all_participants, config, last_result }
-      syncState(data)
-  })
-
-  // 2. 状态变更广播
+  // 1. 统一监听状态变更 (核心修复: 解决延迟和不同步)
   socket.on('lottery_state_change', (data) => {
-      // data: { status, participants_count, config, last_result }
-      // 注意 state_change 可能不包含 all_participants，除非后端改了，
-      // 但我们主要依赖 state 和 config 切换界面
-      syncState(data)
+    console.log('State changed:', data.status)
+    
+    // 同步基础信息
+    if (data.config) {
+        title.value = data.config.title || '抽签'
+        targetCount.value = data.config.count || 1
+    }
+    
+    // 状态机处理
+    if (data.status === 'PREPARING') {
+        phase.value = 'JOINING'
+        stopAnimation()
+        winners.value = []
+    } 
+    else if (data.status === 'ROLLING') {
+        phase.value = 'ROLLING'
+        if (!rollingTimer) {
+            startAnimation()
+        }
+    } 
+    else if (data.status === 'RESULT') {
+        phase.value = 'RESULT'
+        stopAnimation()
+        if (data.last_result && data.last_result.winners) {
+            winners.value = data.last_result.winners
+            // 收到结果后，刷新一下右侧历史记录
+            socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
+        }
+    }
   })
 
-  // 3. 监听列表更新，刷新右上角状态和右侧历史栏
-  socket.on('lottery_list_update', () => {
-      console.log('List updated, fetching history...')
-      socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
-      // 同时也可以重新获取状态以防万一
-      socket.emit('get_lottery_state', { meeting_id: meetingId })
-  })
-  
-  // 4. 统一状态处理函数
-  const syncState = (data) => {
-      console.log('Sync State:', data)
-      
-      // Update Phase
-      if (data.status === 'IDLE') phase.value = 'JOINING' // Default fallback
-      else if (data.status === 'PREPARING') phase.value = 'JOINING'
-      else if (data.status === 'ROLLING') phase.value = 'ROLLING'
-      else if (data.status === 'RESULT') phase.value = 'RESULT'
-      
-      // Update Config
-      if (data.config) {
-          title.value = data.config.title || '抽签'
-          targetCount.value = data.config.count || 1
-      }
-      
-      // Update Participants (if provided)
-      if (data.all_participants) {
-          participants.value = data.all_participants
-      }
-      
-      // Update Result (if RESULT phase)
-      if (data.status === 'RESULT' && data.last_result) {
-          winners.value = data.last_result.winners || []
-          // Stop animation if running
-          stopAnimation()
-          // Refresh history list to show new round
-          socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
-      }
-      
-      // Rolling Animation Trigger
-      if (data.status === 'ROLLING') {
-          startAnimation()
-      }
-  }
-
-  // 监听加入 (保持原样，用于追加显示)
+  // 2. 监听参与者列表更新 (修复: 确保大屏能看到人)
   socket.on('lottery_players_update', (data) => {
+    // data: { count, all_participants, removed_user_id }
     if (data.all_participants) {
       participants.value = data.all_participants
     }
   })
-  
-  // 监听历史记录 (用于右侧栏)
-  socket.on('lottery_history', (data) => {
-      fullRoundList.value = (data.rounds || []).sort((a,b) => a.round_id - b.round_id)
-      
-      const finished = fullRoundList.value.filter(r => r.status === 'finished')
-      historyWinners.value = finished.map(r => ({
-          title: r.title,
-          winners: r.winners || []
-      }))
-      dataLoaded.value = true
-      
-      // Update Round Info
-      // Try to find current round index based on config title if possible, or just length
-      // This is a bit loose but visual only
-      totalRounds.value = fullRoundList.value.length
-      const activeOrPending = fullRoundList.value.findIndex(r => r.status === 'active' || r.status === 'pending')
-      if (activeOrPending !== -1) {
-          currentRoundIndex.value = activeOrPending + 1
-      } else {
-          currentRoundIndex.value = totalRounds.value
+
+  // 3. 监听初始状态同步 (用于刷新页面恢复)
+  socket.on('lottery_state_sync', (data) => {
+      // 模拟触发 state change
+      if(data.status) {
+          // Manually handle sync logic
+          if (data.config) {
+             title.value = data.config.title || '抽签'
+             targetCount.value = data.config.count || 1
+          }
+          if (data.status === 'IDLE' || data.status === 'PREPARING') phase.value = 'JOINING'
+          else if (data.status === 'ROLLING') { phase.value = 'ROLLING'; startAnimation(); }
+          else if (data.status === 'RESULT') {
+              phase.value = 'RESULT'
+              stopAnimation()
+              if (data.last_result) winners.value = data.last_result.winners || []
+          }
+      }
+      if(data.all_participants) {
+          participants.value = data.all_participants
       }
   })
   
-  // Compat: 监听停止事件 (后端也会发这个兼容旧代码，主要用于 toast 或特殊处理，StateChange 已处理界面)
-  socket.on('lottery_stop', (data) => {
-      // Already handled by state_change usually, but double check
-      if (phase.value !== 'RESULT') {
-          winners.value = data.winners || []
-          phase.value = 'RESULT'
-          stopAnimation()
-      }
+  // 4. 监听历史
+  socket.on('lottery_history', (data) => {
+      fullRoundList.value = (data.rounds || []).sort((a,b) => a.round_id - b.round_id)
+      const finished = fullRoundList.value.filter(r => r.status === 'finished')
+      historyWinners.value = finished.map(r => ({
+          title: r.title, winners: r.winners || []
+      }))
+      dataLoaded.value = true
+      totalRounds.value = fullRoundList.value.length
+      const activeOrPending = fullRoundList.value.findIndex(r => r.status === 'active' || r.status === 'pending')
+      if (activeOrPending !== -1) currentRoundIndex.value = activeOrPending + 1
+      else currentRoundIndex.value = totalRounds.value
+  })
+
+  // 5. 监听列表更新
+  socket.on('lottery_list_update', () => {
+      socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
   })
 }
 

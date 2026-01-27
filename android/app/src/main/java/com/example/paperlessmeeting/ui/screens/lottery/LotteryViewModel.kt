@@ -264,8 +264,7 @@ class LotteryViewModel @Inject constructor(
         data.put("user", userObj)
 
         socket?.emit("lottery_action", data)
-        // Optimistic update for responsiveness, server will confirm/reject
-        myStatus = ParticipationStatus.Joined
+        // ❌ 删除 optimistic update，必须等待 lottery_players_update 确认
     }
 
     // --- 新增: 退出抽签 ---
