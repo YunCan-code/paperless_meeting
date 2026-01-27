@@ -255,6 +255,20 @@ async def lottery_action(sid, data):
             del state['participants'][user_id]
             await broadcast_pool_update(meeting_id, state)
 
+    # Admin Manual Add
+    elif action == 'admin_add_participant':
+        user_info = data.get('user')
+        if user_info:
+            import uuid
+            # Ensure ID exists
+            if 'id' not in user_info or not user_info['id']:
+                user_info['id'] = str(uuid.uuid4())
+            
+            uid = str(user_info['id'])
+            state['participants'][uid] = user_info
+            await broadcast_pool_update(meeting_id, state)
+            print(f"[Lottery] Admin added user {uid} (Meeting {meeting_id})")
+
     # 3. 开始滚动 (Admin)
     elif action == 'start':
         if state['status'] != LotteryState.PREPARING:
