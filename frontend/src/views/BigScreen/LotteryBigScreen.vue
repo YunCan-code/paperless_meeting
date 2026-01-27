@@ -371,8 +371,8 @@ const stopRolling = () => {
 }
 
 const waitForNextRound = () => {
-  phase.value = 'JOINING'
-  winners.value = []
+    // Auto-advance logic
+    startNextRound()
 }
 
 const closePage = () => {

@@ -249,7 +249,7 @@ async def lottery_action(sid, data):
         # 关键: 状态变更为 PREPARING
         # 这里可以选择是否清空 participants。doc建议是清空，重新join
         # 如果是"全员自动模式"，这里应该自动填充
-        state['participants'] = {} 
+        # state['participants'] = {}  <-- Modified: Persist users across rounds
         state['status'] = LotteryState.PREPARING
         state['last_result'] = None # 清空上次结果
         
