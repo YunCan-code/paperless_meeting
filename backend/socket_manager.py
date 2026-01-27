@@ -80,11 +80,37 @@ def load_history_set(meeting_id: int) -> set:
 
 def get_or_init_state(meeting_id: int) -> dict:
     if meeting_id not in lottery_states:
+        # Default State
+        status = LotteryState.IDLE
+        current_config = {}
+
+        # --- Auto-Recovery Logic ---
+        try:
+            with get_db_session() as session:
+                # Check for active lottery in this meeting
+                statement = select(Lottery).where(
+                    Lottery.meeting_id == meeting_id,
+                    Lottery.status == "active"
+                )
+                active_lot = session.exec(statement).first()
+                
+                if active_lot:
+                    print(f"[Lottery] Auto-recovered active round: {active_lot.title} (Meeting {meeting_id})")
+                    status = LotteryState.PREPARING
+                    current_config = {
+                        'lottery_id': active_lot.id,
+                        'title': active_lot.title,
+                        'count': active_lot.count,
+                        'allow_repeat': active_lot.allow_repeat
+                    }
+        except Exception as e:
+            print(f"[Lottery] Auto-recover error: {e}")
+            
         lottery_states[meeting_id] = {
-            'status': LotteryState.IDLE,
-            'participants': {},
+            'status': status,
+            'participants': {}, # Memory lost on restart, users must re-join
             'history': load_history_set(meeting_id),
-            'current_config': {},
+            'current_config': current_config,
             'last_result': None
         }
     return lottery_states[meeting_id]
@@ -266,6 +292,13 @@ async def lottery_action(sid, data):
             
             uid = str(user_info['id'])
             state['participants'][uid] = user_info
+            
+            # Auto-Active if IDLE
+            if state['status'] == LotteryState.IDLE:
+                 state['status'] = LotteryState.PREPARING
+                 state['current_config'] = {'title': '临时抽签', 'count': 1}
+                 await broadcast_state_change(meeting_id, state)
+                 
             await broadcast_pool_update(meeting_id, state)
             print(f"[Lottery] Admin added user {uid} (Meeting {meeting_id})")
 
