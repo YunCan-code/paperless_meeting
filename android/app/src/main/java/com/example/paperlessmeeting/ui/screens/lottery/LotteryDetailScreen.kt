@@ -35,8 +35,19 @@ fun LotteryDetailScreen(
     val roundTitle = viewModel.currentRoundTitle
     val myStatus = viewModel.myStatus
     val participantsCount = viewModel.participantsCount
-    // Collect winners
-    val winnersList = viewModel.winners.collectAsState(initial = emptyList()).value
+    val myStatus = viewModel.myStatus
+    val participantsCount = viewModel.participantsCount
+    // Collect winners IDs
+    val winnerIds = viewModel.winnerIds.collectAsState(initial = emptySet()).value
+    val currentUserId = viewModel.getCurrentUserId()
+    val isWinner = winnerIds.contains(currentUserId)
+    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -111,6 +122,35 @@ fun LotteryDetailScreen(
                                  text = "感谢您的关注",
                                  style = MaterialTheme.typography.bodyMedium,
                                  color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                             )
+                         }
+                     }
+                     }
+                } else if (isWinner) {
+                     // Winner Celebration Card
+                     Card(
+                         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)), // Light Yellow
+                         border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFBBF24)),
+                         shape = RoundedCornerShape(16.dp),
+                         modifier = Modifier.fillMaxWidth()
+                     ) {
+                         Column(
+                             modifier = Modifier
+                                 .padding(24.dp)
+                                 .fillMaxWidth(),
+                             horizontalAlignment = Alignment.CenterHorizontally
+                         ) {
+                             Text(
+                                 text = "🎉 恭喜中签！ 🎉",
+                                 style = MaterialTheme.typography.headlineMedium,
+                                 fontWeight = FontWeight.Black,
+                                 color = Color(0xFFB45309)
+                             )
+                             Spacer(modifier = Modifier.height(12.dp))
+                             Text(
+                                 text = "您已成为幸运儿",
+                                 style = MaterialTheme.typography.bodyLarge,
+                                 color = Color(0xFF92400E)
                              )
                          }
                      }
@@ -204,32 +244,11 @@ fun LotteryDetailScreen(
                 }
                 }
                 
-                // Show Winners List
-                Spacer(modifier = Modifier.height(32.dp))
-                if (winnersList.isNotEmpty()) {
-                    Text(
-                        text = "🏆 中奖红榜",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            winnersList.forEach { name ->
-                                Text(
-                                    text = "🎉 $name",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.padding(vertical = 4.dp)
-                                )
-                                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f))
-                            }
-                        }
-                    }
                 }
+                
+                // Show Winners List (Optional: Can remove if confusing, or show names if we had them. 
+                // Since we only track IDs now in VM for logic, we might not show list here unless we map back to names.
+                // For now, removing list to keep UI clean as per doc focus on "Card")
             }
         }
     }

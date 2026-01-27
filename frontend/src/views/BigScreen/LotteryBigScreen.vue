@@ -19,7 +19,25 @@
         <el-button v-else type="primary" size="large" @click="startNextRound">
            开始抽签 (草稿)
         </el-button>
+        <!-- Reset Button (Small) -->
+        <el-popconfirm title="确定要重置由于抽签记录吗？所有中奖数据将被清空！" @confirm="resetLottery">
+             <template #reference>
+                <el-button type="info" link size="small" style="margin-left:8px">重置</el-button>
+             </template>
+        </el-popconfirm>
       </div>
+    </div>
+
+    <!-- Finished Overlay -->
+    <div v-if="allFinished" class="finished-overlay">
+        <div class="finished-content">
+            <el-icon class="finished-icon"><Trophy /></el-icon>
+            <h1>抽签活动圆满结束</h1>
+            <p>感谢大家的参与！</p>
+            <el-button type="primary" plain @click="resetLottery" class="reset-link">
+               重新开始
+            </el-button>
+        </div>
     </div>
 
     <!-- 三栏主体 -->
@@ -39,9 +57,14 @@
               </el-button>
            </div>
 
-          <div v-for="user in participants" :key="user.id" class="participant-item">
+          <div v-for="user in participants" :key="user.id" 
+               class="participant-item" 
+               :class="{ 'is-winner': isWinner(user.id) }">
             <div class="participant-info">
-              <span class="participant-name">{{ user.name }}</span>
+              <span class="participant-name">
+                  {{ user.name }}
+                  <el-icon v-if="isWinner(user.id)" class="winner-icon"><Trophy /></el-icon>
+              </span>
               <span class="participant-dept" v-if="user.department">({{ user.department }})</span>
             </div>
             <el-button 
@@ -57,6 +80,14 @@
           <div v-if="participants.length === 0" class="empty-hint">
             等待参与者加入...
           </div>
+        </div>
+        <!-- Reset Button in Panel Footer -->
+        <div style="padding: 10px; border-top: 1px solid #eee; text-align: center;">
+             <el-popconfirm title="确定要重置吗？" @confirm="resetLottery">
+                <template #reference>
+                   <el-button type="danger" link size="small">重置本场抽签</el-button>
+                </template>
+             </el-popconfirm>
         </div>
       </div>
 
@@ -204,6 +235,7 @@ const dataLoaded = ref(false) // Prevent UI flicker before socket data
 const participants = ref([]) 
 const winners = ref([])
 const historyWinners = ref([]) 
+const allFinished = ref(false) // New: All Finished Flag
 const fullRoundList = ref([]) // To store full list for status logic
 const socketConnected = ref(false)
 let socket = null
@@ -249,6 +281,27 @@ const startNextRound = () => {
             lottery_id: next.round_id
         })
     }
+}
+
+// 重置抽签
+const resetLottery = () => {
+    if (socket) {
+        socket.emit('lottery_action', {
+            action: 'reset',
+            meeting_id: meetingId
+        })
+    }
+}
+
+// Helper: Check Winner
+const isWinner = (uid) => {
+    // Check against historyWinners
+    for (const round of historyWinners.value) {
+        if (round.winners && round.winners.some(w => String(w.id) === String(uid))) {
+            return true
+        }
+    }
+    return false
 }
 
 // --- Socket Logic ---
@@ -302,6 +355,11 @@ const initSocket = () => {
             // 收到结果后，刷新一下右侧历史记录
             socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
         }
+    }
+    
+    // Check All Finished
+    if (data.all_finished !== undefined) {
+        allFinished.value = data.all_finished
     }
   })
 
@@ -571,6 +629,19 @@ onUnmounted(() => {
 .remove-btn { opacity: 0; transition: opacity 0.2s; }
 .participant-item:hover .remove-btn { opacity: 1; }
 
+.participant-item.is-winner {
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+.participant-item.is-winner .participant-name {
+  color: #b45309;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.winner-icon { color: #f59e0b; }
+
 .empty-hint {
   text-align: center;
   color: #94a3b8;
@@ -770,5 +841,38 @@ onUnmounted(() => {
 @keyframes popIn {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+.finished-overlay {
+    position: fixed;
+    top: 60px; /* Below header */
+    left: 0;
+    width: 100%;
+    height: calc(100% - 60px);
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+.finished-content {
+    text-align: center;
+    animation: popIn 0.8s ease;
+}
+.finished-icon {
+    font-size: 80px;
+    color: #ffd700;
+    margin-bottom: 20px;
+}
+.finished-content h1 {
+    font-size: 48px;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+.finished-content p {
+    font-size: 24px;
+    color: #64748b;
+    margin-bottom: 40px;
 }
 </style>

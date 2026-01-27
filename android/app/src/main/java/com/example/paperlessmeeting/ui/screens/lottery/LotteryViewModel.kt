@@ -24,6 +24,9 @@ sealed class ParticipationStatus {
     object Removed : ParticipationStatus() // 被移除了
 }
 
+// Simple Event Wrapper
+data class LotteryEvent(val message: String)
+
 @HiltViewModel
 class LotteryViewModel @Inject constructor(
     private val repository: MeetingRepository,
@@ -50,15 +53,21 @@ class LotteryViewModel @Inject constructor(
     var isMeetingFinished by mutableStateOf(false)
         private set
 
-    // 3. 中奖名单
-    private val _winners = MutableStateFlow<List<String>>(emptyList())
-    val winners: StateFlow<List<String>> = _winners.asStateFlow()
+    // 3. 中奖名单 (IDs)
+    private val _winnerIds = MutableStateFlow<Set<String>>(emptySet())
+    val winnerIds: StateFlow<Set<String>> = _winnerIds.asStateFlow()
+    
+    // 4. Events
+    private val _events = kotlinx.coroutines.flow.MutableSharedFlow<LotteryEvent>()
+    val events = _events.asSharedFlow()
 
     private var socket: Socket? = null
     private var currentMeetingId: Int? = null
     private var currentUserId: String = ""
     private var currentUserName: String = ""
-    private var currentUserDept: String = ""
+    var currentUserDept: String = ""
+    
+    fun getCurrentUserId(): String = currentUserId
 
     init {
         fetchActiveMeetings()
@@ -190,11 +199,11 @@ class LotteryViewModel @Inject constructor(
             
             // Handle History (for winners list)
             socket?.on("lottery_history") { args ->
-                 // ... existing history logic mostly fine for winners list ...
                  if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
                     val rounds = data.optJSONArray("rounds")
-                    val newWinners = mutableListOf<String>()
+                    val newWinnerIds = mutableSetOf<String>()
+                    
                     if (rounds != null) {
                         for (i in 0 until rounds.length()) {
                             val r = rounds.getJSONObject(i)
@@ -202,16 +211,27 @@ class LotteryViewModel @Inject constructor(
                             if (wList != null) {
                                 for (j in 0 until wList.length()) {
                                     val w = wList.getJSONObject(j)
-                                    newWinners.add(w.optString("name"))
+                                    newWinnerIds.add(w.optString("id"))
                                 }
                             }
                         }
                     }
-                    _winners.value = newWinners
+                    _winnerIds.value = newWinnerIds
                  }
             }
 
-            socket?.connect()
+             // Handle Error
+             socket?.on("lottery_error") { args ->
+                 if (args.isNotEmpty()) {
+                     val data = args[0] as JSONObject
+                     val msg = data.optString("message", "发生错误")
+                     viewModelScope.launch {
+                         _events.emit(LotteryEvent(msg))
+                     }
+                 }
+             }
+
+             socket?.connect()
             
         } catch (e: Exception) {
             e.printStackTrace()
@@ -225,6 +245,7 @@ class LotteryViewModel @Inject constructor(
         
         // Update basic info
         participantsCount = participantsCountVal
+        isMeetingFinished = data.optBoolean("all_finished", false)
         
         var title = "暂无抽签"
         if (config != null) {

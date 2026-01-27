@@ -119,11 +119,27 @@ async def broadcast_state_change(meeting_id: int, state: dict):
     """广播状态变更"""
     room = f"meeting_{meeting_id}"
     
+    # Check All Finished
+    all_finished = False
+    try:
+        if state['current_config']: # Only check if we have config loaded (meaning we are active)
+            with get_db_session() as session:
+                # Check if there are any non-finished lotteries
+                # If all are finished -> True
+                # Actually, simply count pending/active.
+                stmt = select(Lottery).where(Lottery.meeting_id == meeting_id)
+                lots = session.exec(stmt).all()
+                if lots and all(l.status == 'finished' for l in lots):
+                    all_finished = True
+    except:
+        pass
+
     # 构建精简的 payload
     payload = {
         'status': state['status'],
         'participants_count': len(state['participants']),
         'config': state['current_config'],
+        'all_finished': all_finished,
         # RESULT 状态带上结果
         'last_result': state['last_result'] if state['status'] == LotteryState.RESULT else None
     }
@@ -247,9 +263,7 @@ async def lottery_action(sid, data):
         state['current_config'] = config
         
         # 关键: 状态变更为 PREPARING
-        # 这里可以选择是否清空 participants。doc建议是清空，重新join
-        # 如果是"全员自动模式"，这里应该自动填充
-        # state['participants'] = {}  <-- Modified: Persist users across rounds
+        # 规则变更(Doc 7): 保持 participants 持久化，不清空
         state['status'] = LotteryState.PREPARING
         state['last_result'] = None # 清空上次结果
         
@@ -261,7 +275,26 @@ async def lottery_action(sid, data):
 
     # 2. 用户加入 (User / Admin / System)
     elif action == 'join':
-        # 只有 PREPARING 状态允许加入
+        # 2.1 自动激活: IDLE -> PREPARING
+        if state['status'] == LotteryState.IDLE:
+             state['status'] = LotteryState.PREPARING
+             # 确保有默认配置
+             if not state.get('current_config'):
+                 state['current_config'] = {'title': '临时抽签', 'count': 1}
+             await broadcast_state_change(meeting_id, state)
+        
+        # 2.2 防迟到: 如果历史不为空(活动已开始过)，且用户当前不在池子里，拒绝加入
+        # Admin 强制添加不走这里(走 admin_add_participant)
+        is_new_user = True
+        user_id_check = data.get('user', {}).get('id')
+        if user_id_check and str(user_id_check) in state['participants']:
+            is_new_user = False
+            
+        if len(state['history']) > 0 and is_new_user:
+            await sio.emit('lottery_error', {'message': '活动已开始，停止报名'}, room=sid)
+            return
+
+        # 2.3 状态检查 (PREPARING only)
         if state['status'] != LotteryState.PREPARING:
             await sio.emit('lottery_error', {'message': '当前阶段无法加入'}, room=sid)
             return
@@ -428,7 +461,41 @@ async def lottery_action(sid, data):
                  session.commit()
              await sio.emit('lottery_list_update', {}, room=room)
              
-    # History (兼容旧接口)
+             await sio.emit('lottery_list_update', {}, room=room)
+             
+    # Reset Action (Doc 7)
+    elif action == 'reset':
+        # 清空 DB LotteryWinner, 重置 Lottery status
+        try:
+            with get_db_session() as session:
+                # 1. Delete Winners
+                # Get all lottery IDs for this meeting
+                l_stmt = select(Lottery.id).where(Lottery.meeting_id == meeting_id)
+                l_ids = session.exec(l_stmt).all()
+                if l_ids:
+                    from sqlmodel import delete, col
+                    session.exec(delete(LotteryWinner).where(col(LotteryWinner.lottery_id).in_(l_ids)))
+                    
+                # 2. Reset Lottery Status -> pending
+                l_stmt_obj = select(Lottery).where(Lottery.meeting_id == meeting_id)
+                lots = session.exec(l_stmt_obj).all()
+                for lot in lots:
+                    lot.status = 'pending'
+                    session.add(lot)
+                session.commit()
+                print(f"[Lottery] Meeting {meeting_id} reset.")
+        except Exception as e:
+            print(f"[Lottery] Reset DB Error: {e}")
+
+        # Reset Memory State
+        state['status'] = LotteryState.IDLE
+        state['history'] = set()
+        state['last_result'] = None
+        # participants 保留
+        
+        await broadcast_state_change(meeting_id, state)
+        await sio.emit('lottery_list_update', {}, room=room)
+
     elif action == 'get_history':
         rounds_data = []
         try:
