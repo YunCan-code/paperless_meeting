@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +35,8 @@ fun LotteryDetailScreen(
     val roundTitle = viewModel.currentRoundTitle
     val myStatus = viewModel.myStatus
     val participantsCount = viewModel.participantsCount
+    // Collect winners
+    val winnersList = viewModel.winners.collectAsState(initial = emptyList()).value
 
     Scaffold(
         topBar = {
@@ -84,6 +87,34 @@ fun LotteryDetailScreen(
                 Spacer(modifier = Modifier.height(48.dp))
 
                 // 操作区域
+                // 操作区域
+                if (viewModel.isMeetingFinished) {
+                     Card(
+                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                         shape = RoundedCornerShape(16.dp),
+                         modifier = Modifier.fillMaxWidth()
+                     ) {
+                         Column(
+                             modifier = Modifier
+                                 .padding(24.dp)
+                                 .fillMaxWidth(),
+                             horizontalAlignment = Alignment.CenterHorizontally
+                         ) {
+                             Text(
+                                 text = "本场抽签已全部结束",
+                                 style = MaterialTheme.typography.titleMedium,
+                                 fontWeight = FontWeight.Bold,
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                             )
+                             Spacer(modifier = Modifier.height(8.dp))
+                             Text(
+                                 text = "感谢您的关注",
+                                 style = MaterialTheme.typography.bodyMedium,
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                             )
+                         }
+                     }
+                } else {
                 when (myStatus) {
                     is ParticipationStatus.NotJoined -> {
                         Button(
@@ -156,6 +187,34 @@ fun LotteryDetailScreen(
                                 ) {
                                     Text("重新加入", color = Color.White)
                                 }
+                            }
+                        }
+                    }
+                }
+                }
+                
+                // Show Winners List
+                Spacer(modifier = Modifier.height(32.dp))
+                if (winnersList.isNotEmpty()) {
+                    Text(
+                        text = "🏆 中奖红榜",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            winnersList.forEach { name ->
+                                Text(
+                                    text = "🎉 $name",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha=0.5f))
                             }
                         }
                     }

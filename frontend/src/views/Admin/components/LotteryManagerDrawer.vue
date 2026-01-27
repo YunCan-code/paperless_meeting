@@ -9,15 +9,12 @@
   >
     <div class="lottery-drawer-content">
       <div class="actions-bar">
-        <el-button type="primary" :icon="Plus" @click="openConfigDialog">
-          预设抽签轮次
+        <el-button type="primary" :icon="Setting" @click="openManageDialog">
+          管理抽签轮次
         </el-button>
         <div class="actions-right">
-          <el-button type="success" :icon="Monitor" :disabled="!nextPendingRound" @click="startNextRound">
-            启动抽签
-          </el-button>
-          <el-button :icon="Edit" @click="openEditDialog">
-            编辑轮次
+          <el-button color="#626aef" :icon="Monitor" @click="openBigScreen">
+            进入抽签大屏
           </el-button>
           <el-button :icon="Refresh" circle @click="fetchLotteries" :loading="loading" />
         </div>
@@ -55,55 +52,16 @@
          </el-card>
        </div>
 
-       <!-- Batch Config Dialog -->
+       <!-- Manage/Edit Dialog -->
        <el-dialog
-         v-model="configDialogVisible"
-         title="预设抽签轮次"
-         width="700px"
+         v-model="manageDialogVisible"
+         title="管理抽签轮次"
+         width="750px"
          append-to-body
          align-center
        >
          <div class="batch-form">
-             <div class="batch-header">
-                <span>轮次标题</span>
-                <span>抽取人数</span>
-                <span>允许重复</span>
-                <span>操作</span>
-             </div>
-             
-             <div v-for="(round, idx) in form.rounds" :key="idx" class="batch-row">
-                 <el-input v-model="round.title" placeholder="轮次名称" style="width: 240px" />
-                 <el-input-number v-model="round.count" :min="1" :max="100" style="width: 120px" />
-                 <div class="switch-col">
-                    <el-switch v-model="round.allowRepeat" />
-                 </div>
-                 <el-button type="danger" link @click="removeRoundRow(idx)" :disabled="form.rounds.length === 1">删除</el-button>
-             </div>
-             
-             <el-button class="add-btn" plain type="primary" :icon="Plus" @click="addRoundRow" style="width: 100%; margin-top: 10px;">
-                增加一轮
-             </el-button>
-         </div>
-         
-         <template #footer>
-           <div class="dialog-footer">
-             <el-button @click="configDialogVisible = false">取消</el-button>
-             <el-button type="primary" @click="handleConfirm">
-               确定添加
-             </el-button>
-           </div>
-         </template>
-       </el-dialog>
-
-       <!-- Edit Dialog -->
-       <el-dialog
-         v-model="editDialogVisible"
-         title="编辑抽签轮次"
-         width="700px"
-         append-to-body
-         align-center
-       >
-         <div class="batch-form">
+            <el-alert title="注意：只能修改未开始的轮次；已结束的轮次无法修改。" type="warning" :closable="false" style="margin-bottom:12px;" />
              <div class="batch-header">
                 <span>轮次标题</span>
                 <span>抽取人数</span>
@@ -117,15 +75,19 @@
                  <div class="switch-col">
                     <el-switch v-model="round.allowRepeat" :disabled="round.status === 'finished'" />
                  </div>
-                 <el-button type="danger" link @click="confirmDeleteRound(round)" :disabled="round.status === 'finished'">删除</el-button>
+                 <el-button type="danger" link @click="confirmDeleteRound(round, idx)" :disabled="round.status === 'finished'">删除</el-button>
              </div>
+
+             <el-button class="add-btn" plain type="primary" :icon="Plus" @click="addRoundRow" style="width: 100%; margin-top: 10px;">
+                增加一轮
+             </el-button>
          </div>
          
          <template #footer>
            <div class="dialog-footer">
-             <el-button @click="editDialogVisible = false">取消</el-button>
-             <el-button type="primary" @click="handleEditConfirm">
-               保存修改
+             <el-button @click="manageDialogVisible = false">取消</el-button>
+             <el-button type="primary" @click="handleManageConfirm">
+               保存配置
              </el-button>
            </div>
          </template>
@@ -136,7 +98,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import { Plus, Refresh, Monitor, Delete, Edit } from '@element-plus/icons-vue'
+import { Plus, Refresh, Monitor, Delete, Edit, Setting } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
@@ -158,118 +120,31 @@ const visible = computed({
 const loading = ref(false)
 const lotteryList = ref([]) 
 const totalParticipants = ref(0)
-const configDialogVisible = ref(false)
-const editDialogVisible = ref(false)
+const manageDialogVisible = ref(false)
 const socket = ref(null)
-
-// 获取下一个待开始的轮次
-const nextPendingRound = computed(() => {
-    return lotteryList.value.find(item => item.status === 'pending')
-})
 
 // --- Config Form ---
 const formRef = ref(null)
 const form = ref({
-  rounds: [
-      { title: '', count: 1, allowRepeat: false }
-  ]
+  rounds: []
 })
 
 const addRoundRow = () => {
-    const nextIdx = (lotteryList.value.length || 0) + form.value.rounds.length + 1
+    // 自动计算下一轮序号
+    // 逻辑：基于当前form长度 + 已经存在的长度（如果是新增）
+    // 但这里form包含所有。
+    const nextIdx = form.value.rounds.length + 1
     form.value.rounds.push({
         title: `第 ${nextIdx} 轮`,
         count: 1,
-        allowRepeat: false
+        allowRepeat: false,
+        status: 'pending' // new rows are pending
     })
 }
 
-const removeRoundRow = (index) => {
-    if(form.value.rounds.length > 1) {
-        form.value.rounds.splice(index, 1)
-    }
-}
-
-const openConfigDialog = () => {
-    const nextRound = (lotteryList.value.length || 0) + 1
-    form.value.rounds = [
-        { title: `第 ${nextRound} 轮`, count: 1, allowRepeat: false }
-    ]
-    configDialogVisible.value = true
-}
-
-const handleConfirm = () => {
-    // 确保socket已连接
-    if(!socket.value || !socket.value.connected) {
-        initSocket()
-        // 延迟发送，等待连接
-        setTimeout(() => {
-            sendBatchAdd()
-        }, 500)
-    } else {
-        sendBatchAdd()
-    }
-    
-    configDialogVisible.value = false
-    loading.value = true
-}
-
-const sendBatchAdd = () => {
-    if(!socket.value) return
-    
-    const roundsPayload = form.value.rounds.map(r => ({
-        title: r.title,
-        count: r.count,
-        allow_repeat: r.allowRepeat
-    }))
-    
-    socket.value.emit('lottery_action', { 
-        action: 'batch_add', 
-        meeting_id: props.meetingId,
-        rounds: roundsPayload
-    })
-}
-
-// --- List Actions ---
-const startRound = (item) => {
-    // Open Big Screen for this specific round
-    // Calls 'prepare' on socket via BigScreen? 
-    // Actually, Admin Drawer controls 'prepare'.
-    // Logic:
-    // 1. Admin clicks "Start"
-    // 2. Admin emit 'prepare' with lottery_id to backend
-    // 3. Backend updates current_config and broadcasts 'lottery_prepare'
-    // 4. Admin opens BigScreen (if not open)
-    
-    if(socket.value) {
-        socket.value.emit('lottery_action', {
-            action: 'prepare',
-            meeting_id: props.meetingId,
-            lottery_id: item.round_id
-        })
-    }
-    
-    // Open Big Screen Window
-    const routeUrl = router.resolve({
-        name: 'LotteryBigScreen',
-        params: { meetingId: props.meetingId },
-        query: {
-             t: Date.now() // Just open, it will listen to socket
-        }
-    })
-    window.open(routeUrl.href, '_blank')
-}
-
-// 启动下一个待开始的轮次
-const startNextRound = () => {
-    if (nextPendingRound.value) {
-        startRound(nextPendingRound.value)
-    }
-}
-
-// 打开编辑弹窗
-const openEditDialog = () => {
-    // 将现有轮次加载到编辑表单
+// 打开管理弹窗
+const openManageDialog = () => {
+    // 将现有轮次加载到表单
     form.value.rounds = lotteryList.value.map(item => ({
         id: item.round_id,
         title: item.title,
@@ -277,31 +152,28 @@ const openEditDialog = () => {
         allowRepeat: item.allow_repeat,
         status: item.status
     }))
-    editDialogVisible.value = true
-}
-
-const deleteRound = async (item) => {
-    try {
-        await ElMessageBox.confirm(
-            `确定要删除抽签轮次"${item.title}"吗？此操作不可恢复。`,
-            '删除确认',
-            { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
-        )
-        if(socket.value) {
-            socket.value.emit('lottery_action', {
-                action: 'delete',
-                meeting_id: props.meetingId,
-                lottery_id: item.round_id
-            })
-            loading.value = true
-        }
-    } catch {
-        // User cancelled
+    
+    // 如果为空，默认加一行
+    if (form.value.rounds.length === 0) {
+        form.value.rounds.push({
+            title: '第 1 轮',
+            count: 1,
+            allowRepeat: false,
+            status: 'pending'
+        })
     }
+    
+    manageDialogVisible.value = true
 }
 
-// 编辑弹窗中的删除确认
-const confirmDeleteRound = async (round) => {
+// 管理弹窗中的删除确认
+const confirmDeleteRound = async (round, index) => {
+    // 如果是新加的行（没有ID），直接删除
+    if (!round.id) {
+        form.value.rounds.splice(index, 1)
+        return
+    }
+
     try {
         await ElMessageBox.confirm(
             `确定要删除抽签轮次"${round.title}"吗？此操作不可恢复。`,
@@ -314,21 +186,23 @@ const confirmDeleteRound = async (round) => {
                 meeting_id: props.meetingId,
                 lottery_id: round.id
             })
-            // 从表单中移除
-            form.value.rounds = form.value.rounds.filter(r => r.id !== round.id)
+            // 从UI暂时移除（socket回调会刷新）
+            form.value.rounds.splice(index, 1)
         }
     } catch {
         // User cancelled
     }
 }
 
-// 保存编辑
-const handleEditConfirm = () => {
-    if(!socket.value) return
+// 保存管理配置
+const handleManageConfirm = () => {
+    if(!socket.value) {
+        // Init socket if needed
+        initSocket()
+    }
     
-    // 过滤出可编辑的轮次（非finished）并发送更新
-    const updatableRounds = form.value.rounds.filter(r => r.status !== 'finished' && r.id)
-    
+    // 1. 发送更新 (针对已有ID且enable的)
+    const updatableRounds = form.value.rounds.filter(r => r.id && r.status !== 'finished')
     updatableRounds.forEach(round => {
         socket.value.emit('lottery_action', {
             action: 'update',
@@ -340,15 +214,44 @@ const handleEditConfirm = () => {
         })
     })
     
-    editDialogVisible.value = false
+    // 2. 发送批量新增 (针对无ID的)
+    const newRounds = form.value.rounds.filter(r => !r.id)
+    if (newRounds.length > 0) {
+        const roundsPayload = newRounds.map(r => ({
+            title: r.title,
+            count: r.count,
+            allow_repeat: r.allowRepeat
+        }))
+        
+        socket.value.emit('lottery_action', { 
+            action: 'batch_add', 
+            meeting_id: props.meetingId,
+            rounds: roundsPayload
+        })
+    }
+    
+    manageDialogVisible.value = false
     loading.value = true
+}
+
+// 进入大屏 (不触发 Prepare, 仅打开窗口)
+const openBigScreen = () => {
+    const routeUrl = router.resolve({
+        name: 'LotteryBigScreen',
+        params: { meetingId: props.meetingId },
+        query: {
+             t: Date.now()
+        }
+    })
+    window.open(routeUrl.href, '_blank')
 }
 
 // --- Socket Events ---
 const initSocket = () => {
     if (socket.value) return
     // Default to localhost:8001 if env not set, solving the 5173 issue
-    const url = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+    // Use relative path by default (for production same-origin), or env var
+    const url = import.meta.env.VITE_API_URL || ''
     socket.value = io(url, {
         path: '/socket.io',
         transports: ['websocket']
@@ -377,6 +280,11 @@ const initSocket = () => {
     })
 
     socket.value.on('lottery_list_update', () => {
+        fetchLotteries()
+    })
+    
+    // Also refresh on state change to ensure status tags are up-to-date
+    socket.value.on('lottery_state_change', () => {
         fetchLotteries()
     })
 }

@@ -14,28 +14,32 @@ router = APIRouter(prefix="/lottery", tags=["lottery"])
 @router.get("/active_meetings", response_model=List[MeetingRead])
 def get_active_lottery_meetings(session: Session = Depends(get_session)):
     """
-    获取当前有正在进行(active)或准备中(pending)抽签的会议。
-    安卓端列表页调用此接口。
+    获取今日所有有抽签活动(无论状态)的会议。
     """
-    # 查找所有 status 为 'active' 或 'pending' 的 lottery 记录的 meeting_id
-    statement = select(Lottery.meeting_id).where(
-        (Lottery.status == "active") | (Lottery.status == "pending")
+    from datetime import date, datetime, time, timedelta
+
+    # 1. 获取今日起始时间 (UTC+0? 还是本地时间? DB存储的是Naive或UTC)
+    # 假设服务器本地时间运行正常，或者 DB 中 start_time 是 UTC。
+    # 为了简单，查最近24小时? 或者今天0点。
+    # 假设使用 UTC。Meeting.start_time 通常是 UTC。
+    # TODO: 时区处理。这里简单使用 utcnow date。
+    
+    today = date.today()
+    today_start = datetime.combine(today, time.min)
+    
+    # 查找:
+    # 1. 状态为 active 或 pending 的 (无论时间)
+    # 2. 状态为 finished 且是今天的
+    from sqlalchemy import or_
+
+    statement = select(Meeting).join(Lottery).where(
+        or_(
+            Lottery.status == "active",
+            Lottery.status == "pending",
+            (Lottery.status == "finished") & (Meeting.start_time >= today_start)
+        )
     ).distinct()
     
-    meeting_ids = session.exec(statement).all()
-    
-    if not meeting_ids:
-        return []
-
-    # 获取会议详情
-    # 同样只返回今天的会议? 或者全部?
-    # 用户需求是"前端启动了抽签...才能看到"。如果不限日期，历史未完成的抽签也会显示。
-    # 通常抽签是现场活动，所以加一个日期过滤是合理的，比如只显示最近24小时的，或者干脆只显示今天的。
-    # 为了保险，加上 today 过滤（可选），但根据需求"前端启动了..."，
-    # 如果前端启动了一个昨天的会议的抽签，应该也要显示。所以暂不加日期过滤，完全依赖 active 状态。
-    
-    meetings = session.exec(
-        select(Meeting).where(Meeting.id.in_(meeting_ids))
-    ).all()
+    meetings = session.exec(statement).all()
     
     return meetings

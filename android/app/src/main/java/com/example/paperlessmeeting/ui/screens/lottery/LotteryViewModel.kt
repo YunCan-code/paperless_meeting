@@ -47,6 +47,13 @@ class LotteryViewModel @Inject constructor(
     var participantsCount by mutableStateOf(0)
         private set
 
+    var isMeetingFinished by mutableStateOf(false)
+        private set
+
+    // 3. 中奖名单
+    private val _winners = MutableStateFlow<List<String>>(emptyList())
+    val winners: StateFlow<List<String>> = _winners.asStateFlow()
+
     private var socket: Socket? = null
     private var currentMeetingId: Int? = null
     private var currentUserId: String = ""
@@ -82,96 +89,121 @@ class LotteryViewModel @Inject constructor(
 
     // --- Socket Logic ---
 
+    // --- Socket Logic ---
+    
     fun connectToMeeting(meetingId: Int) {
         if (currentMeetingId == meetingId && socketConnected) return
         
-        // If user info missing, try reloading
         if (currentUserId.isEmpty()) loadUserInfo()
         
-        disconnect() // Disconnect previous
+        disconnect()
         
         currentMeetingId = meetingId
-        myStatus = ParticipationStatus.NotJoined // Reset status
+        myStatus = ParticipationStatus.NotJoined
 
         try {
             val opts = IO.Options()
             opts.path = "/socket.io"
             opts.transports = arrayOf("websocket")
-            // Reconnection config
             opts.reconnection = true
-            opts.reconnectionAttempts = 10
             
             socket = IO.socket("https://coso.top", opts)
 
             socket?.on(Socket.EVENT_CONNECT) {
                 socketConnected = true
-                // Join room
-                socket?.emit("join_meeting", JSONObject().put("meeting_id", meetingId))
                 
-                // Check if already in participants list? 
-                // Currently backend doesn't push full list on join_meeting immediate response unless customized.
-                // Rely on updates.
+                // 1. Join Room
+                val joinData = JSONObject()
+                joinData.put("meeting_id", meetingId)
+                socket?.emit("join_meeting", joinData)
+
+                // 2. Sync State (Critical Fix)
+                val syncData = JSONObject()
+                syncData.put("meeting_id", meetingId)
+                syncData.put("user_id", currentUserId)
+                socket?.emit("get_lottery_state", syncData)
+                
+                // 3. Get History (for winning list)
+                 val historyPayload = JSONObject()
+                 historyPayload.put("action", "get_history")
+                 historyPayload.put("meeting_id", meetingId)
+                 socket?.emit("lottery_action", historyPayload)
             }
 
             socket?.on(Socket.EVENT_DISCONNECT) {
                 socketConnected = false
             }
 
-            // Listen for prepare/start info
-            socket?.on("lottery_prepare") { args ->
+            // --- State Handling ---
+            
+            // Sync Initial State / Reconnect
+            socket?.on("lottery_state_sync") { args ->
                 if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
-                    currentRoundTitle = data.optString("title", "抽签准备中")
+                    handleStateUpdate(data)
+                }
+            }
+
+            // Handle State Change Broadcast
+            socket?.on("lottery_state_change") { args ->
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    handleStateUpdate(data)
                 }
             }
             
-            // Listen for start (rolling)
-            socket?.on("lottery_start") { 
-                currentRoundTitle = "抽签进行中..."
-            }
-            
-            // Listen for stop (result)
-            socket?.on("lottery_stop") {
-                 currentRoundTitle = "抽签结束，等待下一轮"
-            }
-
-            // Listen for participants update
+            // Handle Players Update (Append/Remove for visual count mostly)
             socket?.on("lottery_players_update") { args ->
-                if (args.isNotEmpty()) {
+                 if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
-                    participantsCount = data.optInt("count", 0)
+                    // Update count
+                    participantsCount = data.optInt("count", participantsCount)
                     
+                    // Update my status if specifically mentioned
                     val removedId = data.optString("removed_user_id", "")
                     if (removedId == currentUserId) {
                         myStatus = ParticipationStatus.Removed
                     }
                     
-                    // Logic to confirm joined status
-                    val allParticipants = data.optJSONArray("all_participants")
-                    if (allParticipants != null) {
-                        var found = false
-                        for (i in 0 until allParticipants.length()) {
-                            val p = allParticipants.getJSONObject(i)
-                            if (p.optString("id") == currentUserId) {
-                                found = true
-                                break
-                            }
-                        }
-                        
-                        if (found) {
-                             if (myStatus != ParticipationStatus.Joined) {
-                                 myStatus = ParticipationStatus.Joined
+                    // Check if I am in all_participants list (if sent)
+                    val allP = data.optJSONArray("all_participants")
+                    if (allP != null) {
+                         var found = false
+                         for(i in 0 until allP.length()) {
+                             val p = allP.getJSONObject(i)
+                             if (p.optString("id") == currentUserId) {
+                                 found = true; break
                              }
-                        } else {
-                             // If previously joined but now not found => Removed
-                             if (myStatus == ParticipationStatus.Joined) {
-                                 myStatus = ParticipationStatus.Removed
-                             }
-                        }
+                         }
+                         if (found) myStatus = ParticipationStatus.Joined
+                         else if (myStatus == ParticipationStatus.Joined) myStatus = ParticipationStatus.NotJoined
                     }
-                }
+                 }
             }
             
+            // Handle History (for winners list)
+            socket?.on("lottery_history") { args ->
+                 // ... existing history logic mostly fine for winners list ...
+                 if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    val rounds = data.optJSONArray("rounds")
+                    val newWinners = mutableListOf<String>()
+                    if (rounds != null) {
+                        for (i in 0 until rounds.length()) {
+                            val r = rounds.getJSONObject(i)
+                            val wList = r.optJSONArray("winners")
+                            if (wList != null) {
+                                for (j in 0 until wList.length()) {
+                                    val w = wList.getJSONObject(j)
+                                    newWinners.add(w.optString("name"))
+                                }
+                            }
+                        }
+                    }
+                    _winners.value = newWinners
+                 }
+            }
+
             socket?.connect()
             
         } catch (e: Exception) {
@@ -179,6 +211,38 @@ class LotteryViewModel @Inject constructor(
         }
     }
 
+    private fun handleStateUpdate(data: JSONObject) {
+        val status = data.optString("status")
+        val config = data.optJSONObject("config")
+        val participantsCountVal = data.optInt("participants_count", 0)
+        
+        // Update basic info
+        participantsCount = participantsCountVal
+        
+        var title = "暂无抽签"
+        if (config != null) {
+            title = config.optString("title", "抽签")
+        }
+        
+        when (status) {
+            "IDLE" -> currentRoundTitle = "等待抽签开始..."
+            "PREPARING" -> currentRoundTitle = "$title (准备中)"
+            "ROLLING" -> currentRoundTitle = "$title (抽签进行中...)"
+            "RESULT" -> currentRoundTitle = "$title (已结束)"
+        }
+        
+        // Update My Status
+        // is_joined is sent in sync, but not always in change (unless broadcast to specific user? No, broadcast is to room)
+        // Wait, socket_manager sends 'lottery_state_sync' to SID, so it HAS is_joined.
+        // 'lottery_state_change' is broadcast, so it DOES NOT have is_joined specific to user usually.
+        // So for change, we rely on previous status or 'lottery_players_update'.
+        
+        if (data.has("is_joined")) {
+            val isJoined = data.getBoolean("is_joined")
+            myStatus = if(isJoined) ParticipationStatus.Joined else ParticipationStatus.NotJoined
+        }
+    }
+    
     fun joinLottery() {
         if (socket == null || !socketConnected) return
         
@@ -193,9 +257,7 @@ class LotteryViewModel @Inject constructor(
         data.put("user", userObj)
 
         socket?.emit("lottery_action", data)
-        // Optimistic update
-        // myStatus = ParticipationStatus.Joined 
-        // Better wait for verification from server callback/update, but to be responsive:
+        // Optimistic update for responsiveness, server will confirm/reject
         myStatus = ParticipationStatus.Joined
     }
 

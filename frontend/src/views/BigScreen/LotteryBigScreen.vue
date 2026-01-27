@@ -13,9 +13,12 @@
         <span class="progress-label">轮次进度:</span>
         <span class="progress-value">第 {{ currentRoundIndex }} 轮 / 共 {{ totalRounds }} 轮</span>
       </div>
-      <div class="connection-status">
-        <span class="status-dot" :class="{ connected: socketConnected }"></span>
-        {{ socketConnected ? '已连接' : '连接断开' }}
+      <div class="status-control">
+        <el-tag v-if="meetingStatus === 'finished'" type="success" size="large" effect="dark">已结束</el-tag>
+        <el-tag v-else-if="meetingStatus === 'active'" type="primary" size="large" effect="dark">进行中</el-tag>
+        <el-button v-else type="primary" size="large" @click="startNextRound">
+           开始抽签 (草稿)
+        </el-button>
       </div>
     </div>
 
@@ -29,6 +32,13 @@
           <span class="count-badge">{{ participants.length }} 人</span>
         </div>
         <div class="participant-list">
+           <!-- Add Button -->
+           <div class="add-participant-row">
+              <el-button type="primary" plain size="small" style="width:100%" @click="handleAddParticipantClick">
+                 + 手动添加参与者
+              </el-button>
+           </div>
+
           <div v-for="user in participants" :key="user.id" class="participant-item">
             <div class="participant-info">
               <span class="participant-name">{{ user.name }}</span>
@@ -93,7 +103,7 @@
           <h1 class="congrats-title">🎉 恭喜 🎉</h1>
           <h2 class="prize-subtitle">{{ title }} 中签名单</h2>
 
-          <div class="winners-grid">
+          <div class="winners-grid" v-if="winners.length > 0">
             <div v-for="winner in winners" :key="winner.id" class="winner-card">
               <div class="winner-avatar">{{ winner.name.substring(0,1) }}</div>
               <div class="winner-info">
@@ -102,16 +112,19 @@
               </div>
             </div>
           </div>
+          
+          <div v-else class="empty-result-hint">
+             🤔 本轮未产生中奖者 (候选人不足或已全部中奖)
+          </div>
 
           <div class="controls">
             <el-button v-if="hasNextRound" type="primary" size="large" @click="waitForNextRound">
               等待下一轮
             </el-button>
-            <el-button v-else @click="closePage">
-              抽签结束
-            </el-button>
+            <div v-else class="finished-text">
+               🎉 所有轮次已完成，感谢参与！
+            </div>
           </div>
-        </div>
 
       </div>
 
@@ -142,7 +155,27 @@
         </div>
       </div>
 
+      </div>
+
     </div>
+
+    <!-- Manual Add Dialog -->
+    <el-dialog v-model="addDialogVisible" title="手动添加参与者" width="400px" append-to-body>
+        <el-form :model="addForm" label-width="80px">
+            <el-form-item label="姓名">
+                <el-input v-model="addForm.name" placeholder="请输入姓名" />
+            </el-form-item>
+            <el-form-item label="部门">
+                <el-input v-model="addForm.department" placeholder="请输入部门（选填）" />
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <div class="dialog-footer">
+                <el-button @click="addDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="confirmAddParticipant">确认添加</el-button>
+            </div>
+        </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -165,11 +198,13 @@ const totalRounds = ref(0)
 
 // 状态: JOINING, ROLLING, RESULT
 const phase = ref('JOINING')
+const dataLoaded = ref(false) // Prevent UI flicker before socket data
 
 // 数据
-const participants = ref([]) // {id, name, department, ...}
+const participants = ref([]) 
 const winners = ref([])
-const historyWinners = ref([]) // [{title, winners: [{id, name}]}]
+const historyWinners = ref([]) 
+const fullRoundList = ref([]) // To store full list for status logic
 const socketConnected = ref(false)
 let socket = null
 
@@ -195,9 +230,30 @@ const toggleSortOrder = () => {
   sortAsc.value = !sortAsc.value
 }
 
+// 计算会议整体抽签状态
+const meetingStatus = computed(() => {
+    if (!dataLoaded.value) return 'loading'
+    if (fullRoundList.value.some(r => r.status === 'active')) return 'active'
+    if (fullRoundList.value.some(r => r.status === 'pending')) return 'pending'
+    if (fullRoundList.value.length > 0 && fullRoundList.value.every(r => r.status === 'finished')) return 'finished'
+    return 'pending'
+})
+
+// 启动下一轮 (用于右上角按钮)
+const startNextRound = () => {
+    const next = fullRoundList.value.find(r => r.status === 'pending')
+    if (next && socket) {
+        socket.emit('lottery_action', {
+            action: 'prepare',
+            meeting_id: meetingId,
+            lottery_id: next.round_id
+        })
+    }
+}
+
 // --- Socket Logic ---
 const initSocket = () => {
-  const url = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+  const url = import.meta.env.VITE_API_URL || ''
   socket = io(url, {
     path: '/socket.io',
     transports: ['websocket'],
@@ -207,65 +263,104 @@ const initSocket = () => {
   socket.on('connect', () => {
     socketConnected.value = true
     socket.emit('join_meeting', { meeting_id: meetingId })
+    // 主动同步完整状态
+    socket.emit('get_lottery_state', { meeting_id: meetingId })
+    // 获取历史记录用于右侧显示
+    socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
   })
 
   socket.on('disconnect', () => {
     socketConnected.value = false
   })
-  
-  // 监听准备/配置更新
-  socket.on('lottery_prepare', (data) => {
-    // data: { title, count, allow_repeat, pool_size, round_index, total_rounds, history_winners }
-    phase.value = 'JOINING'
-    title.value = data.title
-    targetCount.value = data.count
-    currentRoundIndex.value = data.round_index || 1
-    totalRounds.value = data.total_rounds || 1
-    winners.value = []
-    
-    // 更新历史中奖名单
-    if (data.history_winners) {
-      historyWinners.value = data.history_winners
-    }
+
+  // 1. 状态同步 (初始化/重连)
+  socket.on('lottery_state_sync', (data) => {
+      // data: { status, participants_count, all_participants, config, last_result }
+      syncState(data)
   })
 
-  // 监听加入
-  socket.on('lottery_players_update', (data) => {
-    // data: { count, latest_user }
-    if (data.latest_user) {
-      if (!participants.value.find(u => u.id === data.latest_user.id)) {
-        participants.value.push(data.latest_user)
+  // 2. 状态变更广播
+  socket.on('lottery_state_change', (data) => {
+      // data: { status, participants_count, config, last_result }
+      // 注意 state_change 可能不包含 all_participants，除非后端改了，
+      // 但我们主要依赖 state 和 config 切换界面
+      syncState(data)
+  })
+  
+  // 3. 统一状态处理函数
+  const syncState = (data) => {
+      console.log('Sync State:', data)
+      
+      // Update Phase
+      if (data.status === 'IDLE') phase.value = 'JOINING' // Default fallback
+      else if (data.status === 'PREPARING') phase.value = 'JOINING'
+      else if (data.status === 'ROLLING') phase.value = 'ROLLING'
+      else if (data.status === 'RESULT') phase.value = 'RESULT'
+      
+      // Update Config
+      if (data.config) {
+          title.value = data.config.title || '抽签'
+          targetCount.value = data.config.count || 1
       }
-    }
-    // 如果有全量参与者列表
+      
+      // Update Participants (if provided)
+      if (data.all_participants) {
+          participants.value = data.all_participants
+      }
+      
+      // Update Result (if RESULT phase)
+      if (data.status === 'RESULT' && data.last_result) {
+          winners.value = data.last_result.winners || []
+          // Stop animation if running
+          stopAnimation()
+          // Refresh history list to show new round
+          socket.emit('lottery_action', { action: 'get_history', meeting_id: meetingId })
+      }
+      
+      // Rolling Animation Trigger
+      if (data.status === 'ROLLING') {
+          startAnimation()
+      }
+  }
+
+  // 监听加入 (保持原样，用于追加显示)
+  socket.on('lottery_players_update', (data) => {
     if (data.all_participants) {
       participants.value = data.all_participants
     }
-    // 处理移除的用户
-    if (data.removed_user_id) {
-      participants.value = participants.value.filter(p => p.id !== data.removed_user_id)
-    }
   })
-
-  // 监听开始
-  socket.on('lottery_start', () => {
-    phase.value = 'ROLLING'
-    startAnimation()
+  
+  // 监听历史记录 (用于右侧栏)
+  socket.on('lottery_history', (data) => {
+      fullRoundList.value = (data.rounds || []).sort((a,b) => a.round_id - b.round_id)
+      
+      const finished = fullRoundList.value.filter(r => r.status === 'finished')
+      historyWinners.value = finished.map(r => ({
+          title: r.title,
+          winners: r.winners || []
+      }))
+      dataLoaded.value = true
+      
+      // Update Round Info
+      // Try to find current round index based on config title if possible, or just length
+      // This is a bit loose but visual only
+      totalRounds.value = fullRoundList.value.length
+      const activeOrPending = fullRoundList.value.findIndex(r => r.status === 'active' || r.status === 'pending')
+      if (activeOrPending !== -1) {
+          currentRoundIndex.value = activeOrPending + 1
+      } else {
+          currentRoundIndex.value = totalRounds.value
+      }
   })
-
-  // 监听停止
+  
+  // Compat: 监听停止事件 (后端也会发这个兼容旧代码，主要用于 toast 或特殊处理，StateChange 已处理界面)
   socket.on('lottery_stop', (data) => {
-    winners.value = data.winners || []
-    phase.value = 'RESULT'
-    stopAnimation()
-    
-    // 将本轮结果加入历史
-    if (winners.value.length > 0) {
-      historyWinners.value.push({
-        title: title.value,
-        winners: [...winners.value]
-      })
-    }
+      // Already handled by state_change usually, but double check
+      if (phase.value !== 'RESULT') {
+          winners.value = data.winners || []
+          phase.value = 'RESULT'
+          stopAnimation()
+      }
   })
 }
 
@@ -285,20 +380,41 @@ const stopRolling = () => {
 }
 
 const waitForNextRound = () => {
-  // 返回JOINING状态等待管理员启动下一轮
   phase.value = 'JOINING'
   winners.value = []
 }
 
 const closePage = () => {
-  window.close()
+  // Removed window.close()
+}
+
+// Manual Add
+const addDialogVisible = ref(false)
+const addForm = ref({ name: '', department: '' })
+
+const handleAddParticipantClick = () => {
+    addForm.value = { name: '', department: '' }
+    addDialogVisible.value = true
+}
+
+const confirmAddParticipant = () => {
+    if(!addForm.value.name) return
+    if(socket) {
+        socket.emit('lottery_action', {
+            action: 'admin_add_participant',
+            meeting_id: meetingId,
+            user: {
+                name: addForm.value.name,
+                department: addForm.value.department
+            }
+        })
+    }
+    addDialogVisible.value = false
 }
 
 // 移除参与者
 const removeParticipant = (user) => {
-  // 从本地列表移除
   participants.value = participants.value.filter(p => p.id !== user.id)
-  // 通知后端
   if (socket) {
     socket.emit('lottery_action', {
       action: 'remove_participant',
@@ -637,8 +753,22 @@ onUnmounted(() => {
 }
 
 .winner-info { text-align: center; }
-.winner-name { font-size: 22px; font-weight: bold; margin-bottom: 4px; color: #0f172a; }
-.winner-dept { font-size: 14px; color: #64748b; }
+.winner-name { font-size: 32px; font-weight: 800; margin-bottom: 8px; color: #0f172a; line-height: 1.2; }
+.winner-dept { font-size: 18px; color: #64748b; font-weight: 500; }
+
+.empty-result-hint {
+    font-size: 28px;
+    color: #94a3b8;
+    margin: 40px 0;
+    font-weight: bold;
+}
+
+.finished-text {
+    font-size: 24px;
+    font-weight: bold;
+    color: #22c55e;
+    margin-top: 20px;
+}
 
 .controls .el-button {
   font-size: 18px;
