@@ -35,8 +35,6 @@ fun LotteryDetailScreen(
     val roundTitle = viewModel.currentRoundTitle
     val myStatus = viewModel.myStatus
     val participantsCount = viewModel.participantsCount
-    val myStatus = viewModel.myStatus
-    val participantsCount = viewModel.participantsCount
     // Collect winners IDs
     val winnerIds = viewModel.winnerIds.collectAsState(initial = emptySet()).value
     val currentUserId = viewModel.getCurrentUserId()
@@ -44,7 +42,7 @@ fun LotteryDetailScreen(
     
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
+        viewModel.events.collect { event: LotteryEvent ->
             android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
