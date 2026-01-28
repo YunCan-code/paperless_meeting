@@ -54,6 +54,10 @@ class LotteryViewModel @Inject constructor(
     var isMeetingFinished by mutableStateOf(false)
         private set
 
+    // 5. 当前抽签状态 (用于判断是否锁定)
+    var lotteryStatus by mutableStateOf("IDLE")
+        private set
+
     // 3. 中奖名单 (IDs)
     private val _winnerIds = MutableStateFlow<Set<String>>(emptySet())
     val winnerIds: StateFlow<Set<String>> = _winnerIds.asStateFlow()
@@ -252,6 +256,9 @@ class LotteryViewModel @Inject constructor(
         if (config != null) {
             title = config.optString("title", "抽签")
         }
+        
+        // 更新抽签状态
+        lotteryStatus = status
         
         when (status) {
             "IDLE" -> currentRoundTitle = "等待抽签开始..."

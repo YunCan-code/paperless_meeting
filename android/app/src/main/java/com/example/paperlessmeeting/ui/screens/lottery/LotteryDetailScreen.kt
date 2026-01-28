@@ -35,10 +35,10 @@ fun LotteryDetailScreen(
     val roundTitle = viewModel.currentRoundTitle
     val myStatus = viewModel.myStatus
     val participantsCount = viewModel.participantsCount
-    // Collect winners IDs
     val winnerIds = viewModel.winnerIds.collectAsState(initial = emptySet()).value
     val currentUserId = viewModel.getCurrentUserId()
     val isWinner = winnerIds.contains(currentUserId)
+    val isRolling = viewModel.lotteryStatus == "ROLLING"
     
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
@@ -95,9 +95,41 @@ fun LotteryDetailScreen(
 
                 Spacer(modifier = Modifier.height(48.dp))
 
+                // 滚动中状态提示
+                if (isRolling) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3A5F)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF00D9FF),
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "🎰 抽签进行中...",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00D9FF)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "请关注大屏幕，等待结果揭晓",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
                 // 操作区域
-                // 操作区域
-                if (viewModel.isMeetingFinished) {
+                else if (viewModel.isMeetingFinished) {
                      Card(
                          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                          shape = RoundedCornerShape(16.dp),
@@ -191,15 +223,16 @@ fun LotteryDetailScreen(
                                 }
                             }
                             
-                            // --- 新增: 退出按钮 ---
+                            // --- 退出按钮 (滚动中禁用) ---
                             Spacer(modifier = Modifier.height(16.dp))
                             TextButton(
                                 onClick = { viewModel.quitLottery() },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                enabled = !isRolling
                             ) {
                                 Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("退出本次抽签")
+                                Text(if (isRolling) "抽签中无法退出" else "退出本次抽签")
                             }
                         }
                         is ParticipationStatus.Removed -> {
