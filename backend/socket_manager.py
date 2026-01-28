@@ -105,19 +105,27 @@ async def handle_get_lottery_state(sid, data):
     
     state = get_or_init_lottery_state(meeting_id)
     
-    # [Modified] Fetch participants from DB
+    # [核心修改] 从数据库获取真实列表
     db_participants = get_db_participants(meeting_id)
     
-    payload = {
-        "status": state["status"],
-        "participants": db_participants,
-        "current_title": state.get("current_title"),
-        "current_count": state.get("current_count", 1),
-        "winners": state.get("winners", []),
-        "participant_count": len(db_participants)
+    # 检查自己是否在列表中
+    is_joined = False
+    if data.get('user_id'):
+        is_joined = any(str(p['id']) == str(data.get('user_id')) for p in db_participants)
+        
+    response = {
+        'status': state['status'],
+        'participants_count': len(db_participants),
+        'all_participants': db_participants, # 返回持久化数据
+        'config': {
+            'title': state.get('current_title'),
+            'count': state.get('current_count', 1)
+        },
+        'last_result': state.get('winners', []),
+        'is_joined': is_joined
     }
-    await sio.emit('lottery_state_change', payload, to=sid)
-    print(f"[Lottery] Sent state to {sid}: {state['status']}, participants: {len(db_participants)}")
+    await sio.emit('lottery_state_sync', response, room=sid)
+    print(f"[Lottery] Sent state sync to {sid}: {state['status']}")
 
 @sio.on('leave_meeting')
 async def leave_meeting(sid, data):
@@ -253,11 +261,16 @@ async def lottery_action(sid, data):
         if state["status"] == LotteryState.IDLE:
             state["status"] = LotteryState.PREPARING
         
-        # 更新内存 (Optional, mainly for quick lookups if needed, but we rely on DB for list)
+        # 更新内存 (Optional)
         state["participants"][user_id] = {"id": user_id, "name": user_name, "sid": sid}
         
-        await broadcast_lottery_state(meeting_id, state)
-        await sio.emit('lottery_joined', {'user_id': user_id}, to=sid)
+        # 广播更新 (读取最新 DB 数据广播给所有人)
+        room = f"meeting_{meeting_id}"
+        current_list = get_db_participants(meeting_id)
+        await sio.emit('lottery_players_update', {
+            'count': len(current_list),
+            'all_participants': current_list
+        }, room=room)
     
     # ===== QUIT: 用户退出抽签池 =====
     elif action == 'quit':
@@ -445,27 +458,6 @@ async def lottery_action(sid, data):
 
     else:
         await sio.emit('lottery_error', {'message': f'未知动作: {action}'}, to=sid)
-
-
-@sio.on('get_lottery_state')
-async def get_lottery_state_handler(sid, data):
-    """获取当前抽签状态 (用于客户端同步)"""
-    meeting_id = data.get('meeting_id')
-    if not meeting_id:
-        return
-    
-    # [Modified] Fetch participants from DB
-    db_participants = get_db_participants(meeting_id)
-    
-    payload = {
-        "status": state["status"],
-        "participants": db_participants,
-        "current_title": state.get("current_title"),
-        "current_count": state.get("current_count", 1),
-        "winners": state.get("winners", []),
-        "participant_count": len(db_participants)
-    }
-    await sio.emit('lottery_state_change', payload, to=sid)
 
 
 # Create ASGI App
