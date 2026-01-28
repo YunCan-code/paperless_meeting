@@ -120,7 +120,11 @@ fun MainScreen() {
                         onReadingClick = { url, name, page ->
                             val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                             val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-                            navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$page")
+                            val encodedname = java.net.URLEncoder.encode(name, "UTF-8")
+                            navController.navigate("reader?url=$encodedUrl&name=$encodedname&page=$page")
+                        },
+                        onLotteryClick = {
+                            navController.navigate(Screen.LotteryDetail.createRoute(it.id, it.title))
                         }
                     )
                 }
@@ -155,6 +159,22 @@ fun MainScreen() {
                 }
                 composable(Screen.Settings.route) {
                     com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(navController = navController)
+                }
+
+                composable(
+                    route = Screen.LotteryDetail.route,
+                    arguments = listOf(
+                        androidx.navigation.navArgument("meetingId") { type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("title") { type = androidx.navigation.NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val meetingId = backStackEntry.arguments?.getInt("meetingId") ?: 0
+                    val title = backStackEntry.arguments?.getString("title") ?: "抽签"
+                    com.example.paperlessmeeting.ui.screens.lottery.LotteryDetailScreen(
+                        meetingId = meetingId,
+                        meetingTitle = title,
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
                 
                 // Keep Detail route accessible if needed for phone view deep links context

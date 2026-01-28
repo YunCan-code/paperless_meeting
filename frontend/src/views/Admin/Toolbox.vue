@@ -69,9 +69,15 @@
       </template>
     </el-dialog>
 
-    <!-- Vote Configuration Component -->
     <VoteConfigDialog
       v-model="voteDialogVisible"
+      :meeting-id="currentMeeting?.id"
+      :meeting-title="currentMeeting?.title"
+    />
+
+    <!-- Lottery Configuration Drawer -->
+    <LotteryManagerDrawer
+      v-model="lotteryDialogVisible"
       :meeting-id="currentMeeting?.id"
       :meeting-title="currentMeeting?.title"
     />
@@ -87,6 +93,7 @@ import {
 } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import VoteConfigDialog from '@/views/Admin/components/VoteConfigDialog.vue'
+import LotteryManagerDrawer from '@/views/Admin/components/LotteryManagerDrawer.vue'
 import { ElMessage } from 'element-plus'
 
 // Tools Configuration
@@ -114,18 +121,30 @@ const tools = [
     icon: 'Timer',
     bgColor: '#faf5ff', // purple-50
     color: '#a855f7'    // purple-500
+  },
+  {
+    id: 'lottery',
+    title: '抽签',
+    desc: '随机抽取参会人员',
+    icon: 'Trophy',
+    bgColor: '#fff7ed', // orange-50
+    color: '#f97316'    // orange-500
   }
 ]
 
 // Logic
 const meetingSelectVisible = ref(false)
 const voteDialogVisible = ref(false)
+const lotteryDialogVisible = ref(false)
 const meetings = ref([])
 const loadingMeetings = ref(false)
 const selectedMeetingId = ref(null)
 const activeToolId = ref(null)
 
 const selectTip = computed(() => {
+  if (activeToolId.value === 'lottery') {
+    return '请选择要进行抽签的会议：'
+  }
   return '请选择通过哪个会议发起投票：'
 })
 
@@ -134,7 +153,7 @@ const currentMeeting = computed(() => {
 })
 
 const handleToolClick = (tool) => {
-  if (tool.id === 'vote') {
+  if (tool.id === 'vote' || tool.id === 'lottery') {
     activeToolId.value = tool.id
     openMeetingSelect()
   } else {
@@ -176,6 +195,8 @@ const confirmMeetingSelect = () => {
   
   if (activeToolId.value === 'vote') {
     voteDialogVisible.value = true
+  } else if (activeToolId.value === 'lottery') {
+    lotteryDialogVisible.value = true
   }
 }
 

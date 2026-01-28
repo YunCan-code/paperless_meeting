@@ -69,6 +69,11 @@ const router = createRouter({
             path: '/vote/bigscreen/:id',
             name: 'vote-bigscreen',
             component: () => import('../views/BigScreen/VoteBigScreen.vue')
+        },
+        {
+            path: '/lottery/:meetingId',
+            name: 'LotteryBigScreen',
+            component: () => import('../views/BigScreen/LotteryBigScreen.vue')
         }
     ]
 })

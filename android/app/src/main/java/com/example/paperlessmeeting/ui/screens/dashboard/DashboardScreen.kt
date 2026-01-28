@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -42,6 +43,7 @@ import java.util.Locale
 fun DashboardScreen(
     onMeetingClick: (Int) -> Unit,
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
+    onLotteryClick: (com.example.paperlessmeeting.domain.model.Meeting) -> Unit = {},
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -114,7 +116,13 @@ fun DashboardScreen(
                 state = state, 
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
-                onVoteClick = { viewModel.checkAnyActiveVote() }
+                onVoteClick = { viewModel.checkAnyActiveVote() },
+                onLotteryClick = {
+                    val meeting = state.activeMeetings.firstOrNull()
+                    if (meeting != null) {
+                        onLotteryClick(meeting)
+                    }
+                }
             )
         }
     }
@@ -126,7 +134,8 @@ fun DashboardContent(
     state: DashboardUiState.Success, 
     onMeetingClick: (Int) -> Unit, 
     onReadingClick: (String, String, Int) -> Unit,
-    onVoteClick: () -> Unit
+    onVoteClick: () -> Unit,
+    onLotteryClick: () -> Unit
 ) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
@@ -300,6 +309,12 @@ fun DashboardContent(
                     icon = androidx.compose.material.icons.Icons.Default.HowToVote,
                     label = "投票",
                     onClick = onVoteClick
+                )
+
+                QuickActionButton(
+                    icon = androidx.compose.material.icons.Icons.Default.Star,
+                    label = "抽签",
+                    onClick = onLotteryClick
                 )
             }
         }

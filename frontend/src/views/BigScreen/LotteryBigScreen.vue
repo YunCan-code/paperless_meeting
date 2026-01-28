@@ -1,0 +1,382 @@
+<template>
+  <div class="lottery-bigscreen">
+    <!-- Top Banner -->
+    <div class="top-banner">
+      <div class="banner-content">
+        <div class="title-section">
+          <h1 class="page-title">{{ state.current_title || '现场抽签' }}</h1>
+          <div class="subtitle">
+            <span class="status-badge" :class="state.status.toLowerCase()">
+              <span class="status-dot"></span>
+              {{ getStatusText(state.status) }}
+            </span>
+            <span class="count-badge" v-if="state.status === 'PREPARING'">
+              已加入 {{ state.participant_count }} 人
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- IDLE / PREPARING: Participant Pool -->
+      <div v-if="state.status === 'IDLE' || state.status === 'PREPARING'" class="pool-container">
+        <div class="pool-grid" v-if="state.participants.length > 0">
+          <transition-group name="list">
+            <div 
+              v-for="p in state.participants" 
+              :key="p.id" 
+              class="participant-card"
+            >
+              <div class="avatar-placeholder">{{ p.name.charAt(0) }}</div>
+              <span class="name">{{ p.name }}</span>
+            </div>
+          </transition-group>
+        </div>
+        <div v-else class="empty-pool">
+          <el-icon class="scanning-icon"><Cpu /></el-icon>
+          <div class="text">等待参与者加入...</div>
+          <div class="sub-text">请在移动端点击"抽签"加入</div>
+        </div>
+      </div>
+
+      <!-- ROLLING: Rolling Animation -->
+      <div v-else-if="state.status === 'ROLLING'" class="rolling-container">
+        <div class="rolling-machine">
+          <div class="rolling-window">
+            <div class="rolling-name">{{ rollingName }}</div>
+          </div>
+          <div class="rolling-status">正在抽取 {{ state.current_count }} 位幸运儿...</div>
+        </div>
+      </div>
+
+      <!-- RESULT: Winners Display -->
+      <div v-else-if="state.status === 'RESULT'" class="result-container">
+        <div class="winners-grid">
+          <div 
+            v-for="(winner, index) in state.winners" 
+            :key="winner.id || index" 
+            class="winner-card"
+            :style="{ animationDelay: index * 0.2 + 's' }"
+          >
+            <div class="trophy-icon">🏆</div>
+            <div class="winner-name">{{ winner.name }}</div>
+            <div class="winner-label">恭喜中奖</div>
+          </div>
+        </div>
+        
+        <div class="confetti-canvas"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { io } from 'socket.io-client'
+import { Cpu } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+
+const route = useRoute()
+const meetingId = route.params.meetingId
+
+// State
+const state = ref({
+  status: 'IDLE',
+  participants: [],
+  current_title: '',
+  current_count: 1,
+  winners: [],
+  participant_count: 0
+})
+
+const rollingName = ref('???')
+let rollingInterval = null
+let socket = null
+
+// Helpers
+const getStatusText = (status) => {
+  const map = {
+    'IDLE': '等待配置',
+    'PREPARING': '准备就绪',
+    'ROLLING': '正在抽签',
+    'RESULT': '结果公布'
+  }
+  return map[status] || status
+}
+
+// Socket Initialization
+const initSocket = () => {
+  const url = import.meta.env.VITE_API_URL || window.location.origin
+  socket = io(url, {
+    path: '/socket.io',
+    transports: ['websocket']
+  })
+
+  socket.on('connect', () => {
+    console.log('Connected to socket')
+    socket.emit('join_meeting', { meeting_id: meetingId })
+    // Fetch initial state
+    socket.emit('get_lottery_state', { meeting_id: meetingId })
+  })
+
+  socket.on('lottery_state_change', (data) => {
+    console.log('State update:', data)
+    handleStateChange(data)
+  })
+
+  socket.on('lottery_error', (data) => {
+    ElMessage.error(data.message)
+  })
+}
+
+// State Logic
+const handleStateChange = (newState) => {
+  const oldStatus = state.value.status
+  state.value = newState
+
+  // Status transitions
+  if (newState.status === 'ROLLING' && oldStatus !== 'ROLLING') {
+    startRolling()
+  } else if (newState.status !== 'ROLLING' && oldStatus === 'ROLLING') {
+    stopRolling()
+  }
+}
+
+// Rolling Logic
+const startRolling = () => {
+  if (rollingInterval) return
+  const names = state.value.participants.map(p => p.name)
+  if (names.length === 0) return
+
+  rollingInterval = setInterval(() => {
+    const randomName = names[Math.floor(Math.random() * names.length)]
+    rollingName.value = randomName
+  }, 50) // Fast switching
+}
+
+const stopRolling = () => {
+  if (rollingInterval) {
+    clearInterval(rollingInterval)
+    rollingInterval = null
+  }
+}
+
+onMounted(() => {
+  document.documentElement.classList.add('dark')
+  initSocket()
+})
+
+onUnmounted(() => {
+  document.documentElement.classList.remove('dark')
+  if (socket) socket.disconnect()
+  stopRolling()
+})
+</script>
+
+<style scoped>
+/* Base Layout matching VoteBigScreen */
+.lottery-bigscreen {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
+  color: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Background Grid */
+.lottery-bigscreen::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Banner */
+.top-banner {
+  background: linear-gradient(180deg, rgba(26, 31, 58, 0.95) 0%, rgba(26, 31, 58, 0.7) 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 48px;
+  z-index: 10;
+}
+
+.page-title {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffffff 0%, #a0aec0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.subtitle {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.1);
+  font-size: 14px;
+}
+
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #aaa;
+}
+
+.status-badge.preparing .status-dot { background: #10b981; animation: pulse 2s infinite; }
+.status-badge.rolling .status-dot { background: #f59e0b; }
+.status-badge.result .status-dot { background: #8b5cf6; }
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  position: relative;
+  z-index: 5;
+}
+
+/* Pool View */
+.pool-container {
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+}
+
+.pool-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  align-content: flex-start;
+}
+
+.participant-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 16px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.avatar-placeholder {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Empty State */
+.empty-pool {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+}
+
+.scanning-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  animation: float 3s ease-in-out infinite;
+}
+
+.empty-pool .text { font-size: 24px; margin-bottom: 8px; }
+.empty-pool .sub-text { font-size: 16px; opacity: 0.7; }
+
+/* Rolling View */
+.rolling-machine {
+  text-align: center;
+}
+
+.rolling-window {
+  font-size: 80px;
+  font-weight: 800;
+  color: #fbbf24;
+  text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+  margin-bottom: 32px;
+  min-height: 120px;
+}
+
+.rolling-status {
+  font-size: 24px;
+  color: #94a3b8;
+}
+
+/* Result View */
+.winners-grid {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.winner-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(217, 119, 6, 0.2));
+  border: 2px solid #fbbf24;
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+  min-width: 240px;
+  animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  box-shadow: 0 0 50px rgba(251, 191, 36, 0.3);
+}
+
+.trophy-icon { font-size: 64px; margin-bottom: 16px; }
+.winner-name { font-size: 36px; font-weight: bold; margin-bottom: 8px; color: #fff; }
+.winner-label { color: #fbbf24; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
+
+/* Animations */
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(50px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Transitions */
+.list-enter-active, .list-leave-active { transition: all 0.5s ease; }
+.list-enter-from, .list-leave-to { opacity: 0; transform: translateY(20px); }
+</style>

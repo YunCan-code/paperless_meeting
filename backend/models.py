@@ -268,3 +268,31 @@ class VoteStatusUpdate(SQLModel):
 class VoteSubmit(SQLModel):
     user_id: int
     option_ids: List[int]
+
+
+# ========== 抽签模型 ==========
+
+class Lottery(SQLModel, table=True):
+    """抽签轮次记录"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    meeting_id: int = Field(foreign_key="meeting.id")
+    title: str 
+    count: int = Field(default=1)  # 本轮中奖人数
+    allow_repeat: bool = Field(default=False)  # 是否允许重复中奖
+    status: str = Field(default="pending")  # pending/active/finished
+    created_at: datetime = Field(default_factory=datetime.now)
+    
+    # 关联中奖者
+    winners: List["LotteryWinner"] = Relationship(back_populates="lottery")
+
+
+class LotteryWinner(SQLModel, table=True):
+    """抽签中奖记录"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lottery_id: int = Field(foreign_key="lottery.id")
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id")  # 可选，允许临时用户
+    user_name: str  # 中奖者姓名
+    winning_at: datetime = Field(default_factory=datetime.now)
+    
+    lottery: Optional[Lottery] = Relationship(back_populates="winners")
+    user: Optional[User] = Relationship()

@@ -29,6 +29,7 @@ interface MeetingRepository {
     suspend fun getVoteList(meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
     suspend fun submitVote(voteId: Int, userId: Int, optionIds: List<Int>)
     suspend fun getVoteResult(voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult?
+    suspend fun getLotteryHistory(meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse?
 }
 
 @Singleton
@@ -158,6 +159,15 @@ class MeetingRepositoryImpl @Inject constructor(
     override suspend fun getVoteResult(voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult? {
         return try {
             api.getVoteResult(voteId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override suspend fun getLotteryHistory(meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse? {
+        return try {
+            api.getLotteryHistory(meetingId)
         } catch (e: Exception) {
             e.printStackTrace()
             null
