@@ -66,6 +66,16 @@
           </div>
         </div>
         
+        <!-- Next Round Button -->
+        <div class="next-round-section" v-if="hasNextRound">
+          <el-button type="primary" size="large" @click="prepareNextRound">
+            抽下一轮
+          </el-button>
+        </div>
+        <div class="all-done-section" v-else>
+          <div class="all-done-text">🎊 所有轮次已完成 🎊</div>
+        </div>
+        
         <div class="confetti-canvas"></div>
       </div>
     </div>
@@ -73,14 +83,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
 import { Cpu } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import request from '@/utils/request'
 
 const route = useRoute()
 const meetingId = route.params.meetingId
+
+// Rounds list (fetched from API)
+const rounds = ref([])
+const currentRoundIndex = ref(0)
 
 // State
 const state = ref({
@@ -95,6 +110,11 @@ const state = ref({
 const rollingName = ref('???')
 let rollingInterval = null
 let socket = null
+
+// Computed: is there a next round?
+const hasNextRound = computed(() => {
+  return currentRoundIndex.value < rounds.value.length - 1
+})
 
 // Helpers
 const getStatusText = (status) => {
@@ -121,20 +141,8 @@ const initSocket = () => {
     // Fetch initial state
     socket.emit('get_lottery_state', { meeting_id: meetingId })
     
-    // Plan A: Auto-prepare if this big screen was opened with round params
-    const lotteryId = route.query.lottery_id
-    const title = route.query.title
-    const count = route.query.count
-    if (lotteryId && title) {
-      console.log('Auto-preparing lottery:', lotteryId, title, count)
-      socket.emit('lottery_action', {
-        action: 'prepare',
-        meeting_id: parseInt(meetingId),
-        lottery_id: parseInt(lotteryId),
-        title: title,
-        count: parseInt(count) || 1
-      })
-    }
+    // Auto-fetch rounds and prepare first unfinished
+    fetchRoundsAndPrepareFirst()
   })
 
   socket.on('lottery_state_change', (data) => {
@@ -176,6 +184,51 @@ const stopRolling = () => {
   if (rollingInterval) {
     clearInterval(rollingInterval)
     rollingInterval = null
+  }
+}
+
+// Fetch rounds from API and prepare first unfinished
+const fetchRoundsAndPrepareFirst = async () => {
+  try {
+    const res = await request.get(`/lottery/${meetingId}/history`)
+    rounds.value = res.rounds || []
+    
+    // Find first unfinished round
+    const firstUnfinished = rounds.value.findIndex(r => r.status !== 'finished')
+    if (firstUnfinished >= 0) {
+      currentRoundIndex.value = firstUnfinished
+      const round = rounds.value[firstUnfinished]
+      console.log('Auto-preparing round:', round.title)
+      socket.emit('lottery_action', {
+        action: 'prepare',
+        meeting_id: parseInt(meetingId),
+        lottery_id: round.id,
+        title: round.title,
+        count: round.count
+      })
+    } else if (rounds.value.length > 0) {
+      // All finished, show last round result
+      currentRoundIndex.value = rounds.value.length - 1
+    }
+  } catch (e) {
+    console.error('Failed to fetch rounds:', e)
+  }
+}
+
+// Prepare next round
+const prepareNextRound = () => {
+  const nextIndex = currentRoundIndex.value + 1
+  if (nextIndex < rounds.value.length) {
+    currentRoundIndex.value = nextIndex
+    const round = rounds.value[nextIndex]
+    console.log('Preparing next round:', round.title)
+    socket.emit('lottery_action', {
+      action: 'prepare',
+      meeting_id: parseInt(meetingId),
+      lottery_id: round.id,
+      title: round.title,
+      count: round.count
+    })
   }
 }
 
@@ -394,4 +447,31 @@ onUnmounted(() => {
 /* Transitions */
 .list-enter-active, .list-leave-active { transition: all 0.5s ease; }
 .list-enter-from, .list-leave-to { opacity: 0; transform: translateY(20px); }
+
+/* Next Round Section */
+.next-round-section {
+  margin-top: 48px;
+  text-align: center;
+}
+
+.next-round-section .el-button {
+  padding: 16px 48px;
+  font-size: 20px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  animation: pulse 2s infinite;
+}
+
+.all-done-section {
+  margin-top: 48px;
+  text-align: center;
+}
+
+.all-done-text {
+  font-size: 32px;
+  color: #fbbf24;
+  font-weight: 600;
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+}
 </style>

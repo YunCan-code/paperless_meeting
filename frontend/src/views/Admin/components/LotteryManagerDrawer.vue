@@ -28,32 +28,39 @@
             <el-button type="primary" @click="createRound" :loading="creating">
               创建轮次
             </el-button>
-            <el-button @click="openBigScreen" :disabled="!meetingId">
-              <el-icon><Monitor /></el-icon>
-              打开大屏
-            </el-button>
           </el-form-item>
         </el-form>
       </div>
 
       <!-- 历史轮次 -->
       <div class="section">
-        <h4>历史轮次</h4>
+        <div class="section-header">
+          <h4>已创建轮次</h4>
+          <el-button 
+            v-if="history.rounds.length > 0"
+            type="success" 
+            @click="openBigScreen"
+          >
+            <el-icon><Monitor /></el-icon>
+            进入大屏
+          </el-button>
+        </div>
         <div v-if="loading" class="loading-state">
           <el-icon class="is-loading"><Loading /></el-icon>
           加载中...
         </div>
         <div v-else-if="history.rounds.length === 0" class="empty-state">
-          暂无抽签记录
+          暂无抽签轮次，请先创建
         </div>
         <div v-else class="history-list">
           <div 
-            v-for="round in history.rounds" 
+            v-for="(round, index) in history.rounds" 
             :key="round.id" 
             class="history-item"
             :class="{ finished: round.status === 'finished' }"
           >
             <div class="round-header">
+              <span class="round-number">第 {{ index + 1 }} 轮</span>
               <span class="round-title">{{ round.title }}</span>
               <el-tag :type="round.status === 'finished' ? 'success' : 'warning'" size="small">
                 {{ round.status === 'finished' ? '已完成' : '待抽取' }}
@@ -65,14 +72,6 @@
               </span>
             </div>
             <div class="round-actions">
-              <el-button 
-                v-if="round.status !== 'finished'"
-                size="small" 
-                type="primary" 
-                @click="openBigScreenForRound(round)"
-              >
-                进入抽签
-              </el-button>
               <el-button 
                 size="small" 
                 type="danger" 
@@ -265,10 +264,29 @@ watch(() => props.modelValue, (visible) => {
   margin-bottom: 24px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-header h4 {
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+}
+
 .section h4 {
   margin: 0 0 12px 0;
   color: var(--el-text-color-primary);
   font-size: 15px;
+}
+
+.round-number {
+  font-weight: 600;
+  color: var(--el-color-primary);
+  margin-right: 8px;
 }
 
 .loading-state,
