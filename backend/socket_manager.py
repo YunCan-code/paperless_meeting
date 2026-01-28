@@ -71,6 +71,26 @@ async def join_meeting(sid, data):
         
         print(f"[Socket.IO] {sid} joined room: {room}")
 
+@sio.on('get_lottery_state')
+async def handle_get_lottery_state(sid, data):
+    """响应客户端的抽签状态请求"""
+    meeting_id = data.get('meeting_id')
+    if not meeting_id:
+        await sio.emit('lottery_error', {'message': '缺少会议ID'}, to=sid)
+        return
+    
+    state = get_or_init_lottery_state(meeting_id)
+    payload = {
+        "status": state["status"],
+        "participants": list(state["participants"].values()),
+        "current_title": state.get("current_title"),
+        "current_count": state.get("current_count", 1),
+        "winners": state.get("winners", []),
+        "participant_count": len(state["participants"])
+    }
+    await sio.emit('lottery_state_change', payload, to=sid)
+    print(f"[Lottery] Sent state to {sid}: {state['status']}")
+
 @sio.on('leave_meeting')
 async def leave_meeting(sid, data):
     """离开会议房间"""

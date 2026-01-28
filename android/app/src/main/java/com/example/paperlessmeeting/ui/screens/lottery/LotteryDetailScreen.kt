@@ -217,7 +217,7 @@ fun ActionArea(
                 Button(
                     onClick = onJoin,
                     modifier = Modifier.weight(1f).height(56.dp),
-                    enabled = status != "IDLE" // Disable join if nothing happened? Or allow join anytime pending? Usually PREPARING allows join.
+                    enabled = status != "ROLLING" && status != "RESULT" // Allow join when IDLE or PREPARING
                 ) {
                     Text("立即参与")
                 }
