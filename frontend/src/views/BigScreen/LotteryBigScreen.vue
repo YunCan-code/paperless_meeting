@@ -120,6 +120,21 @@ const initSocket = () => {
     socket.emit('join_meeting', { meeting_id: meetingId })
     // Fetch initial state
     socket.emit('get_lottery_state', { meeting_id: meetingId })
+    
+    // Plan A: Auto-prepare if this big screen was opened with round params
+    const lotteryId = route.query.lottery_id
+    const title = route.query.title
+    const count = route.query.count
+    if (lotteryId && title) {
+      console.log('Auto-preparing lottery:', lotteryId, title, count)
+      socket.emit('lottery_action', {
+        action: 'prepare',
+        meeting_id: parseInt(meetingId),
+        lottery_id: parseInt(lotteryId),
+        title: title,
+        count: parseInt(count) || 1
+      })
+    }
   })
 
   socket.on('lottery_state_change', (data) => {

@@ -32,13 +32,8 @@ fun LotteryDetailScreen(
     onBackClick: () -> Unit,
     viewModel: LotteryViewModel = hiltViewModel()
 ) {
-    // Hardcoded current user for now (should come from SessionManager)
-    // TODO: Replace with real user injection
-    val currentUserId = 12 
-    val currentUserName = "Android User"
-
     LaunchedEffect(Unit) {
-        viewModel.init(meetingId, currentUserId, currentUserName)
+        viewModel.init(meetingId)
     }
 
     val uiState by viewModel.uiState.collectAsState()

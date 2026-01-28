@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.lottery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LotteryState
 import com.google.gson.Gson
@@ -17,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LotteryViewModel @Inject constructor(
-    private val repository: MeetingRepository
+    private val repository: MeetingRepository,
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LotteryState?>(null)
@@ -32,13 +34,13 @@ class LotteryViewModel @Inject constructor(
 
     private var socket: Socket? = null
     private var meetingId: Int = 0
-    private var userId: Int = 0 // Should valid user id
+    private var userId: Int = 0
     private var userName: String = ""
 
-    fun init(meetingId: Int, userId: Int, userName: String) {
+    fun init(meetingId: Int) {
         this.meetingId = meetingId
-        this.userId = userId
-        this.userName = userName
+        this.userId = userPreferences.getUserId()
+        this.userName = userPreferences.getUserName() ?: "未知用户"
         fetchHistory()
         initSocket()
     }
@@ -60,8 +62,8 @@ class LotteryViewModel @Inject constructor(
             options.transports = arrayOf("websocket")
             
             // Assuming we can get the base URL from somewhere, hardcoding for now or need injection
-            // Using localhost alias for Android emulator or IP
-            val url = "http://10.0.2.2:8000" // Emulator standard
+            // Production URL matching API baseUrl in AppModule.kt
+            val url = "https://coso.top" // Production server
             // In real app, this should come from config
             
             socket = IO.socket(url, options)

@@ -69,9 +69,9 @@
                 v-if="round.status !== 'finished'"
                 size="small" 
                 type="primary" 
-                @click="prepareRound(round)"
+                @click="openBigScreenForRound(round)"
               >
-                开始抽签
+                进入抽签
               </el-button>
               <el-button 
                 size="small" 
@@ -157,7 +157,8 @@ const createRound = async () => {
   }
 }
 
-// 准备抽签 (发送 prepare 事件)
+// 准备抽签 (发送 prepare 事件) - 已移动到大屏自动触发
+// 保留此函数用于备用
 const prepareRound = (round) => {
   if (!socket || !socket.connected) {
     initSocket()
@@ -169,8 +170,6 @@ const prepareRound = (round) => {
     title: round.title,
     count: round.count
   })
-  ElMessage.success('已准备抽签，请在大屏操作')
-  openBigScreen()
 }
 
 // 删除轮次
@@ -187,9 +186,23 @@ const deleteRound = async (id) => {
   }
 }
 
-// 打开大屏
+// 打开大屏 (通用)
 const openBigScreen = () => {
   const url = router.resolve({ name: 'LotteryBigScreen', params: { meetingId: props.meetingId } })
+  window.open(url.href, '_blank')
+}
+
+// 打开大屏并带上轮次信息 (Plan A: 大屏自动prepare)
+const openBigScreenForRound = (round) => {
+  const url = router.resolve({ 
+    name: 'LotteryBigScreen', 
+    params: { meetingId: props.meetingId },
+    query: { 
+      lottery_id: round.id,
+      title: round.title,
+      count: round.count 
+    }
+  })
   window.open(url.href, '_blank')
 }
 
@@ -241,9 +254,9 @@ watch(() => props.modelValue, (visible) => {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: #f0f9ff;
+  background: var(--el-color-primary-light-9);
   border-radius: 8px;
-  color: #0369a1;
+  color: var(--el-color-primary);
   font-weight: 500;
   margin-bottom: 20px;
 }
@@ -254,14 +267,14 @@ watch(() => props.modelValue, (visible) => {
 
 .section h4 {
   margin: 0 0 12px 0;
-  color: #374151;
+  color: var(--el-text-color-primary);
   font-size: 15px;
 }
 
 .loading-state,
 .empty-state {
   text-align: center;
-  color: #9ca3af;
+  color: var(--el-text-color-secondary);
   padding: 32px 0;
 }
 
@@ -277,14 +290,14 @@ watch(() => props.modelValue, (visible) => {
 
 .history-item {
   padding: 16px;
-  background: #f9fafb;
+  background: var(--el-fill-color-light);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--el-border-color-light);
 }
 
 .history-item.finished {
-  background: #f0fdf4;
-  border-color: #86efac;
+  background: var(--el-color-success-light-9);
+  border-color: var(--el-color-success-light-5);
 }
 
 .round-header {
@@ -296,7 +309,7 @@ watch(() => props.modelValue, (visible) => {
 
 .round-title {
   font-weight: 600;
-  color: #1f2937;
+  color: var(--el-text-color-primary);
 }
 
 .winners {
@@ -308,10 +321,10 @@ watch(() => props.modelValue, (visible) => {
 
 .winner-tag {
   padding: 4px 12px;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  background: var(--el-color-warning-light-7);
   border-radius: 16px;
   font-size: 13px;
-  color: #92400e;
+  color: var(--el-color-warning-dark-2);
 }
 
 .round-actions {
