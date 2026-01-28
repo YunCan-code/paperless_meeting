@@ -499,16 +499,42 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ========== 深色科技主题 ========== */
 .lottery-screen {
   width: 100vw;
   height: 100vh;
   position: relative;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  color: #0f172a;
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  color: #ffffff;
   overflow: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* 动态粒子背景 */
+.background-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.15), transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.1), transparent),
+    radial-gradient(2px 2px at 50px 160px, rgba(255,255,255,0.15), transparent),
+    radial-gradient(2px 2px at 90px 40px, rgba(255,255,255,0.1), transparent),
+    radial-gradient(2px 2px at 130px 80px, rgba(255,255,255,0.15), transparent),
+    radial-gradient(2px 2px at 160px 120px, rgba(255,255,255,0.1), transparent);
+  background-size: 200px 200px;
+  animation: particleMove 20s linear infinite;
+  z-index: 0;
+}
+
+@keyframes particleMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 200px 200px; }
+}
+
+/* 顶部状态栏 - 半透明毒砂玻璃效果 */
 .header {
   position: absolute;
   top: 0;
@@ -519,8 +545,9 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0 30px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  background: rgba(15, 12, 41, 0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
   z-index: 100;
 }
 
@@ -530,7 +557,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #0f172a;
+  color: #ffd700;
 }
 
 .round-progress {
@@ -539,8 +566,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
 }
-.progress-label { color: #64748b; }
-.progress-value { color: #3b82f6; font-weight: bold; }
+.progress-label { color: rgba(255,255,255,0.6); }
+.progress-value { color: #00d9ff; font-weight: bold; text-shadow: 0 0 10px rgba(0,217,255,0.5); }
 
 .connection-status {
   font-size: 14px;
@@ -565,39 +592,43 @@ onUnmounted(() => {
   display: flex;
   height: calc(100vh - 60px);
   margin-top: 60px;
+  position: relative;
+  z-index: 1;
 }
 
 .side-panel {
   width: 280px;
-  background: #ffffff;
+  background: rgba(15, 12, 41, 0.7);
+  backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255,255,255,0.1);
 }
 
-.left-panel { border-right: 1px solid #e2e8f0; border-left: none; }
-.right-panel { border-left: 1px solid #e2e8f0; border-right: none; }
+.left-panel { border-right: 1px solid rgba(255,255,255,0.1); border-left: none; }
+.right-panel { border-left: 1px solid rgba(255,255,255,0.1); border-right: none; }
 
 .panel-header {
   padding: 16px 20px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f8fafc;
+  background: rgba(255,255,255,0.05);
 }
 .panel-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #334155;
+  color: rgba(255,255,255,0.9);
 }
 .count-badge {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #00d9ff 0%, #0099ff 100%);
   color: #ffffff;
   padding: 2px 10px;
   border-radius: 12px;
   font-size: 12px;
+  box-shadow: 0 0 10px rgba(0,217,255,0.3);
 }
 
 .participant-list, .history-list {
@@ -606,57 +637,66 @@ onUnmounted(() => {
   padding: 12px;
 }
 
+/* 参与者卡片 - 深色主题 */
 .participant-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #f8fafc;
+  background: rgba(255,255,255,0.08);
   border-radius: 8px;
   margin-bottom: 6px;
   font-size: 14px;
-  border: 1px solid #e2e8f0;
-  transition: background 0.2s;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.3s ease;
 }
 .participant-item:hover {
-  background: #f1f5f9;
+  background: rgba(255,255,255,0.15);
+  transform: translateX(3px);
 }
 .participant-info {
   flex: 1;
 }
-.participant-name { color: #0f172a; font-weight: 500; }
-.participant-dept { color: #64748b; font-size: 12px; }
+.participant-name { color: rgba(255,255,255,0.9); font-weight: 500; }
+.participant-dept { color: rgba(255,255,255,0.5); font-size: 12px; }
 .remove-btn { opacity: 0; transition: opacity 0.2s; }
 .participant-item:hover .remove-btn { opacity: 1; }
 
+/* 中奖者高亮 */
 .participant-item.is-winner {
-  background: #fffbeb;
-  border-color: #fbbf24;
+  background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,165,0,0.2) 100%);
+  border-color: #ffd700;
+  box-shadow: 0 0 15px rgba(255,215,0,0.3);
 }
 .participant-item.is-winner .participant-name {
-  color: #b45309;
+  color: #ffd700;
   font-weight: bold;
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.winner-icon { color: #f59e0b; }
+.winner-icon { color: #ffd700; animation: pulse 1.5s ease infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 .empty-hint {
   text-align: center;
-  color: #94a3b8;
+  color: rgba(255,255,255,0.4);
   padding: 20px;
   font-size: 14px;
 }
 
-/* 抽签结果 */
+/* 抽签结果 - 深色主题 */
 .history-round {
   margin-bottom: 12px;
   padding: 14px;
-  background: #ffffff;
+  background: rgba(255,255,255,0.08);
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(5px);
 }
 .round-header {
   display: flex;
@@ -664,10 +704,10 @@ onUnmounted(() => {
   gap: 8px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px dashed #e2e8f0;
+  border-bottom: 1px dashed rgba(255,255,255,0.2);
 }
 .round-index {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #00d9ff 0%, #0099ff 100%);
   color: #fff;
   padding: 2px 8px;
   border-radius: 4px;
@@ -677,7 +717,7 @@ onUnmounted(() => {
 .round-title {
   font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: rgba(255,255,255,0.9);
 }
 .round-winners {
   display: flex;
@@ -688,28 +728,28 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(255,215,0,0.1);
+  border: 1px solid rgba(255,215,0,0.3);
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
 }
 .history-winner .winner-name {
-  color: #0f172a;
+  color: #ffd700;
   font-weight: 500;
 }
 .history-winner .winner-dept {
-  color: #64748b;
+  color: rgba(255,255,255,0.5);
   font-size: 12px;
 }
 
-/* 中央区域 */
+/* 中央区域 - 全屏深色 */
 .center-area {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #f8fafc;
+  background: transparent;
 }
 
 .phase-container {
@@ -719,62 +759,95 @@ onUnmounted(() => {
   padding: 40px;
 }
 
+/* 奖项标题 - 霍光效果 */
 .prize-title {
-  font-size: 52px;
+  font-size: 56px;
   font-weight: 800;
   margin-bottom: 30px;
-  background: linear-gradient(to right, #3b82f6, #2563eb);
+  background: linear-gradient(135deg, #00d9ff 0%, #0099ff 50%, #00d9ff 100%);
+  background-size: 200% 200%;
   -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
+  animation: shimmer 3s ease infinite;
+  text-shadow: 0 0 30px rgba(0,217,255,0.3);
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 .count-display {
   font-size: 20px;
   margin-bottom: 40px;
-  color: #64748b;
+  color: rgba(255,255,255,0.6);
 }
 
 .count-display .number {
-  color: #3b82f6;
-  font-size: 40px;
+  color: #00d9ff;
+  font-size: 48px;
   font-weight: bold;
   margin-left: 10px;
+  text-shadow: 0 0 20px rgba(0,217,255,0.5);
 }
 
 .sub-title {
   font-size: 28px;
-  color: #334155;
+  color: rgba(255,255,255,0.8);
   margin-bottom: 20px;
 }
 
+/* 滚动框 - 霍光边框 */
 .rolling-box {
   margin: 40px auto;
-  width: 400px;
-  height: 160px;
-  background: #ffffff;
-  border: 3px solid #3b82f6;
-  border-radius: 16px;
+  width: 450px;
+  height: 180px;
+  background: rgba(15, 12, 41, 0.9);
+  border: 3px solid #00d9ff;
+  border-radius: 20px;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 24px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 40px rgba(0,217,255,0.4), inset 0 0 30px rgba(0,217,255,0.1);
+  animation: borderGlow 2s ease-in-out infinite;
+}
+
+@keyframes borderGlow {
+  0%, 100% { box-shadow: 0 0 40px rgba(0,217,255,0.4), inset 0 0 30px rgba(0,217,255,0.1); }
+  50% { box-shadow: 0 0 60px rgba(0,217,255,0.6), inset 0 0 40px rgba(0,217,255,0.2); }
 }
 
 .rolling-name {
-  font-size: 42px;
+  font-size: 48px;
   font-weight: bold;
-  color: #0f172a;
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255,215,0,0.5);
+  animation: textFlash 0.1s ease infinite;
 }
 
+@keyframes textFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* 恭喜标题 */
 .congrats-title {
-  font-size: 42px;
-  color: #22c55e;
+  font-size: 48px;
+  color: #ffd700;
   margin-bottom: 16px;
+  text-shadow: 0 0 30px rgba(255,215,0,0.5);
+  animation: celebratePulse 1s ease infinite;
+}
+
+@keyframes celebratePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 .prize-subtitle {
   font-size: 26px;
-  color: #334155;
+  color: rgba(255,255,255,0.8);
   margin-bottom: 40px;
 }
 
@@ -786,41 +859,50 @@ onUnmounted(() => {
   margin-bottom: 40px;
 }
 
+/* 中奖卡片 - 金色边框 */
 .winner-card {
-  background: #ffffff;
-  color: #0f172a;
-  width: 200px;
-  padding: 24px;
-  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,215,0,0.15) 0%, rgba(255,165,0,0.1) 100%);
+  color: #ffffff;
+  width: 220px;
+  padding: 28px;
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  border: 1px solid #e2e8f0;
-  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  box-shadow: 0 0 30px rgba(255,215,0,0.3);
+  border: 2px solid #ffd700;
+  animation: winnerPopIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  backdrop-filter: blur(10px);
+}
+
+@keyframes winnerPopIn {
+  0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.1) rotate(3deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
 }
 
 .winner-avatar {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  color: #0f172a;
   border-radius: 50%;
-  font-size: 28px;
+  font-size: 32px;
   display: flex;
   justify-content: center;
   align-items: center;
   margin-bottom: 16px;
   font-weight: bold;
+  box-shadow: 0 0 20px rgba(255,215,0,0.5);
 }
 
 .winner-info { text-align: center; }
-.winner-name { font-size: 32px; font-weight: 800; margin-bottom: 8px; color: #0f172a; line-height: 1.2; }
-.winner-dept { font-size: 18px; color: #64748b; font-weight: 500; }
+.winner-name { font-size: 36px; font-weight: 800; margin-bottom: 8px; color: #ffd700; line-height: 1.2; }
+.winner-dept { font-size: 18px; color: rgba(255,255,255,0.6); font-weight: 500; }
 
 .empty-result-hint {
     font-size: 28px;
-    color: #94a3b8;
+    color: rgba(255,255,255,0.4);
     margin: 40px 0;
     font-weight: bold;
 }
@@ -828,8 +910,9 @@ onUnmounted(() => {
 .finished-text {
     font-size: 24px;
     font-weight: bold;
-    color: #22c55e;
+    color: #ffd700;
     margin-top: 20px;
+    text-shadow: 0 0 15px rgba(255,215,0,0.5);
 }
 
 .controls .el-button {
@@ -843,13 +926,14 @@ onUnmounted(() => {
   to { transform: scale(1); opacity: 1; }
 }
 
+/* 结束遮罩层 - 深色主题 */
 .finished-overlay {
     position: fixed;
-    top: 60px; /* Below header */
+    top: 60px;
     left: 0;
     width: 100%;
     height: calc(100% - 60px);
-    background: rgba(255, 255, 255, 0.95);
+    background: linear-gradient(135deg, rgba(15,12,41,0.98) 0%, rgba(48,43,99,0.98) 100%);
     z-index: 200;
     display: flex;
     justify-content: center;
@@ -861,18 +945,20 @@ onUnmounted(() => {
     animation: popIn 0.8s ease;
 }
 .finished-icon {
-    font-size: 80px;
+    font-size: 100px;
     color: #ffd700;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    animation: celebratePulse 1.5s ease infinite;
 }
 .finished-content h1 {
-    font-size: 48px;
-    color: #0f172a;
+    font-size: 52px;
+    color: #ffd700;
     margin-bottom: 16px;
+    text-shadow: 0 0 30px rgba(255,215,0,0.5);
 }
 .finished-content p {
     font-size: 24px;
-    color: #64748b;
+    color: rgba(255,255,255,0.6);
     margin-bottom: 40px;
 }
 </style>

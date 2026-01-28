@@ -273,49 +273,47 @@ async def lottery_action(sid, data):
         # Notify clients to refresh round list (fixes button state lag)
         await sio.emit('lottery_list_update', {}, room=room)
 
-    # 2. 用户加入 (User / Admin / System)
+    # ========== 2. 用户加入 (移动端/匿名用户) ==========
     elif action == 'join':
-        # 2.1 自动激活: IDLE -> PREPARING
+        # 2.1 获取用户信息
+        user_info = data.get('user')
+        if not user_info:
+            await sio.emit('lottery_error', {'message': '缺少用户信息'}, room=sid)
+            return
+        
+        # 2.2 自动激活: 如果状态是 IDLE，自动切换到 PREPARING
         if state['status'] == LotteryState.IDLE:
              state['status'] = LotteryState.PREPARING
-             # 确保有默认配置
              if not state.get('current_config'):
                  state['current_config'] = {'title': '临时抽签', 'count': 1}
              await broadcast_state_change(meeting_id, state)
         
-        # 2.2 防迟到: 如果历史不为空(活动已开始过)，且用户当前不在池子里，拒绝加入
-        # Admin 强制添加不走这里(走 admin_add_participant)
-        is_new_user = True
-        user_id_check = data.get('user', {}).get('id')
-        if user_id_check and str(user_id_check) in state['participants']:
-            is_new_user = False
-            
+        # 2.3 防迟到检查: 如果已有中奖记录，且用户不在池中，拒绝加入
+        user_id_check = user_info.get('id')
+        is_new_user = not (user_id_check and str(user_id_check) in state['participants'])
+        
         if len(state['history']) > 0 and is_new_user:
             await sio.emit('lottery_error', {'message': '活动已开始，停止报名'}, room=sid)
             return
 
-        # 2.3 状态检查 (PREPARING only)
+        # 2.4 状态检查: 只有 PREPARING 阶段可加入
         if state['status'] != LotteryState.PREPARING:
             await sio.emit('lottery_error', {'message': '当前阶段无法加入'}, room=sid)
             return
 
+        # 2.5 确保用户有唯一 ID
         import uuid
-        if not user_info: return
-        
-        # Ensure ID at backend too
-        if 'id' not in user_info or not user_info['id']:
+        if not user_info.get('id'):
              user_info['id'] = str(uuid.uuid4())
-             # If name is missing, give a default
-             if 'name' not in user_info or not user_info['name']:
-                 user_info['name'] = f"Guest-{user_info['id'][:4]}"
+             if not user_info.get('name'):
+                 user_info['name'] = f"访客-{user_info['id'][:4]}"
 
         uid = str(user_info['id'])
         
-        # 幂等检查 (Update logic to allow re-join updates if needed, or keep check)
-        # Using update to ensure info is refresh
+        # 2.6 加入候选池 (幂等操作，重复加入会刷新信息)
         state['participants'][uid] = user_info
         await broadcast_pool_update(meeting_id, state)
-        print(f"[Lottery] User {uid} ({user_info.get('name')}) joined pool.")
+        print(f"[抽签] 用户 {uid} ({user_info.get('name')}) 加入候选池")
             
     # Remove participant
     elif action == 'remove_participant':
@@ -421,18 +419,17 @@ async def lottery_action(sid, data):
             except Exception as e:
                 print(f"[Lottery] Save Error: {e}")
         
-        # 更新状态
+        # 更新状态为 RESULT
         state['status'] = LotteryState.RESULT
         state['last_result'] = {
             'winners': winners,
             'remaining_count': len(candidates) - len(winners)
         }
         
-        # (lottery_stop 兼容旧逻辑，state_change 走新逻辑)
-        await sio.emit('lottery_stop', state['last_result'], room=room)
+        # 广播状态变更和列表更新
         await broadcast_state_change(meeting_id, state)
-        # Notify list update so draft becomes active/finished in list
         await sio.emit('lottery_list_update', {}, room=room)
+        print(f"[抽签] 本轮抽取 {len(winners)} 人，剩余 {len(candidates) - len(winners)} 人")
 
 
     # 管理动作 (增删改) - 保持原样或简化，广播 list_update 即可
