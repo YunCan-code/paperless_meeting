@@ -323,7 +323,7 @@ const initSocket = () => {
     }
     
     // 状态机处理
-    if (data.status === 'PREPARING') {
+    if (data.status === 'IDLE' || data.status === 'PREPARING') {
         phase.value = 'JOINING'
         stopAnimation()
         winners.value = []
