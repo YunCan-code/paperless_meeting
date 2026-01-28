@@ -70,8 +70,4 @@ interface ApiService {
 
     @GET("vote/meeting/{meetingId}/list")
     suspend fun getVoteList(@retrofit2.http.Path("meetingId") meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
-
-    // Lottery API
-    @GET("lottery/active_meetings")
-    suspend fun getActiveLotteryMeetings(): List<Meeting>
 }

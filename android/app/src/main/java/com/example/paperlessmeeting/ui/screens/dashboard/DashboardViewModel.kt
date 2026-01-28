@@ -89,19 +89,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun checkLotteryStatus(onAvailable: () -> Unit) {
-        val currentState = _uiState.value
-        if (currentState is DashboardUiState.Success) {
-            if (currentState.activeMeetings.isEmpty()) {
-                viewModelScope.launch {
-                    _toastMessage.emit("今日会议无抽签")
-                }
-            } else {
-                onAvailable()
-            }
-        }
-    }
-
     fun submitVote(optionIds: List<Int>) {
         val voteId = _currentVote.value?.id ?: return
         viewModelScope.launch {

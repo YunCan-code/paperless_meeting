@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.HowToVote
-import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -43,7 +42,6 @@ import java.util.Locale
 fun DashboardScreen(
     onMeetingClick: (Int) -> Unit,
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
-    onLotteryClick: () -> Unit,
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -116,8 +114,7 @@ fun DashboardScreen(
                 state = state, 
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
-                onVoteClick = { viewModel.checkAnyActiveVote() },
-                onLotteryClick = { viewModel.checkLotteryStatus(onLotteryClick) }
+                onVoteClick = { viewModel.checkAnyActiveVote() }
             )
         }
     }
@@ -129,8 +126,7 @@ fun DashboardContent(
     state: DashboardUiState.Success, 
     onMeetingClick: (Int) -> Unit, 
     onReadingClick: (String, String, Int) -> Unit,
-    onVoteClick: () -> Unit,
-    onLotteryClick: () -> Unit
+    onVoteClick: () -> Unit
 ) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
@@ -304,11 +300,6 @@ fun DashboardContent(
                     icon = androidx.compose.material.icons.Icons.Default.HowToVote,
                     label = "投票",
                     onClick = onVoteClick
-                )
-                QuickActionButton(
-                    icon = androidx.compose.material.icons.Icons.Default.Casino,
-                    label = "抽签",
-                    onClick = onLotteryClick
                 )
             }
         }

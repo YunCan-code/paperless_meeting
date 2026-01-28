@@ -4,18 +4,16 @@ Socket.IO 实时通信管理器
 """
 import socketio
 import os
-import random
-from datetime import datetime
-from typing import Dict, Set, Optional
+from typing import Dict, Set
 
 # 导入数据库依赖
-from sqlmodel import select, Session as SQLSession
+from sqlmodel import Session as SQLSession
 try:
     from backend.database import engine
-    from backend.models import Lottery, LotteryWinner, User
+    from backend.models import User
 except ImportError:
     from database import engine
-    from models import Lottery, LotteryWinner, User
+    from models import User
 
 # 获取 Redis URL (用于多 Worker 模式下的跨进程通信)
 REDIS_URL = os.environ.get('REDIS_URL')
@@ -44,117 +42,10 @@ else:
 # 会议房间管理
 meeting_rooms: Dict[int, Set[str]] = {}  # meeting_id -> set of sid
 
-# 抽签状态枚举
-class LotteryState:
-    IDLE = "IDLE"           # 无/结束
-    PREPARING = "PREPARING" # 准备中 (等待加入)
-    ROLLING = "ROLLING"     # 滚动中 (锁定)
-    RESULT = "RESULT"       # 结果展示
-
-# 抽签状态管理 (内存)
-# meeting_id -> {
-#    'status': str,             # LotteryState
-#    'participants': dict,      # user_id -> user_info (当前候选池)
-#    'history': set,            # set of user_id (已中奖历史)
-#    'current_config': dict,    # 当前轮次配置 {lottery_id, title, count, allow_repeat}
-#    'last_result': dict        # 上次/当前结果 {winners, ...} (用于RESULT状态回显)
-# }
-lottery_states: Dict[int, dict] = {}
-
 
 def get_db_session():
     return SQLSession(engine)
 
-def load_history_set(meeting_id: int) -> set:
-    """Helper: Load history winners from DB"""
-    history_set = set()
-    try:
-        with get_db_session() as session:
-            statement = select(LotteryWinner.user_id).join(Lottery).where(Lottery.meeting_id == meeting_id)
-            results = session.exec(statement).all()
-            for uid in results:
-                history_set.add(str(uid))
-    except Exception as e:
-        print(f"[Lottery] Error loading history: {e}")
-    return history_set
-
-def get_or_init_state(meeting_id: int) -> dict:
-    if meeting_id not in lottery_states:
-        # Default State
-        status = LotteryState.IDLE
-        current_config = {}
-
-        # --- Auto-Recovery Logic ---
-        try:
-            with get_db_session() as session:
-                # Check for active lottery in this meeting
-                statement = select(Lottery).where(
-                    Lottery.meeting_id == meeting_id,
-                    Lottery.status == "active"
-                )
-                active_lot = session.exec(statement).first()
-                
-                if active_lot:
-                    print(f"[Lottery] Auto-recovered active round: {active_lot.title} (Meeting {meeting_id})")
-                    status = LotteryState.PREPARING
-                    current_config = {
-                        'lottery_id': active_lot.id,
-                        'title': active_lot.title,
-                        'count': active_lot.count,
-                        'allow_repeat': active_lot.allow_repeat
-                    }
-        except Exception as e:
-            print(f"[Lottery] Auto-recover error: {e}")
-            
-        lottery_states[meeting_id] = {
-            'status': status,
-            'participants': {}, # Memory lost on restart, users must re-join
-            'history': load_history_set(meeting_id),
-            'current_config': current_config,
-            'last_result': None
-        }
-    return lottery_states[meeting_id]
-
-async def broadcast_state_change(meeting_id: int, state: dict):
-    """广播状态变更"""
-    room = f"meeting_{meeting_id}"
-    
-    # Check All Finished
-    all_finished = False
-    try:
-        if state['current_config']: # Only check if we have config loaded (meaning we are active)
-            with get_db_session() as session:
-                # Check if there are any non-finished lotteries
-                # If all are finished -> True
-                # Actually, simply count pending/active.
-                stmt = select(Lottery).where(Lottery.meeting_id == meeting_id)
-                lots = session.exec(stmt).all()
-                if lots and all(l.status == 'finished' for l in lots):
-                    all_finished = True
-    except:
-        pass
-
-    # 构建精简的 payload
-    payload = {
-        'status': state['status'],
-        'participants_count': len(state['participants']),
-        'config': state['current_config'],
-        'all_finished': all_finished,
-        # RESULT 状态带上结果
-        'last_result': state['last_result'] if state['status'] == LotteryState.RESULT else None
-    }
-    
-    await sio.emit('lottery_state_change', payload, room=room)
-    print(f"[Lottery] Broadcast state change: {state['status']} (Meeting {meeting_id})")
-
-async def broadcast_pool_update(meeting_id: int, state: dict):
-    """广播此池更新 (含全量列表，主要用于大屏/安卓展示头像)"""
-    room = f"meeting_{meeting_id}"
-    participants_list = list(state['participants'].values())
-    await sio.emit('lottery_players_update', {
-        'count': len(participants_list),
-        'all_participants': participants_list
-    }, room=room)
 
 # --- 标准 Socket.IO 事件 ---
 
@@ -165,377 +56,46 @@ async def connect(sid, environ):
 @sio.event
 async def disconnect(sid):
     print(f"[Socket.IO] Client disconnected: {sid}")
-    for meeting_id, sids in meeting_rooms.items():
-        sids.discard(sid)
 
-@sio.event
+@sio.on('join_meeting')
 async def join_meeting(sid, data):
+    """加入会议房间"""
     meeting_id = data.get('meeting_id')
     if meeting_id:
         room = f"meeting_{meeting_id}"
         await sio.enter_room(sid, room)
+        
         if meeting_id not in meeting_rooms:
             meeting_rooms[meeting_id] = set()
         meeting_rooms[meeting_id].add(sid)
-        print(f"[Socket.IO] {sid} joined room {room}")
-        return {"success": True}
-    return {"success": False}
+        
+        print(f"[Socket.IO] {sid} joined room: {room}")
 
-@sio.event
+@sio.on('leave_meeting')
 async def leave_meeting(sid, data):
+    """离开会议房间"""
     meeting_id = data.get('meeting_id')
     if meeting_id:
         room = f"meeting_{meeting_id}"
         await sio.leave_room(sid, room)
-        print(f"[Socket.IO] {sid} left room {room}")
-
-# --- 新增: 客户端主动查询状态 (解决刷新/重连数据丢失) ---
-@sio.event
-async def get_lottery_state(sid, data):
-    meeting_id = data.get('meeting_id')
-    user_id = data.get('user_id') # 可选，查询自己是否在池中
-    
-    if not meeting_id:
-        return
-        
-    state = get_or_init_state(meeting_id)
-    
-    is_joined = False
-    if user_id:
-        is_joined = str(user_id) in state['participants']
-        
-    response = {
-        'status': state['status'],
-        'participants_count': len(state['participants']),
-        'all_participants': list(state['participants'].values()), # 全量给前端恢复显示
-        'config': state['current_config'],
-        'last_result': state['last_result'],
-        'is_joined': is_joined
-    }
-    await sio.emit('lottery_state_sync', response, room=sid)
-
-# --- 抽签核心业务 ---
-
-@sio.event
-async def lottery_action(sid, data):
-    action = data.get('action')
-    meeting_id = data.get('meeting_id')
-    
-    if not meeting_id: 
-        return
-        
-    room = f"meeting_{meeting_id}"
-    state = get_or_init_state(meeting_id)
-    
-    print(f"[Lottery] Action {action} in Meeting {meeting_id} (Current: {state['status']})")
-    
-    # 1. 准备/配置 (Admin)
-    if action == 'prepare':
-        lottery_id = data.get('lottery_id')
-        
-        # 加载配置
-        config = {}
-        if lottery_id:
-            try:
-                with get_db_session() as session:
-                    lot = session.get(Lottery, lottery_id)
-                    if lot:
-                        config = {
-                            'lottery_id': lot.id, 
-                            'title': lot.title, 
-                            'count': lot.count, 
-                            'allow_repeat': lot.allow_repeat
-                        }
-                        # DB Status -> active
-                        lot.status = "active"
-                        session.add(lot)
-                        session.commit()
-            except Exception as e:
-                print(f"[Lottery] DB Error: {e}")
-        else:
-            # 临时创建逻辑(同原代码，略简)
-            config = {
-                'title': data.get('title', '临时抽签'),
-                'count': data.get('count', 1),
-                'allow_repeat': data.get('allow_repeat', False)
-            }
-            
-        state['current_config'] = config
-        
-        # 关键: 状态变更为 PREPARING
-        # 规则变更(Doc 7): 保持 participants 持久化，不清空
-        state['status'] = LotteryState.PREPARING
-        state['last_result'] = None # 清空上次结果
-        
-        await broadcast_state_change(meeting_id, state)
-        await broadcast_pool_update(meeting_id, state) # 清空前端列表
-        
-        # Notify clients to refresh round list (fixes button state lag)
-        await sio.emit('lottery_list_update', {}, room=room)
-
-    # ========== 2. 用户加入 (移动端/匿名用户) ==========
-    elif action == 'join':
-        # 2.1 获取用户信息
-        user_info = data.get('user')
-        if not user_info:
-            await sio.emit('lottery_error', {'message': '缺少用户信息'}, room=sid)
-            return
-        
-        # 2.2 自动激活: 如果状态是 IDLE，自动切换到 PREPARING
-        if state['status'] == LotteryState.IDLE:
-             state['status'] = LotteryState.PREPARING
-             if not state.get('current_config'):
-                 state['current_config'] = {'title': '临时抽签', 'count': 1}
-             await broadcast_state_change(meeting_id, state)
-        
-        # 2.3 防迟到检查: 如果已有中奖记录，且用户不在池中，拒绝加入
-        user_id_check = user_info.get('id')
-        is_new_user = not (user_id_check and str(user_id_check) in state['participants'])
-        
-        if len(state['history']) > 0 and is_new_user:
-            await sio.emit('lottery_error', {'message': '活动已开始，停止报名'}, room=sid)
-            return
-
-        # 2.4 状态检查: 只有 PREPARING 阶段可加入
-        if state['status'] != LotteryState.PREPARING:
-            await sio.emit('lottery_error', {'message': '当前阶段无法加入'}, room=sid)
-            return
-
-        # 2.5 确保用户有唯一 ID
-        import uuid
-        if not user_info.get('id'):
-             user_info['id'] = str(uuid.uuid4())
-             if not user_info.get('name'):
-                 user_info['name'] = f"访客-{user_info['id'][:4]}"
-
-        uid = str(user_info['id'])
-        
-        # 2.6 加入候选池 (幂等操作，重复加入会刷新信息)
-        state['participants'][uid] = user_info
-        await broadcast_pool_update(meeting_id, state)
-        print(f"[抽签] 用户 {uid} ({user_info.get('name')}) 加入候选池")
-            
-    # Remove participant
-    elif action == 'remove_participant':
-        user_id = str(data.get('user_id'))
-        if user_id in state['participants']:
-            del state['participants'][user_id]
-            # Broadcast update with removed_user_id
-            participants_list = list(state['participants'].values())
-            await sio.emit('lottery_players_update', {
-                'count': len(participants_list),
-                'all_participants': participants_list,
-                'removed_user_id': user_id
-            }, room=room)
-
-    # Admin Manual Add
-    elif action == 'admin_add_participant':
-        user_info = data.get('user')
-        if user_info:
-            import uuid
-            # Ensure ID exists
-            if 'id' not in user_info or not user_info['id']:
-                user_info['id'] = str(uuid.uuid4())
-            
-            uid = str(user_info['id'])
-            # Logic: Update/Insert instead of reset
-            state['participants'][uid] = user_info
-            
-            # Auto-Active if IDLE
-            if state['status'] == LotteryState.IDLE:
-                 state['status'] = LotteryState.PREPARING
-                 # Ensure default config if missing
-                 if not state.get('current_config'):
-                     state['current_config'] = {'title': '临时抽签', 'count': 1}
-                 await broadcast_state_change(meeting_id, state)
-                 
-            await broadcast_pool_update(meeting_id, state)
-            print(f"[Lottery] Admin added user {uid} (Meeting {meeting_id})")
-
-    # 3. 开始滚动 (Admin)
-    elif action == 'start':
-        if state['status'] != LotteryState.PREPARING:
-            return
-            
-        state['status'] = LotteryState.ROLLING
-        await broadcast_state_change(meeting_id, state)
-        
-    # 4. 停止并出结果 (Admin)
-    elif action == 'stop':
-        if state['status'] != LotteryState.ROLLING:
-            return
-            
-        # 计算逻辑
-        config = state.get('current_config', {})
-        count = config.get('count', 1)
-        allow_repeat = config.get('allow_repeat', False)
-        
-        candidates = list(state['participants'].values())
-        
-        # 过滤
-        if not allow_repeat:
-            state['history'] = load_history_set(meeting_id) # 确保历史最新
-            candidates = [u for u in candidates if str(u['id']) not in state['history']]
-        winners = []
-        if candidates:
-            actual_count = min(len(candidates), count)
-            if actual_count > 0:
-                winners = random.sample(candidates, actual_count)
-            
-            # 保存结果到 DB Persistence
-            try:
-                with get_db_session() as session:
-                    timestamp = datetime.now()
-                    lottery_id = config.get('lottery_id')
-                    
-                    # Ensure Lottery Record
-                    lottery = None
-                    if lottery_id:
-                        lottery = session.get(Lottery, lottery_id)
-                    
-                    if not lottery:
-                        lottery = Lottery(
-                            meeting_id=meeting_id,
-                            title=config.get('title'),
-                            count=count,
-                            allow_repeat=allow_repeat,
-                            status="finished",
-                            created_at=timestamp
-                        )
-                        session.add(lottery)
-                        session.commit()
-                        session.refresh(lottery)
-                    else:
-                        lottery.status = "finished"
-                        session.add(lottery)
-                        
-                    # Winners
-                    for w in winners:
-                        uid = str(w['id'])
-                        state['history'].add(uid)
-                        rec = LotteryWinner(lottery_id=lottery.id, user_id=int(uid), winning_at=timestamp)
-                        session.add(rec)
-                    session.commit()
-            except Exception as e:
-                print(f"[Lottery] Save Error: {e}")
-        
-        # 更新状态为 RESULT
-        state['status'] = LotteryState.RESULT
-        state['last_result'] = {
-            'winners': winners,
-            'remaining_count': len(candidates) - len(winners)
-        }
-        
-        # 广播状态变更和列表更新
-        await broadcast_state_change(meeting_id, state)
-        await sio.emit('lottery_list_update', {}, room=room)
-        print(f"[抽签] 本轮抽取 {len(winners)} 人，剩余 {len(candidates) - len(winners)} 人")
+        if meeting_id in meeting_rooms and sid in meeting_rooms[meeting_id]:
+            meeting_rooms[meeting_id].discard(sid)
 
 
-    # 管理动作 (增删改) - 保持原样或简化，广播 list_update 即可
-    elif action in ['batch_add', 'delete', 'update']:
-        # ... (Reuse existing DB logic for CRUD) ...
-        # (Simplified implementation for brevity, implementing key parts)
-        if action == 'delete':
-            lid = data.get('lottery_id')
-            with get_db_session() as session:
-                from sqlmodel import delete
-                session.exec(delete(LotteryWinner).where(LotteryWinner.lottery_id == lid))
-                session.exec(delete(Lottery).where(Lottery.id == lid))
-                session.commit()
-            state['history'] = load_history_set(meeting_id)
-            await sio.emit('lottery_list_update', {}, room=room)
-            
-        elif action == 'batch_add':
-             rounds = data.get('rounds', [])
-             with get_db_session() as session:
-                 for r in rounds:
-                     # Default status pending
-                     session.add(Lottery(
-                         meeting_id=meeting_id, title=r['title'], count=r.get('count',1), 
-                         allow_repeat=r.get('allow_repeat',False), status='pending'
-                     ))
-                 session.commit()
-             await sio.emit('lottery_list_update', {}, room=room)
-             
-             await sio.emit('lottery_list_update', {}, room=room)
-             
-    # Reset Action (Doc 7)
-    elif action == 'reset':
-        # 清空 DB LotteryWinner, 重置 Lottery status
-        try:
-            with get_db_session() as session:
-                # 1. Delete Winners
-                # Get all lottery IDs for this meeting
-                l_stmt = select(Lottery.id).where(Lottery.meeting_id == meeting_id)
-                l_ids = session.exec(l_stmt).all()
-                if l_ids:
-                    from sqlmodel import delete, col
-                    session.exec(delete(LotteryWinner).where(col(LotteryWinner.lottery_id).in_(l_ids)))
-                    
-                # 2. Reset Lottery Status -> pending
-                l_stmt_obj = select(Lottery).where(Lottery.meeting_id == meeting_id)
-                lots = session.exec(l_stmt_obj).all()
-                for lot in lots:
-                    lot.status = 'pending'
-                    session.add(lot)
-                session.commit()
-                print(f"[Lottery] Meeting {meeting_id} reset.")
-        except Exception as e:
-            print(f"[Lottery] Reset DB Error: {e}")
+# --- 投票相关广播 ---
 
-        # Reset Memory State
-        state['status'] = LotteryState.IDLE
-        state['history'] = set()
-        state['last_result'] = None
-        # participants 保留
-        
-        await broadcast_state_change(meeting_id, state)
-        await sio.emit('lottery_list_update', {}, room=room)
-
-    elif action == 'get_history':
-        rounds_data = []
-        try:
-            with get_db_session() as session:
-                # Query Both Pending and Finished
-                stmt = select(Lottery).where(Lottery.meeting_id == meeting_id).order_by(Lottery.created_at)
-                lotteries = session.exec(stmt).all()
-                
-                for lot in lotteries:
-                    # Get User info for winners (Join User table)
-                    w_stmt = select(User).join(LotteryWinner).where(LotteryWinner.lottery_id == lot.id)
-                    db_winners = session.exec(w_stmt).all()
-                    
-                    winner_list = [{'id': u.id, 'name': u.name, 'department': u.department} for u in db_winners]
-                    
-                    rounds_data.append({
-                        'round_id': lot.id,
-                        'title': lot.title,
-                        'status': lot.status, # pending / finished
-                        'count': lot.count,
-                        'winners': winner_list,
-                        'timestamp': lot.created_at.isoformat()
-                    })
-        except Exception as e:
-            print(f"[Lottery] History error: {e}")
-        
-        await sio.emit('lottery_history', {
-            'rounds': rounds_data,
-            'total_participants': len(state['participants'])
-        }, room=sid)
-        
-# 投票相关保持不变
 async def broadcast_vote_start(meeting_id: int, vote_data: dict):
     room = f"meeting_{meeting_id}"
     await sio.emit('vote_start', vote_data, room=room)
 
 async def broadcast_vote_end(meeting_id: int, vote_id: int, final_results: dict):
     room = f"meeting_{meeting_id}"
-    await sio.emit('vote_end', {'vote_id': vote_id, **final_results}, room=room)
+    await sio.emit('vote_end', {'vote_id': vote_id, 'results': final_results}, room=room)
 
 async def broadcast_vote_update(meeting_id: int, vote_id: int, results: list):
     room = f"meeting_{meeting_id}"
     await sio.emit('vote_update', {'vote_id': vote_id, 'results': results}, room=room)
+
 
 # Create ASGI App
 socket_app = socketio.ASGIApp(sio)
