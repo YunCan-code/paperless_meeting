@@ -16,11 +16,9 @@
       <div class="status-control">
         <el-tag v-if="meetingStatus === 'finished'" type="success" size="large" effect="dark">已结束</el-tag>
         <el-tag v-else-if="meetingStatus === 'active'" type="primary" size="large" effect="dark">进行中</el-tag>
-        <el-button v-else type="primary" size="large" @click="startNextRound">
-           开始抽签 (草稿)
-        </el-button>
+        <el-tag v-else type="info" size="large" effect="dark">准备中</el-tag>
         <!-- Reset Button (Small) -->
-        <el-popconfirm title="确定要重置由于抽签记录吗？所有中奖数据将被清空！" @confirm="resetLottery">
+        <el-popconfirm title="确定要重置抽签记录吗？所有中奖数据将被清空！" @confirm="resetLottery">
              <template #reference>
                 <el-button type="info" link size="small" style="margin-left:8px">重置</el-button>
              </template>
@@ -265,23 +263,12 @@ const toggleSortOrder = () => {
 // 计算会议整体抽签状态
 const meetingStatus = computed(() => {
     if (!dataLoaded.value) return 'loading'
-    if (fullRoundList.value.some(r => r.status === 'active')) return 'active'
-    if (fullRoundList.value.some(r => r.status === 'pending')) return 'pending'
-    if (fullRoundList.value.length > 0 && fullRoundList.value.every(r => r.status === 'finished')) return 'finished'
+    // 根据当前 phase 状态判断
+    if (phase.value === 'ROLLING') return 'active'
+    if (phase.value === 'RESULT') return 'active'
+    if (allFinished.value) return 'finished'
     return 'pending'
 })
-
-// 启动下一轮 (用于右上角按钮)
-const startNextRound = () => {
-    const next = fullRoundList.value.find(r => r.status === 'pending')
-    if (next && socket) {
-        socket.emit('lottery_action', {
-            action: 'prepare',
-            meeting_id: meetingId,
-            lottery_id: next.round_id
-        })
-    }
-}
 
 // 重置抽签
 const resetLottery = () => {
