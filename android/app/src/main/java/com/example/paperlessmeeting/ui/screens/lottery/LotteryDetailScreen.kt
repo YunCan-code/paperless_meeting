@@ -69,7 +69,7 @@ fun LotteryDetailScreen(
         ) {
             // 1. Hero Status Card
             val status = uiState?.status ?: "IDLE"
-            val isJoined = uiState?.participants?.any { it.id == currentUserId.toString() } == true
+            val isJoined = uiState?.participants?.any { it.id == viewModel.getCurrentUserId().toString() } == true
             
             StatusHeroCard(
                 status = status,

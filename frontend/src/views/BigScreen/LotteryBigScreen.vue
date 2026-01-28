@@ -116,6 +116,9 @@ const hasNextRound = computed(() => {
   return currentRoundIndex.value < rounds.value.length - 1
 })
 
+// Flag to track if initial state has been received
+let initialStateReceived = false
+
 // Helpers
 const getStatusText = (status) => {
   const map = {
@@ -138,11 +141,8 @@ const initSocket = () => {
   socket.on('connect', () => {
     console.log('Connected to socket')
     socket.emit('join_meeting', { meeting_id: meetingId })
-    // Fetch initial state
+    // Fetch initial state - fetchRoundsAndPrepareFirst will be called after state is received
     socket.emit('get_lottery_state', { meeting_id: meetingId })
-    
-    // Auto-fetch rounds and prepare first unfinished
-    fetchRoundsAndPrepareFirst()
   })
 
   socket.on('lottery_state_change', (data) => {
@@ -159,6 +159,12 @@ const initSocket = () => {
 const handleStateChange = (newState) => {
   const oldStatus = state.value.status
   state.value = newState
+
+  // On first state receive, fetch rounds and prepare if needed
+  if (!initialStateReceived) {
+    initialStateReceived = true
+    fetchRoundsAndPrepareFirst()
+  }
 
   // Status transitions
   if (newState.status === 'ROLLING' && oldStatus !== 'ROLLING') {
@@ -198,14 +204,21 @@ const fetchRoundsAndPrepareFirst = async () => {
     if (firstUnfinished >= 0) {
       currentRoundIndex.value = firstUnfinished
       const round = rounds.value[firstUnfinished]
-      console.log('Auto-preparing round:', round.title)
-      socket.emit('lottery_action', {
-        action: 'prepare',
-        meeting_id: parseInt(meetingId),
-        lottery_id: round.id,
-        title: round.title,
-        count: round.count
-      })
+      
+      // Only send prepare if state is IDLE (to avoid resetting when refreshing)
+      // If already PREPARING/ROLLING/RESULT, just sync the round index
+      if (state.value.status === 'IDLE') {
+        console.log('Auto-preparing round:', round.title)
+        socket.emit('lottery_action', {
+          action: 'prepare',
+          meeting_id: parseInt(meetingId),
+          lottery_id: round.id,
+          title: round.title,
+          count: round.count
+        })
+      } else {
+        console.log('State is not IDLE, skipping auto-prepare. Current status:', state.value.status)
+      }
     } else if (rounds.value.length > 0) {
       // All finished, show last round result
       currentRoundIndex.value = rounds.value.length - 1
@@ -473,5 +486,30 @@ onUnmounted(() => {
   color: #fbbf24;
   font-weight: 600;
   text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+}
+
+.action-footer {
+  margin-top: 32px;
+  text-align: center;
+  animation: slideUp 0.5s ease;
+}
+
+.start-btn {
+  padding: 20px 60px;
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+  transition: all 0.3s ease;
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(245, 158, 11, 0.6);
+}
+
+.start-btn:active {
+  transform: translateY(1px);
 }
 </style>

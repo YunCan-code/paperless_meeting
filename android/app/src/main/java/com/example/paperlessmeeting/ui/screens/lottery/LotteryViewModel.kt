@@ -45,6 +45,8 @@ class LotteryViewModel @Inject constructor(
         initSocket()
     }
 
+    fun getCurrentUserId(): Int = userId
+
     private fun fetchHistory() {
         viewModelScope.launch {
             val response = repository.getLotteryHistory(meetingId)
