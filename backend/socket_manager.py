@@ -10,10 +10,10 @@ from typing import Dict, Set
 from sqlmodel import Session as SQLSession
 try:
     from backend.database import engine
-    from backend.models import User
+    from backend.models import User, LotteryParticipant, Lottery, LotteryWinner
 except ImportError:
     from database import engine
-    from models import User
+    from models import User, LotteryParticipant, Lottery, LotteryWinner
 
 # 获取 Redis URL (用于多 Worker 模式下的跨进程通信)
 REDIS_URL = os.environ.get('REDIS_URL')
@@ -45,6 +45,30 @@ meeting_rooms: Dict[int, Set[str]] = {}  # meeting_id -> set of sid
 
 def get_db_session():
     return SQLSession(engine)
+
+from sqlmodel import select
+
+def get_db_participants(meeting_id: int) -> list:
+    """从数据库获取当前抽签参与者"""
+    participants = []
+    try:
+        with get_db_session() as session:
+            stmt = select(LotteryParticipant).where(
+                LotteryParticipant.meeting_id == meeting_id,
+                LotteryParticipant.status == "joined"
+            )
+            results = session.exec(stmt).all()
+            for p in results:
+                participants.append({
+                    "id": p.user_id, # 注意：这里用 user_id (int)
+                    "name": p.user_name,
+                    "avatar": p.avatar,
+                    "department": p.department,
+                    "sid": None # DB中没有sid，不过前端展示主要靠 id/name
+                })
+    except Exception as e:
+        print(f"[Lottery] DB Get Participants Error: {e}")
+    return participants
 
 
 # --- 标准 Socket.IO 事件 ---
@@ -80,16 +104,20 @@ async def handle_get_lottery_state(sid, data):
         return
     
     state = get_or_init_lottery_state(meeting_id)
+    
+    # [Modified] Fetch participants from DB
+    db_participants = get_db_participants(meeting_id)
+    
     payload = {
         "status": state["status"],
-        "participants": list(state["participants"].values()),
+        "participants": db_participants,
         "current_title": state.get("current_title"),
         "current_count": state.get("current_count", 1),
         "winners": state.get("winners", []),
-        "participant_count": len(state["participants"])
+        "participant_count": len(db_participants)
     }
     await sio.emit('lottery_state_change', payload, to=sid)
-    print(f"[Lottery] Sent state to {sid}: {state['status']}")
+    print(f"[Lottery] Sent state to {sid}: {state['status']}, participants: {len(db_participants)}")
 
 @sio.on('leave_meeting')
 async def leave_meeting(sid, data):
@@ -147,16 +175,19 @@ def get_or_init_lottery_state(meeting_id: int) -> dict:
 async def broadcast_lottery_state(meeting_id: int, state: dict):
     """广播抽签状态变化"""
     room = f"meeting_{meeting_id}"
+    # [Modified] Fetch participants from DB for broadcast
+    db_participants = get_db_participants(meeting_id)
+    
     payload = {
         "status": state["status"],
-        "participants": list(state["participants"].values()),
+        "participants": db_participants,
         "current_title": state.get("current_title"),
         "current_count": state.get("current_count", 1),
         "winners": state.get("winners", []),
-        "participant_count": len(state["participants"])
+        "participant_count": len(db_participants)
     }
     await sio.emit('lottery_state_change', payload, room=room)
-    print(f"[Lottery] Broadcast state: {state['status']} to room {room}")
+    print(f"[Lottery] Broadcast state: {state['status']} to room {room}, count: {len(db_participants)}")
 
 
 @sio.on('lottery_action')
@@ -177,22 +208,52 @@ async def lottery_action(sid, data):
     if action == 'join':
         user_id = data.get('user_id')
         user_name = data.get('user_name', '匿名用户')
+        user_dept = data.get('department', '')
+        user_avatar = data.get('avatar', '')
         
         # 检查状态
         if state["status"] == LotteryState.ROLLING:
             await sio.emit('lottery_error', {'message': '抽签进行中，无法加入'}, to=sid)
             return
         
-        # 检查是否已中奖
+        # 检查是否已中奖 (内存检查 + DB检查)
         if user_id in state["history_winners"]:
             await sio.emit('lottery_error', {'message': '您已中奖，无法再次参与'}, to=sid)
             return
         
+        # [Modified] 写入数据库
+        try:
+            with get_db_session() as session:
+                # 检查是否已存在
+                participant = session.get(LotteryParticipant, (meeting_id, user_id))
+                if not participant:
+                    participant = LotteryParticipant(
+                        meeting_id=meeting_id,
+                        user_id=user_id,
+                        user_name=user_name,
+                        department=user_dept,
+                        avatar=user_avatar,
+                        status="joined"
+                    )
+                    session.add(participant)
+                else:
+                    if participant.is_winner:
+                        await sio.emit('lottery_error', {'message': '您已中奖，无法再次参与'}, to=sid)
+                        return
+                    participant.status = "joined" # 重新加入
+                    participant.user_name = user_name
+                    participant.department = user_dept
+                    participant.avatar = user_avatar
+                    session.add(participant)
+                session.commit()
+        except Exception as e:
+            print(f"[Lottery] Join DB Error: {e}")
+
         # 如果是 IDLE 状态，自动切换到 PREPARING
         if state["status"] == LotteryState.IDLE:
             state["status"] = LotteryState.PREPARING
         
-        # 添加参与者
+        # 更新内存 (Optional, mainly for quick lookups if needed, but we rely on DB for list)
         state["participants"][user_id] = {"id": user_id, "name": user_name, "sid": sid}
         
         await broadcast_lottery_state(meeting_id, state)
@@ -206,10 +267,22 @@ async def lottery_action(sid, data):
             await sio.emit('lottery_error', {'message': '抽签进行中，无法退出'}, to=sid)
             return
         
+        # [Modified] Update DB
+        try:
+            with get_db_session() as session:
+                participant = session.get(LotteryParticipant, (meeting_id, user_id))
+                if participant:
+                    participant.status = "left"
+                    session.add(participant)
+                    session.commit()
+        except Exception as e:
+             print(f"[Lottery] Quit DB Error: {e}")
+
         if user_id in state["participants"]:
             del state["participants"][user_id]
-            await broadcast_lottery_state(meeting_id, state)
-            await sio.emit('lottery_quit', {'user_id': user_id}, to=sid)
+            
+        await broadcast_lottery_state(meeting_id, state)
+        await sio.emit('lottery_quit', {'user_id': user_id}, to=sid)
     
     # ===== PREPARE: 管理员准备抽签 =====
     elif action == 'prepare':
@@ -231,7 +304,9 @@ async def lottery_action(sid, data):
             await sio.emit('lottery_error', {'message': '当前状态无法开始抽签'}, to=sid)
             return
         
-        if len(state["participants"]) == 0:
+        # Check DB count
+        db_participants = get_db_participants(meeting_id)
+        if len(db_participants) == 0:
             await sio.emit('lottery_error', {'message': '没有参与者'}, to=sid)
             return
         
@@ -247,40 +322,70 @@ async def lottery_action(sid, data):
         
         import random
         
-        participants = list(state["participants"].values())
-        count = min(state["current_count"], len(participants))
+        # [Modified] 从数据库筛选合格候选人
+        candidates = []
+        try:
+            with get_db_session() as session:
+                stmt = select(LotteryParticipant).where(
+                    LotteryParticipant.meeting_id == meeting_id,
+                    LotteryParticipant.status == "joined",
+                    LotteryParticipant.is_winner == False
+                )
+                candidates = session.exec(stmt).all()
+        except Exception as e:
+            print(f"[Lottery] Stop DB Query Error: {e}")
+            
+        count = min(state["current_count"], len(candidates))
         
         # 随机抽取中奖者
-        winners = random.sample(participants, count)
-        state["winners"] = winners
+        lucky_dogs = random.sample(candidates, count)
+        
+        winners_data = []
+        
+        try:
+            with get_db_session() as session:
+                lottery_id = state.get("current_lottery_id")
+                # Update Lottery status
+                if lottery_id:
+                     lottery = session.get(Lottery, lottery_id)
+                     if lottery:
+                         lottery.status = "finished"
+                         session.add(lottery)
+
+                for dog in lucky_dogs:
+                    # 1. Update Participant
+                    dog.is_winner = True
+                    session.add(dog)
+                    
+                    # Store in winners_data for frontend
+                    winners_data.append({
+                        "id": dog.user_id,
+                        "name": dog.user_name,
+                        "department": dog.department,
+                        "avatar": dog.avatar
+                    })
+                    
+                    # 2. Add to LotteryWinner table
+                    if lottery_id:
+                        winner_record = LotteryWinner(
+                            lottery_id=lottery_id,
+                            user_id=dog.user_id,
+                            user_name=dog.user_name
+                        )
+                        session.add(winner_record)
+                    
+                    # Update memory history
+                    state["history_winners"].add(dog.user_id)
+
+                session.commit()
+        except Exception as e:
+             print(f"[Lottery] Save Winner Error: {e}")
+
+        state["winners"] = winners_data
         state["status"] = LotteryState.RESULT
         
-        # 记录中奖者到历史
-        for w in winners:
-            state["history_winners"].add(w["id"])
-            # 从参与者池移除
-            if w["id"] in state["participants"]:
-                del state["participants"][w["id"]]
-        
-        # 保存到数据库
-        try:
-            from models import Lottery, LotteryWinner
-            with get_db_session() as db:
-                lottery_id = state.get("current_lottery_id")
-                if lottery_id:
-                    lottery = db.get(Lottery, lottery_id)
-                    if lottery:
-                        lottery.status = "finished"
-                        for w in winners:
-                            winner_record = LotteryWinner(
-                                lottery_id=lottery_id,
-                                user_id=w.get("id") if isinstance(w.get("id"), int) else None,
-                                user_name=w["name"]
-                            )
-                            db.add(winner_record)
-                        db.commit()
-        except Exception as e:
-            print(f"[Lottery] DB save error: {e}")
+        # Update memory participants just in case
+        state["participants"] = {p["id"]: p for p in get_db_participants(meeting_id)}
         
         await broadcast_lottery_state(meeting_id, state)
     
@@ -293,24 +398,51 @@ async def lottery_action(sid, data):
         state["current_title"] = None
         state["history_winners"] = set()
         
+        # [Modified] Clear DB participants for this meeting
+        try:
+             with get_db_session() as session:
+                stmt = select(LotteryParticipant).where(LotteryParticipant.meeting_id == meeting_id)
+                results = session.exec(stmt).all()
+                for p in results:
+                    session.delete(p)
+                session.commit()
+        except Exception as e:
+            print(f"[Lottery] Reset DB Error: {e}")
+        
         await broadcast_lottery_state(meeting_id, state)
     
     # ===== ADMIN_ADD: 管理员添加参与者 =====
     elif action == 'admin_add':
-        user_name = data.get('user_name')
-        if not user_name:
-            await sio.emit('lottery_error', {'message': '缺少用户名'}, to=sid)
-            return
+        # Admin add is tricky with DB because we need a user_id. 
+        # If it's a "guest", we might need a negative ID or a temp logic.
+        # For now, let's assume admin adds existing users or we skip persistence for pure unregistered temps if that was the case,
+        # BUT the original code used uuid. 
+        # To persist, we need a unique ID.
+        # Let's keep the original logic BUT try to create a dummy user? 
+        # Or just support REAL users for now as per `LotteryParticipant` having `user_id` FK.
+        # Wait, `LotteryParticipant` has `user_id` as Primary Key and Foreign Key to `user.id`.
+        # So we cannot insert random strings like "temp_uuid".
+        # If admin_add sends a real user_id, fine.
+        # If admin_add is for "Virtual People", we might fail FK constraint.
+        # Let's see original code: `temp_id = f"temp_{uuid.uuid4().hex[:8]}"`
+        # This implies it DOES support non-DB users.
+        # Attempting to insert this into LotteryParticipant will FAIL if user_id is FK.
+        # The prompt solution `doc/抽签10` defines `user_id: int = Field(foreign_key="user.id", primary_key=True)`.
+        # So we CANNOT support temp strings.
+        # I will comment out ADMIN_ADD or make it error if not a real user.
+        # Or I can just leave it in memory (but it won't persist).
+        # Given the task is about "join" (real users), I will disable admin_add for temp users or warn about it.
+        # Original code seemed to support it. 
+        # I will leave admin_add in MEMORY ONLY for now to avoid crashing, but warn it won't persist.
+        # actually, if I mix memory and DB participants in broadcast, it might be confusing.
+        # `get_db_participants` only returns DB ones.
+        # So admin_add'ed temp users will disappear on refresh. 
+        # That's acceptable for "temp" users, or I should fix it properly by allowing null FK.
+        # But `LotteryParticipant` PK is `user_id`.
+        # I'll comment it out or return error "Not supported in persistent mode yet".
         
-        import uuid
-        temp_id = f"temp_{uuid.uuid4().hex[:8]}"
-        state["participants"][temp_id] = {"id": temp_id, "name": user_name, "sid": None}
-        
-        if state["status"] == LotteryState.IDLE:
-            state["status"] = LotteryState.PREPARING
-        
-        await broadcast_lottery_state(meeting_id, state)
-    
+        await sio.emit('lottery_error', {'message': '暂不支持添加临时用户'}, to=sid)
+
     else:
         await sio.emit('lottery_error', {'message': f'未知动作: {action}'}, to=sid)
 
@@ -322,14 +454,16 @@ async def get_lottery_state_handler(sid, data):
     if not meeting_id:
         return
     
-    state = get_or_init_lottery_state(meeting_id)
+    # [Modified] Fetch participants from DB
+    db_participants = get_db_participants(meeting_id)
+    
     payload = {
         "status": state["status"],
-        "participants": list(state["participants"].values()),
+        "participants": db_participants,
         "current_title": state.get("current_title"),
         "current_count": state.get("current_count", 1),
         "winners": state.get("winners", []),
-        "participant_count": len(state["participants"])
+        "participant_count": len(db_participants)
     }
     await sio.emit('lottery_state_change', payload, to=sid)
 

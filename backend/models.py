@@ -296,3 +296,15 @@ class LotteryWinner(SQLModel, table=True):
     
     lottery: Optional[Lottery] = Relationship(back_populates="winners")
     user: Optional[User] = Relationship()
+
+
+class LotteryParticipant(SQLModel, table=True):
+    """抽签参与者池 (解决刷新数据丢失问题)"""
+    meeting_id: int = Field(foreign_key="meeting.id", primary_key=True)
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    user_name: str # 冗余存个名字，方便显示
+    avatar: Optional[str] = None 
+    department: Optional[str] = None
+    status: str = Field(default="joined") # joined: 已加入, left: 已退出
+    is_winner: bool = Field(default=False) # 是否已中奖 (防止重复中奖)
+    created_at: datetime = Field(default_factory=datetime.now)
