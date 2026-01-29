@@ -36,9 +36,11 @@ data class LotteryState(
 )
 
 data class LotteryParticipant(
-    val id: String, // Can be int string or temp string
+    val id: Any, // Can be int or string
     val name: String,
-    val sid: String?
+    val sid: String?,
+    val avatar: String?,
+    val department: String?
 )
 
 data class LotteryWinnerMap(

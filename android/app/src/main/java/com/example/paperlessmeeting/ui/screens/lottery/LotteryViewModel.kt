@@ -71,34 +71,77 @@ class LotteryViewModel @Inject constructor(
             socket = IO.socket(url, options)
             
             socket?.on(Socket.EVENT_CONNECT) {
+                println("[Lottery] Socket connected")
                 // Join meeting room
                 val data = JSONObject()
                 data.put("meeting_id", meetingId)
                 socket?.emit("join_meeting", data)
-                
-                // Get initial state
-                socket?.emit("get_lottery_state", data)
+
+                // Get initial state with user_id
+                val stateData = JSONObject()
+                stateData.put("meeting_id", meetingId)
+                stateData.put("user_id", userId)
+                socket?.emit("get_lottery_state", stateData)
             }
 
             socket?.on("lottery_state_change") { args ->
                 if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
+                    println("[Lottery] State change received: $data")
                     val gson = Gson()
                     val state = gson.fromJson(data.toString(), LotteryState::class.java)
                     _uiState.value = state
-                    
+
                     // Refresh history if round finished
                     if (state.status == "RESULT") {
                         fetchHistory()
                     }
                 }
             }
-            
+
+            // 监听状态同步事件（初始状态）
+            socket?.on("lottery_state_sync") { args ->
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    println("[Lottery] State sync received: $data")
+                    val gson = Gson()
+                    val state = gson.fromJson(data.toString(), LotteryState::class.java)
+                    _uiState.value = state
+                }
+            }
+
+            // 监听参与者更新事件
+            socket?.on("lottery_players_update") { args ->
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    println("[Lottery] Players update received: $data")
+                    // 更新参与者数量到当前状态
+                    val currentState = _uiState.value
+                    if (currentState != null) {
+                        val updatedState = currentState.copy(
+                            participant_count = data.optInt("count", currentState.participant_count)
+                        )
+                        _uiState.value = updatedState
+                    }
+                }
+            }
+
             socket?.on("lottery_error") { args ->
                 if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
-                    _error.value = data.optString("message")
+                    val errorMsg = data.optString("message")
+                    println("[Lottery] Error received: $errorMsg")
+                    _error.value = errorMsg
                 }
+            }
+
+            socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
+                println("[Lottery] Connection error: ${args.joinToString()}")
+                _error.value = "连接失败"
+            }
+
+            socket?.on(Socket.EVENT_DISCONNECT) {
+                println("[Lottery] Socket disconnected")
             }
 
             socket?.connect()
@@ -110,11 +153,15 @@ class LotteryViewModel @Inject constructor(
     
     fun joinLottery() {
         viewModelScope.launch {
+            println("[Lottery] Attempting to join - userId: $userId, userName: $userName, meetingId: $meetingId")
             val data = JSONObject()
             data.put("action", "join")
             data.put("meeting_id", meetingId)
-            data.put("user_id", userId.toString()) // Backend uses string key for map
+            data.put("user_id", userId) // 发送整数类型，匹配后端期望
             data.put("user_name", userName)
+            data.put("department", "") // 可选字段
+            data.put("avatar", "") // 可选字段
+            println("[Lottery] Emitting lottery_action with data: $data")
             socket?.emit("lottery_action", data)
         }
     }
@@ -124,7 +171,7 @@ class LotteryViewModel @Inject constructor(
             val data = JSONObject()
             data.put("action", "quit")
             data.put("meeting_id", meetingId)
-            data.put("user_id", userId.toString())
+            data.put("user_id", userId) // 发送整数类型
             socket?.emit("lottery_action", data)
         }
     }

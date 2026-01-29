@@ -43,8 +43,19 @@ fun LotteryDetailScreen(
     // Error Handling
     LaunchedEffect(error) {
         if (error != null) {
-            // Show toast or snackbar logic handled by scaffold usually
-            // Here just log or you can add local state specifically for snackbar
+            viewModel.clearError()
+        }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show error in snackbar
+    LaunchedEffect(error) {
+        error?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
         }
     }
 
@@ -58,7 +69,8 @@ fun LotteryDetailScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -69,7 +81,15 @@ fun LotteryDetailScreen(
         ) {
             // 1. Hero Status Card
             val status = uiState?.status ?: "IDLE"
-            val isJoined = uiState?.participants?.any { it.id == viewModel.getCurrentUserId().toString() } == true
+            val currentUserId = viewModel.getCurrentUserId()
+            // 检查用户是否已加入（兼容 int 和 string 类型的 id）
+            val isJoined = uiState?.participants?.any {
+                when (it.id) {
+                    is String -> it.id == currentUserId.toString()
+                    is Number -> it.id as Int == currentUserId
+                    else -> false
+                }
+            } == true
             
             StatusHeroCard(
                 status = status,
