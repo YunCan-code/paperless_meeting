@@ -1,13 +1,13 @@
-﻿<template>
+<template>
   <div class="lottery-bigscreen">
     <!-- Top Banner -->
     <div class="top-banner">
       <div class="banner-content">
         <div class="title-section">
-          <h1 class="page-title">{{ state.current_title || '鎶界娲诲姩' }}</h1>
+          <h1 class="page-title">{{ state.current_title || '抽签活动' }}</h1>
           <div class="round-info" v-if="rounds.length > 0">
-            绗?{{ currentRoundIndex + 1 }}/{{ rounds.length }} 杞?
-            <span v-if="state.current_count > 0"> 路 鎶藉彇 {{ state.current_count }} 浜?/span>
+            第 {{ currentRoundIndex + 1 }}/{{ rounds.length }} 轮
+            <span v-if="state.current_count > 0"> · 抽取 {{ state.current_count }} 人</span>
           </div>
         </div>
         <div class="status-section">
@@ -17,7 +17,7 @@
           </div>
           <div class="participant-stats">
             <el-icon><User /></el-icon>
-            <span>{{ state.participant_count }} 浜哄弬涓?/span>
+            <span>{{ state.participant_count }} 人参与</span>
           </div>
         </div>
       </div>
@@ -36,22 +36,22 @@
             :disabled="state.participant_count === 0"
           >
             <el-icon><VideoPlay /></el-icon>
-            寮€濮嬫娊绛?
+            开始抽签
           </el-button>
           <el-button 
             size="large" 
             @click="resetLottery"
           >
             <el-icon><RefreshLeft /></el-icon>
-            閲嶇疆
+            重置
           </el-button>
         </div>
 
         <!-- Participant Pool -->
         <div class="pool-section">
           <div class="pool-header" v-if="state.participants.length > 0">
-            <h2>鍙備笌鑰呮睜</h2>
-            <div class="pool-count">{{ state.participants.length }} 浜?/div>
+            <h2>参与者池</h2>
+            <div class="pool-count">{{ state.participants.length }} 人</div>
           </div>
           
           <div class="pool-grid" v-if="state.participants.length > 0">
@@ -77,11 +77,11 @@
             <div class="scanning-animation">
               <el-icon class="scanning-icon"><Cpu /></el-icon>
             </div>
-            <h3>绛夊緟鍙備笌鑰呭姞鍏?/h3>
-            <p>璇峰湪绉诲姩绔壂鐮佹垨鐐瑰嚮"鎶界"鍔犲叆鏈疆鎶界</p>
+            <h3>等待参与者加入</h3>
+            <p>请在移动端扫码或点击"抽签"加入本轮抽签</p>
             <div class="mobile-hint">
               <el-icon><Cellphone /></el-icon>
-              <span>鎵嬫満绔矾寰? 浼氳璇︽儏 鈫?鎶界</span>
+              <span>手机端路径: 会议详情 → 抽签</span>
             </div>
           </div>
         </div>
@@ -93,14 +93,14 @@
           <div class="rolling-window">
             <div class="rolling-name">{{ rollingName }}</div>
           </div>
-          <div class="rolling-status">姝ｅ湪鎶藉彇 {{ state.current_count }} 浣嶅垢杩愬効...</div>
+          <div class="rolling-status">正在抽取 {{ state.current_count }} 位幸运儿...</div>
         </div>
       </div>
 
       <!-- RESULT: Winners Display -->
       <div v-else-if="state.status === 'RESULT'" class="result-container">
         <div class="result-header">
-          <h2>馃帀 {{ state.current_title }} 涓鍚嶅崟 馃帀</h2>
+          <h2>🎉 {{ state.current_title }} 中奖名单 🎉</h2>
         </div>
         
         <div class="winners-grid">
@@ -111,7 +111,7 @@
             :style="{ animationDelay: index * 0.15 + 's' }"
           >
             <div class="winner-rank">{{ index + 1 }}</div>
-            <div class="trophy-icon">馃弳</ div>
+            <div class="trophy-icon">🏆</ div>
             <div class="winner-name">{{ winner.name }}</div>
           </div>
         </div>
@@ -125,7 +125,7 @@
             @click="prepareNextRound"
           >
             <el-icon><DArrowRight /></el-icon>
-            涓嬩竴杞娊绛?
+            下一轮抽签
           </el-button>
           <el-button 
             v-else
@@ -133,14 +133,14 @@
             size="large"
           >
             <el-icon><CircleCheck /></el-icon>
-            鎵€鏈夎疆娆″凡瀹屾垚
+            所有轮次已完成
           </el-button>
           <el-button 
             size="large"
             @click="backToPool"
           >
             <el-icon><Back /></el-icon>
-            杩斿洖鍙備笌鑰呮睜
+            返回参与者池
           </el-button>
         </div>
         
@@ -193,10 +193,10 @@ let initialStateReceived = false
 // Helpers
 const getStatusText = (status) => {
   const map = {
-    'IDLE': '绛夊緟閰嶇疆',
-    'PREPARING': '鍑嗗灏辩华',
-    'ROLLING': '姝ｅ湪鎶界',
-    'RESULT': '缁撴灉鍏竷'
+    'IDLE': '等待配置',
+    'PREPARING': '准备就绪',
+    'ROLLING': '正在抽签',
+    'RESULT': '结果公布'
   }
   return map[status] || status
 }
@@ -347,7 +347,7 @@ const prepareNextRound = () => {
 const startLottery = () => {
   const round = rounds.value[currentRoundIndex.value]
   if (!round) {
-    ElMessage.warning('娌℃湁鍙敤鐨勮疆娆?)
+    ElMessage.warning('没有可用的轮次')
     return
   }
   socket.emit('lottery_action', {
@@ -361,11 +361,11 @@ const startLottery = () => {
 const resetLottery = async () => {
   try {
     await ElMessageBox.confirm(
-      '纭畾瑕侀噸缃湰杞娊绛惧悧锛熻繖灏嗘竻绌烘墍鏈夊弬涓庤€呫€?,
-      '纭閲嶇疆',
+      '确定要重置本轮抽签吗？这将清空所有参与者。',
+      '确认重置',
       {
-        confirmButtonText: '纭畾',
-        cancelButtonText: '鍙栨秷',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
         type: 'warning'
       }
     )
@@ -373,7 +373,7 @@ const resetLottery = async () => {
       action: 'reset',
       meeting_id: parseInt(meetingId)
     })
-    ElMessage.success('宸查噸缃?)
+    ElMessage.success('已重置')
   } catch (e) {
     // User cancelled
   }
@@ -660,7 +660,8 @@ onUnmounted(() => {
 .start-btn:active {
   transform: translateY(1px);
 }
-/* ====== Enhanced UI Styles ====== */
+
+/* Enhanced UI Styles */
 .banner-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; }
 .title-section { flex: 1; }
 .page-title { background-clip: text; }
@@ -668,41 +669,25 @@ onUnmounted(() => {
 .status-section { display: flex; gap: 20px; align-items: center; }
 .participant-stats { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-radius: 24px; background: rgba(59, 130, 246, 0.15); color: #93C5FD; font-size: 15px; font-weight: 500; }
 .status-badge.idle .status-dot { background: #6B7280; }
-
-/* Control Panel */
 .control-panel { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; padding: 24px; background: rgba(255, 255, 255, 0.03); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); }
 .control-panel .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
-
-/* Pool Section */
 .pool-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .pool-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
 .pool-header h2 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0; }
 .pool-count { font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.8); padding: 8px 20px; background: rgba(59, 130, 246, 0.15); border-radius: 20px; }
-
-/* Enhanced Participant Card */
 .participant-info { display: flex; flex-direction: column; gap: 2px; }
 .participant-info .name { font-size: 15px; font-weight: 600; color: #ffffff; }
 .participant-info .dept { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
 .avatar-placeholder img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .avatar-text { color: #ffffff; font-weight: 600; }
-
-/* Enhanced Empty Pool */
 .scanning-animation { margin-bottom: 24px; animation: float 3s ease-in-out infinite; }
 .empty-pool h3 { font-size: 28px; font-weight: 600; color: rgba(255, 255, 255, 0.9); margin: 0 0 12px 0; }
 .empty-pool p { font-size: 16px; color: rgba(255, 255, 255, 0.6); margin: 0 0 20px 0; }
 .mobile-hint { display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: rgba(59, 130, 246, 0.1); border-radius: 24px; color: #93C5FD; font-size: 14px; }
-
-/* Result Header */
 .result-header { text-align: center; margin-bottom: 40px; }
 .result-header h2 { font-size: 36px; font-weight: 700; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0; animation: slideUp 0.6s ease; }
-
-/* Winner Rank */
 .winner-rank { position: absolute; top: -8px; left: -8px; width: 32px; height: 32px; background: linear-gradient(135deg, #3B82F6, #1D4ED8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #ffffff; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
 .winner-card { position: relative; }
-
-/* Result Actions */
 .result-actions { display: flex; gap: 16px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
 .result-actions .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
-
 </style>
-
