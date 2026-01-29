@@ -164,9 +164,10 @@
             v-else
             type="success"
             size="large"
+            @click="viewAllResults"
           >
-            <el-icon><CircleCheck /></el-icon>
-            所有轮次已完成
+            <el-icon><Document /></el-icon>
+            查看所有轮次结果
           </el-button>
           <el-button 
             size="large"
@@ -179,6 +180,57 @@
         
         <div class="confetti-canvas"></div>
       </div>
+
+      <!-- ALL ROUNDS SUMMARY -->
+      <div v-else-if="showSummary" class="summary-container">
+        <div class="summary-header">
+          <h1>🎊 本次抽签活动完整结果 🎊</h1>
+          <p>共 {{ rounds.length }} 轮抽签</p>
+        </div>
+
+        <div class="rounds-summary">
+          <div 
+            v-for="(round, rIndex) in rounds" 
+            :key="round.id"
+            class="round-block"
+            :style="{ animationDelay: rIndex * 0.1 + 's' }"
+          >
+            <div class="round-header">
+              <span class="round-number">第 {{ rIndex + 1 }} 轮</span>
+              <h3>{{ round.title }}</h3>
+              <span class="round-count">抽取 {{ round.count }} 人</span>
+            </div>
+            
+            <div class="round-winners" v-if="round.winners && round.winners.length > 0">
+              <div 
+                v-for="(winner, wIndex) in round.winners" 
+                :key="winner.id || wIndex"
+                class="summary-winner-card"
+              >
+                <div class="winner-badge">{{ wIndex + 1 }}</div>
+                <div class="winner-info">
+                  <div class="winner-name">{{ winner.name }}</div>
+                  <div class="winner-dept" v-if="winner.department">{{ winner.department }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="no-winners" v-else>
+              <span>暂无中奖者</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-actions">
+          <el-button 
+            type="primary"
+            size="large"
+            @click="showSummary = false"
+          >
+            <el-icon><Back /></el-icon>
+            返回当前轮结果
+          </el-button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -189,7 +241,7 @@ import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
 import { 
   Cpu, User, VideoPlay, RefreshLeft, Cellphone, 
-  DArrowRight, CircleCheck, Back, CircleClose, InfoFilled, UserFilled 
+  DArrowRight, CircleCheck, Back, CircleClose, InfoFilled, UserFilled, Document 
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
@@ -210,6 +262,8 @@ const state = ref({
   winners: [],
   participant_count: 0
 })
+
+const showSummary = ref(false) // Show all rounds summary
 
 const rollingName = ref('???')
 let rollingInterval = null
@@ -464,6 +518,19 @@ const addTestParticipants = () => {
       }
     }, index * 200) // Stagger the joins
   })
+}
+
+// View all results summary
+const viewAllResults = async () => {
+  try {
+    // Fetch latest round data with winners
+    const res = await request.get(`/lottery/${meetingId}/history`)
+    rounds.value = res.rounds || []
+    showSummary.value = true
+  } catch (e) {
+    console.error('Failed to fetch results:', e)
+    ElMessage.error('获取结果失败')
+  }
 }
 
 onMounted(() => {
@@ -773,4 +840,26 @@ onUnmounted(() => {
 .notice-icon { font-size: 48px; color: #60A5FA; flex-shrink: 0; }
 .notice-content h3 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0 0 12px 0; }
 .notice-content p { font-size: 16px; color: rgba(255, 255, 255, 0.7); margin: 0; line-height: 1.6; }
+
+/* Summary View */
+.summary-container { padding: 40px 60px; max-width: 1400px; margin: 0 auto; animation: fadeIn 0.6s ease; }
+.summary-header { text-align: center; margin-bottom: 60px; }
+.summary-header h1 { font-size: 48px; font-weight: 700; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 16px 0; }
+.summary-header p { font-size: 20px; color: rgba(255, 255, 255, 0.7); margin: 0; }
+.rounds-summary { display: flex; flex-direction: column; gap: 32px; margin-bottom: 60px; }
+.round-block { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%); border-radius: 20px; border: 2px solid rgba(59, 130, 246, 0.3); padding: 32px; animation: slideUp 0.6s ease both; }
+.round-header { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
+.round-number { font-size: 18px; font-weight: 600; color: #60A5FA; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); border-radius: 12px; }
+.round-header h3 { flex: 1; font-size: 28px; font-weight: 700; color: #93C5FD; margin: 0; }
+.round-count { font-size: 16px; color: rgba(255, 255, 255, 0.7); }
+.round-winners { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.summary-winner-card { display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
+.summary-winner-card:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(59, 130, 246, 0.4); transform: translateY(-2px); }
+.winner-badge { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #fbbf24, #f59e0b); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; flex-shrink: 0; }
+.winner-info { flex: 1; min-width: 0; }
+.winner-name { font-size: 16px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+.winner-dept { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.no-winners { text-align: center; padding: 40px; color: rgba(255, 255, 255, 0.4); font-size: 16px; }
+.summary-actions { text-align: center; }
+.summary-actions .el-button { padding: 16px 48px; font-size: 18px; font-weight: 600; }
 </style>
