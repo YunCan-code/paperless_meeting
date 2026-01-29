@@ -94,6 +94,18 @@
             <div class="rolling-name">{{ rollingName }}</div>
           </div>
           <div class="rolling-status">正在抽取 {{ state.current_count }} 位幸运儿...</div>
+          
+          <!-- Stop Button -->
+          <div class="stop-button-section">
+            <el-button 
+              type="danger" 
+              size="large"
+              @click="stopLottery"
+            >
+              <el-icon><CircleClose /></el-icon>
+              停止抽签
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -156,7 +168,7 @@ import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
 import { 
   Cpu, User, VideoPlay, RefreshLeft, Cellphone, 
-  DArrowRight, CircleCheck, Back 
+  DArrowRight, CircleCheck, Back, CircleClose 
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
@@ -390,6 +402,14 @@ const backToPool = () => {
     lottery_id: round.id,
     title: round.title,
     count: round.count
+  })
+}
+
+// Stop lottery (trigger result)
+const stopLottery = () => {
+  socket.emit('lottery_action', {
+    action: 'stop',
+    meeting_id: parseInt(meetingId)
   })
 }
 
@@ -690,4 +710,8 @@ onUnmounted(() => {
 .winner-card { position: relative; }
 .result-actions { display: flex; gap: 16px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
 .result-actions .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
+
+/* Stop Button */
+.stop-button-section { margin-top: 40px; text-align: center; }
+.stop-button-section .el-button { padding: 16px 48px; font-size: 20px; font-weight: 700; animation: pulse 1.5s infinite; }
 </style>
