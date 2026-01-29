@@ -301,7 +301,7 @@ class LotteryWinner(SQLModel, table=True):
 class LotteryParticipant(SQLModel, table=True):
     """抽签参与者池 (解决刷新数据丢失问题)"""
     meeting_id: int = Field(foreign_key="meeting.id", primary_key=True)
-    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    user_id: int = Field(primary_key=True)
     user_name: str # 冗余存个名字，方便显示
     avatar: Optional[str] = None 
     department: Optional[str] = None

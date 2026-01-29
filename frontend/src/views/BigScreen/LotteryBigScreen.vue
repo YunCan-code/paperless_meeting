@@ -187,6 +187,11 @@
         <div class="summary-header">
           <h1>🎊 本次抽签活动完整结果 🎊</h1>
           <p>共 {{ rounds.length }} 轮抽签</p>
+          <div style="margin-top: 20px;">
+             <el-button type="primary" size="large" @click="showSummary = false">
+                <el-icon><Back /></el-icon> 返回大屏
+             </el-button>
+          </div>
         </div>
 
         <div class="rounds-summary">
@@ -356,6 +361,9 @@ const handleStateChange = (newState) => {
   // On first state receive, fetch rounds and prepare if needed
   if (!initialStateReceived) {
     initialStateReceived = true
+    fetchRoundsAndPrepareFirst()
+  } else if (newState.status === 'IDLE') {
+    // Reload on reset
     fetchRoundsAndPrepareFirst()
   }
 

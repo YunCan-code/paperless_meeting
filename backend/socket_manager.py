@@ -66,6 +66,9 @@ def get_db_participants(meeting_id: int) -> list:
                     "name": p.user_name,
                     "avatar": p.avatar,
                     "department": p.department,
+                    "avatar": p.avatar,
+                    "department": p.department,
+                    "is_winner": p.is_winner, # 返回中奖状态
                     "sid": None # DB中没有sid，不过前端展示主要靠 id/name
                 })
     except Exception as e:
@@ -393,6 +396,12 @@ async def lottery_action(sid, data):
                             user_name=dog.user_name
                         )
                         session.add(winner_record)
+                    
+                    # 3. Update LotteryParticipant is_winner status
+                    participant = session.get(LotteryParticipant, (meeting_id, dog.user_id))
+                    if participant:
+                        participant.is_winner = True
+                        session.add(participant)
                     
                     # Update memory history
                     state["history_winners"].add(dog.user_id)
