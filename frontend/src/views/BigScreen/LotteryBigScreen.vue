@@ -526,30 +526,38 @@ const addTestParticipants = () => {
     { id: 9004, name: '赵六', department: '人事部', avatar: '' },
     { id: 9005, name: '钱七', department: '运营部', avatar: '' },
     { id: 9006, name: '孙八', department: '研发部', avatar: '' },
-    { id: 9007, name: '周九', department: '设计部', avatar: '' },
-    { id: 9008, name: '吴十', department: '销售部', avatar: '' }
-  ]
+  // Dynamic generation of test users
+  const currentCount = state.value.participants.length
+  const batchSize = 10
+  const departments = ['技术部', '市场部', '财务部', '人事部', '运营部', '研发部', '设计部', '销售部']
+  const surnames = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨']
   
-  console.log('[Test Participants] Starting to add test users...')
-  let count = 0
-  testUsers.forEach((user, index) => {
+  console.log('[Test Participants] Starting to add dynamic test users...')
+  let addedCount = 0
+  
+  for (let i = 0; i < batchSize; i++) {
+    const id = 9000 + currentCount + i + 1
+    const randomSurname = surnames[Math.floor(Math.random() * surnames.length)]
+    const randomName = `${randomSurname}测试${id}` // Unique name
+    const dept = departments[i % departments.length]
+    
     setTimeout(() => {
-      console.log(`[Test Participants] Adding user ${index + 1}:`, user.name)
-      socket.emit('lottery_action', {
+       console.log(`[Test Participants] Adding user ${i + 1}:`, randomName)
+       socket.emit('lottery_action', {
         action: 'join',
         meeting_id: parseInt(meetingId),
-        user_id: user.id,
-        user_name: user.name,
-        department: user.department,
-        avatar: user.avatar
+        user_id: id,
+        user_name: randomName,
+        department: dept,
+        avatar: ''
       })
-      count++
-      if (count === testUsers.length) {
-        console.log('[Test Participants] All users added')
-        ElMessage.success(`已添加 ${count} 个测试参与者`)
+      addedCount++
+      if (addedCount === batchSize) {
+        console.log('[Test Participants] All dynamic users added')
+        ElMessage.success(`已添加 ${batchSize} 个测试参与者`)
       }
-    }, index * 200) // Stagger the joins
-  })
+    }, i * 100)
+  }
 }
 
 // View all results summary
