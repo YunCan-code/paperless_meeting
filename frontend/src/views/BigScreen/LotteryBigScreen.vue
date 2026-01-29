@@ -351,7 +351,7 @@ const startLottery = () => {
     return
   }
   socket.emit('lottery_action', {
-    action: 'start',
+    action: 'roll',
     meeting_id: parseInt(meetingId),
     lottery_id: round.id
   })
