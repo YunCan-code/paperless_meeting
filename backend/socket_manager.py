@@ -57,7 +57,9 @@ def get_db_participants(meeting_id: int) -> list:
                 LotteryParticipant.meeting_id == meeting_id,
                 LotteryParticipant.status == "joined"
             )
+            print(f"[Lottery] Querying participants for meeting_id={meeting_id}, status='joined'")
             results = session.exec(stmt).all()
+            print(f"[Lottery] Query returned {len(results)} results")
             for p in results:
                 participants.append({
                     "id": p.user_id, # 注意：这里用 user_id (int)
@@ -254,8 +256,11 @@ async def lottery_action(sid, data):
                     participant.avatar = user_avatar
                     session.add(participant)
                 session.commit()
+                print(f"[Lottery] User {user_id} ({user_name}) joined successfully, status=joined")
         except Exception as e:
             print(f"[Lottery] Join DB Error: {e}")
+            import traceback
+            traceback.print_exc()
 
         # 如果是 IDLE 状态，自动切换到 PREPARING
         if state["status"] == LotteryState.IDLE:
@@ -266,7 +271,9 @@ async def lottery_action(sid, data):
         
         # 广播更新 (读取最新 DB 数据广播给所有人)
         room = f"meeting_{meeting_id}"
+        print(f"[Lottery] Fetching participants for meeting {meeting_id} from DB...")
         current_list = get_db_participants(meeting_id)
+        print(f"[Lottery] Found {len(current_list)} participants in DB: {[p['name'] for p in current_list]}")
         await sio.emit('lottery_players_update', {
             'count': len(current_list),
             'all_participants': current_list
