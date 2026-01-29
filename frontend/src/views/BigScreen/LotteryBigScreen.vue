@@ -81,6 +81,7 @@
                 v-for="p in state.participants" 
                 :key="p.id" 
                 class="participant-card"
+                :class="{ 'is-winner': p.is_winner }"
               >
                 <div class="avatar-placeholder">
                   <img v-if="p.avatar" :src="p.avatar" :alt="p.name" />
@@ -131,7 +132,7 @@
       </div>
 
       <!-- RESULT: Winners Display -->
-      <div v-else-if="state.status === 'RESULT'" class="result-container">
+      <div v-else-if="state.status === 'RESULT' && !showSummary" class="result-container">
         <div class="result-header">
           <h2>🎉 {{ state.current_title }} 中奖名单 🎉</h2>
         </div>
@@ -310,10 +311,17 @@ const initSocket = () => {
 
   socket.on('lottery_players_update', (data) => {
     console.log('Players update:', data)
+    console.log('Players update - all_participants:', data.all_participants)
+    console.log('Players update - count:', data.count)
     // Update participants list
     if (data.all_participants) {
       state.value.participants = data.all_participants
       state.value.participant_count = data.count || data.all_participants.length
+      console.log('State updated - participants:', state.value.participants)
+      console.log('State updated - count:', state.value.participant_count)
+      console.log('Current status:', state.value.status)
+    } else {
+      console.warn('No all_participants in data!')
     }
   })
 
@@ -715,6 +723,22 @@ onUnmounted(() => {
   text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
   margin-bottom: 32px;
   min-height: 120px;
+}
+
+.participant-card.is-winner {
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.15);
+  animation: pulse 2s infinite;
+}
+
+.participant-card.is-winner .name {
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+.participant-card.is-winner .avatar-text {
+  color: #fbbf24;
 }
 
 .rolling-status {
