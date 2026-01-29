@@ -490,6 +490,19 @@ const stopLottery = () => {
 
 // Add test participants for testing
 const addTestParticipants = () => {
+  // Check socket connection
+  if (!socket || !socket.connected) {
+    ElMessage.error('Socket未连接,请稍后重试')
+    console.error('[Test Participants] Socket not connected')
+    return
+  }
+  
+  // Check if in valid state
+  if (state.value.status !== 'PREPARING') {
+    ElMessage.warning(`当前状态为"${getStatusText(state.value.status)}",需要在"准备就绪"状态下添加参与者`)
+    return
+  }
+  
   const testUsers = [
     { id: 9001, name: '张三', department: '技术部', avatar: '' },
     { id: 9002, name: '李四', department: '市场部', avatar: '' },
@@ -501,9 +514,11 @@ const addTestParticipants = () => {
     { id: 9008, name: '吴十', department: '销售部', avatar: '' }
   ]
   
+  console.log('[Test Participants] Starting to add test users...')
   let count = 0
   testUsers.forEach((user, index) => {
     setTimeout(() => {
+      console.log(`[Test Participants] Adding user ${index + 1}:`, user.name)
       socket.emit('lottery_action', {
         action: 'join',
         meeting_id: parseInt(meetingId),
@@ -514,6 +529,7 @@ const addTestParticipants = () => {
       })
       count++
       if (count === testUsers.length) {
+        console.log('[Test Participants] All users added')
         ElMessage.success(`已添加 ${count} 个测试参与者`)
       }
     }, index * 200) // Stagger the joins
