@@ -519,13 +519,7 @@ const addTestParticipants = () => {
     return
   }
   
-  const testUsers = [
-    { id: 9001, name: '张三', department: '技术部', avatar: '' },
-    { id: 9002, name: '李四', department: '市场部', avatar: '' },
-    { id: 9003, name: '王五', department: '财务部', avatar: '' },
-    { id: 9004, name: '赵六', department: '人事部', avatar: '' },
-    { id: 9005, name: '钱七', department: '运营部', avatar: '' },
-    { id: 9006, name: '孙八', department: '研发部', avatar: '' },
+
   // Dynamic generation of test users
   const currentCount = state.value.participants.length
   const batchSize = 10
