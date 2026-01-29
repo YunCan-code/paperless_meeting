@@ -46,10 +46,11 @@
             type="primary" 
             size="large" 
             @click="startLottery"
-            :disabled="state.participant_count === 0"
+            :disabled="state.participant_count === 0 || allFinished"
+            :type="allFinished ? 'info' : 'primary'"
           >
             <el-icon><VideoPlay /></el-icon>
-            开始抽签
+            {{ allFinished ? '抽签结束' : (state.participant_count === 0 ? '等待参与者...' : '开始抽签') }}
           </el-button>
           <el-button 
             size="large" 
@@ -215,7 +216,7 @@
               >
                 <div class="winner-badge">{{ wIndex + 1 }}</div>
                 <div class="winner-info">
-                  <div class="winner-name">{{ winner.name }}</div>
+                  <div class="winner-name">{{ winner.user_name }}</div>
                   <div class="winner-dept" v-if="winner.department">{{ winner.department }}</div>
                 </div>
               </div>
@@ -278,6 +279,10 @@ let socket = null
 // Computed: is there a next round?
 const hasNextRound = computed(() => {
   return currentRoundIndex.value < rounds.value.length - 1
+})
+
+const allFinished = computed(() => {
+  return rounds.value.length > 0 && rounds.value.every(r => r.status === 'finished')
 })
 
 // Flag to track if initial state has been received
@@ -896,7 +901,11 @@ onUnmounted(() => {
 .summary-header { text-align: center; margin-bottom: 60px; }
 .summary-header h1 { font-size: 48px; font-weight: 700; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 16px 0; }
 .summary-header p { font-size: 20px; color: rgba(255, 255, 255, 0.7); margin: 0; }
-.rounds-summary { display: flex; flex-direction: column; gap: 32px; margin-bottom: 60px; }
+.rounds-summary { display: flex; flex-direction: column; gap: 32px; margin-bottom: 60px; max-height: 65vh; overflow-y: auto; padding-right: 12px; }
+.rounds-summary::-webkit-scrollbar { width: 8px; }
+.rounds-summary::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+.rounds-summary::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+.rounds-summary::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 .round-block { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%); border-radius: 20px; border: 2px solid rgba(59, 130, 246, 0.3); padding: 32px; animation: slideUp 0.6s ease both; }
 .round-header { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
 .round-number { font-size: 18px; font-weight: 600; color: #60A5FA; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); border-radius: 12px; }

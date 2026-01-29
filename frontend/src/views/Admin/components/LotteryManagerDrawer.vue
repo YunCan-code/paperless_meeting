@@ -72,7 +72,7 @@
           >
             <div class="round-header">
               <span class="round-number">第 {{ index + 1 }} 轮</span>
-              <span class="round-title">{{ round.title }}</span>
+              <span class="round-title">{{ round.title }} ({{ round.count }}人)</span>
               <el-tag :type="round.status === 'finished' ? 'success' : 'warning'" size="small">
                 {{ round.status === 'finished' ? '已完成' : '待抽取' }}
               </el-tag>
