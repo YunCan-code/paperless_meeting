@@ -159,6 +159,24 @@ const initSocket = () => {
     }
   })
 
+  socket.on('lottery_state_sync', (data) => {
+    console.log('State sync (initial load):', data)
+    // Handle initial state from database
+    // Map backend field names to frontend state structure
+    state.value.status = data.status || 'IDLE'
+    state.value.participants = data.all_participants || []
+    state.value.participant_count = data.participants_count || 0
+    state.value.current_title = data.config?.title || ''
+    state.value.current_count = data.config?.count || 1
+    state.value.winners = data.last_result || []
+    
+    // On first state receive, fetch rounds and prepare if needed
+    if (!initialStateReceived) {
+      initialStateReceived = true
+      fetchRoundsAndPrepareFirst()
+    }
+  })
+
   socket.on('lottery_error', (data) => {
     ElMessage.error(data.message)
   })
