@@ -150,6 +150,15 @@ const initSocket = () => {
     handleStateChange(data)
   })
 
+  socket.on('lottery_players_update', (data) => {
+    console.log('Players update:', data)
+    // Update participants list
+    if (data.all_participants) {
+      state.value.participants = data.all_participants
+      state.value.participant_count = data.count || data.all_participants.length
+    }
+  })
+
   socket.on('lottery_error', (data) => {
     ElMessage.error(data.message)
   })
