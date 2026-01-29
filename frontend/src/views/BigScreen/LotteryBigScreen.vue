@@ -27,6 +27,19 @@
     <div class="main-content">
       <!-- IDLE / PREPARING: Participant Pool -->
       <div v-if="state.status === 'IDLE' || state.status === 'PREPARING'" class="pool-container">
+        <!-- IDLE State Notice -->
+        <div v-if="state.status === 'IDLE'" class="idle-notice">
+          <el-icon class="notice-icon"><InfoFilled /></el-icon>
+          <div class="notice-content">
+            <h3 v-if="rounds.length === 0">暂无抽签轮次</h3>
+            <h3 v-else-if="rounds.every(r => r.status === 'finished')">所有轮次已完成</h3>
+            <h3 v-else>等待配置中...</h3>
+            <p v-if="rounds.length === 0">请先在管理界面创建抽签轮次</p>
+            <p v-else-if="rounds.every(r => r.status === 'finished')">所有抽签轮次已完成,可在历史记录中查看结果</p>
+            <p v-else>正在加载抽签配置,请稍候...</p>
+          </div>
+        </div>
+        
         <!-- Control Panel -->
         <div v-if="state.status === 'PREPARING'" class="control-panel">
           <el-button 
@@ -168,7 +181,7 @@ import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
 import { 
   Cpu, User, VideoPlay, RefreshLeft, Cellphone, 
-  DArrowRight, CircleCheck, Back, CircleClose 
+  DArrowRight, CircleCheck, Back, CircleClose, InfoFilled 
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
@@ -714,4 +727,10 @@ onUnmounted(() => {
 /* Stop Button */
 .stop-button-section { margin-top: 40px; text-align: center; }
 .stop-button-section .el-button { padding: 16px 48px; font-size: 20px; font-weight: 700; animation: pulse 1.5s infinite; }
+
+/* IDLE Notice */
+.idle-notice { display: flex; align-items: flex-start; gap: 20px; padding: 60px 40px; background: rgba(59, 130, 246, 0.1); border-radius: 16px; border: 1px solid rgba(59, 130, 246, 0.2); max-width: 800px; margin: 100px auto; }
+.notice-icon { font-size: 48px; color: #60A5FA; flex-shrink: 0; }
+.notice-content h3 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0 0 12px 0; }
+.notice-content p { font-size: 16px; color: rgba(255, 255, 255, 0.7); margin: 0; line-height: 1.6; }
 </style>
