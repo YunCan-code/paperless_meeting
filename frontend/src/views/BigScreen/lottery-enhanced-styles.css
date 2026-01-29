@@ -1,0 +1,43 @@
+/* ====== Enhanced UI Styles ====== */
+.banner-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; }
+.title-section { flex: 1; }
+.page-title { background-clip: text; }
+.round-info { margin-top: 8px; font-size: 16px; color: rgba(255, 255, 255, 0.7); font-weight: 500; }
+.status-section { display: flex; gap: 20px; align-items: center; }
+.participant-stats { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-radius: 24px; background: rgba(59, 130, 246, 0.15); color: #93C5FD; font-size: 15px; font-weight: 500; }
+.status-badge.idle .status-dot { background: #6B7280; }
+
+/* Control Panel */
+.control-panel { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; padding: 24px; background: rgba(255, 255, 255, 0.03); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); }
+.control-panel .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
+
+/* Pool Section */
+.pool-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.pool-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
+.pool-header h2 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0; }
+.pool-count { font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.8); padding: 8px 20px; background: rgba(59, 130, 246, 0.15); border-radius: 20px; }
+
+/* Enhanced Participant Card */
+.participant-info { display: flex; flex-direction: column; gap: 2px; }
+.participant-info .name { font-size: 15px; font-weight: 600; color: #ffffff; }
+.participant-info .dept { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.avatar-placeholder img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.avatar-text { color: #ffffff; font-weight: 600; }
+
+/* Enhanced Empty Pool */
+.scanning-animation { margin-bottom: 24px; animation: float 3s ease-in-out infinite; }
+.empty-pool h3 { font-size: 28px; font-weight: 600; color: rgba(255, 255, 255, 0.9); margin: 0 0 12px 0; }
+.empty-pool p { font-size: 16px; color: rgba(255, 255, 255, 0.6); margin: 0 0 20px 0; }
+.mobile-hint { display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: rgba(59, 130, 246, 0.1); border-radius: 24px; color: #93C5FD; font-size: 14px; }
+
+/* Result Header */
+.result-header { text-align: center; margin-bottom: 40px; }
+.result-header h2 { font-size: 36px; font-weight: 700; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0; animation: slideUp 0.6s ease; }
+
+/* Winner Rank */
+.winner-rank { position: absolute; top: -8px; left: -8px; width: 32px; height: 32px; background: linear-gradient(135deg, #3B82F6, #1D4ED8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #ffffff; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+.winner-card { position: relative; }
+
+/* Result Actions */
+.result-actions { display: flex; gap: 16px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
+.result-actions .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }

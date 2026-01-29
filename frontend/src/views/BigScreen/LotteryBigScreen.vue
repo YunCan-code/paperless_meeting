@@ -4,15 +4,20 @@
     <div class="top-banner">
       <div class="banner-content">
         <div class="title-section">
-          <h1 class="page-title">{{ state.current_title || '现场抽签' }}</h1>
-          <div class="subtitle">
-            <span class="status-badge" :class="state.status.toLowerCase()">
-              <span class="status-dot"></span>
-              {{ getStatusText(state.status) }}
-            </span>
-            <span class="count-badge" v-if="state.status === 'PREPARING'">
-              已加入 {{ state.participant_count }} 人
-            </span>
+          <h1 class="page-title">{{ state.current_title || '抽签活动' }}</h1>
+          <div class="round-info" v-if="rounds.length > 0">
+            第 {{ currentRoundIndex + 1 }}/{{ rounds.length }} 轮
+            <span v-if="state.current_count > 0"> · 抽取 {{ state.current_count }} 人</span>
+          </div>
+        </div>
+        <div class="status-section">
+          <div class="status-badge" :class="state.status.toLowerCase()">
+            <span class="status-dot"></span>
+            {{ getStatusText(state.status) }}
+          </div>
+          <div class="participant-stats">
+            <el-icon><User /></el-icon>
+            <span>{{ state.participant_count }} 人参与</span>
           </div>
         </div>
       </div>
@@ -22,22 +27,63 @@
     <div class="main-content">
       <!-- IDLE / PREPARING: Participant Pool -->
       <div v-if="state.status === 'IDLE' || state.status === 'PREPARING'" class="pool-container">
-        <div class="pool-grid" v-if="state.participants.length > 0">
-          <transition-group name="list">
-            <div 
-              v-for="p in state.participants" 
-              :key="p.id" 
-              class="participant-card"
-            >
-              <div class="avatar-placeholder">{{ p.name.charAt(0) }}</div>
-              <span class="name">{{ p.name }}</span>
-            </div>
-          </transition-group>
+        <!-- Control Panel -->
+        <div v-if="state.status === 'PREPARING'" class="control-panel">
+          <el-button 
+            type="primary" 
+            size="large" 
+            @click="startLottery"
+            :disabled="state.participant_count === 0"
+          >
+            <el-icon><VideoPlay /></el-icon>
+            开始抽签
+          </el-button>
+          <el-button 
+            size="large" 
+            @click="resetLottery"
+          >
+            <el-icon><RefreshLeft /></el-icon>
+            重置
+          </el-button>
         </div>
-        <div v-else class="empty-pool">
-          <el-icon class="scanning-icon"><Cpu /></el-icon>
-          <div class="text">等待参与者加入...</div>
-          <div class="sub-text">请在移动端点击"抽签"加入</div>
+
+        <!-- Participant Pool -->
+        <div class="pool-section">
+          <div class="pool-header" v-if="state.participants.length > 0">
+            <h2>参与者池</h2>
+            <div class="pool-count">{{ state.participants.length }} 人</div>
+          </div>
+          
+          <div class="pool-grid" v-if="state.participants.length > 0">
+            <transition-group name="list">
+              <div 
+                v-for="p in state.participants" 
+                :key="p.id" 
+                class="participant-card"
+              >
+                <div class="avatar-placeholder">
+                  <img v-if="p.avatar" :src="p.avatar" :alt="p.name" />
+                  <span v-else class="avatar-text">{{ p.name.charAt(0) }}</span>
+                </div>
+                <div class="participant-info">
+                  <span class="name">{{ p.name }}</span>
+                  <span class="dept" v-if="p.department">{{ p.department }}</span>
+                </div>
+              </div>
+            </transition-group>
+          </div>
+          
+          <div v-else class="empty-pool">
+            <div class="scanning-animation">
+              <el-icon class="scanning-icon"><Cpu /></el-icon>
+            </div>
+            <h3>等待参与者加入</h3>
+            <p>请在移动端扫码或点击"抽签"加入本轮抽签</p>
+            <div class="mobile-hint">
+              <el-icon><Cellphone /></el-icon>
+              <span>手机端路径: 会议详情 → 抽签</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -53,27 +99,49 @@
 
       <!-- RESULT: Winners Display -->
       <div v-else-if="state.status === 'RESULT'" class="result-container">
+        <div class="result-header">
+          <h2>🎉 {{ state.current_title }} 中奖名单 🎉</h2>
+        </div>
+        
         <div class="winners-grid">
           <div 
             v-for="(winner, index) in state.winners" 
             :key="winner.id || index" 
             class="winner-card"
-            :style="{ animationDelay: index * 0.2 + 's' }"
+            :style="{ animationDelay: index * 0.15 + 's' }"
           >
-            <div class="trophy-icon">🏆</div>
+            <div class="winner-rank">{{ index + 1 }}</div>
+            <div class="trophy-icon">🏆</ div>
             <div class="winner-name">{{ winner.name }}</div>
-            <div class="winner-label">恭喜中奖</div>
           </div>
         </div>
         
-        <!-- Next Round Button -->
-        <div class="next-round-section" v-if="hasNextRound">
-          <el-button type="primary" size="large" @click="prepareNextRound">
-            抽下一轮
+        <!-- Action Buttons -->
+        <div class="result-actions">
+          <el-button 
+            v-if="hasNextRound" 
+            type="primary" 
+            size="large"
+            @click="prepareNextRound"
+          >
+            <el-icon><DArrowRight /></el-icon>
+            下一轮抽签
           </el-button>
-        </div>
-        <div class="all-done-section" v-else>
-          <div class="all-done-text">🎊 所有轮次已完成 🎊</div>
+          <el-button 
+            v-else
+            type="success"
+            size="large"
+          >
+            <el-icon><CircleCheck /></el-icon>
+            所有轮次已完成
+          </el-button>
+          <el-button 
+            size="large"
+            @click="backToPool"
+          >
+            <el-icon><Back /></el-icon>
+            返回参与者池
+          </el-button>
         </div>
         
         <div class="confetti-canvas"></div>
@@ -86,8 +154,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
-import { Cpu } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { 
+  Cpu, User, VideoPlay, RefreshLeft, Cellphone, 
+  DArrowRight, CircleCheck, Back 
+} from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
 const route = useRoute()
@@ -270,6 +341,56 @@ const prepareNextRound = () => {
       count: round.count
     })
   }
+}
+
+// Start lottery (admin control)
+const startLottery = () => {
+  const round = rounds.value[currentRoundIndex.value]
+  if (!round) {
+    ElMessage.warning('没有可用的轮次')
+    return
+  }
+  socket.emit('lottery_action', {
+    action: 'start',
+    meeting_id: parseInt(meetingId),
+    lottery_id: round.id
+  })
+}
+
+// Reset lottery (clear all participants)
+const resetLottery = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要重置本轮抽签吗？这将清空所有参与者。',
+      '确认重置',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    socket.emit('lottery_action', {
+      action: 'reset',
+      meeting_id: parseInt(meetingId)
+    })
+    ElMessage.success('已重置')
+  } catch (e) {
+    // User cancelled
+  }
+}
+
+// Back to pool (return from result to preparing)
+const backToPool = () => {
+  const round = rounds.value[currentRoundIndex.value]
+  if (!round) return
+  
+  socket.emit('lottery_action', {
+    action: 'prepare',
+    meeting_id: parseInt(meetingId),
+    lottery_id: round.id,
+    title: round.title,
+    count: round.count
+  })
 }
 
 onMounted(() => {
