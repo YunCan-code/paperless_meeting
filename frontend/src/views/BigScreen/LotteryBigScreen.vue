@@ -58,6 +58,14 @@
             <el-icon><RefreshLeft /></el-icon>
             重置
           </el-button>
+          <el-button 
+            type="warning"
+            size="large" 
+            @click="addTestParticipants"
+          >
+            <el-icon><UserFilled /></el-icon>
+            添加测试参与者
+          </el-button>
         </div>
 
         <!-- Participant Pool -->
@@ -181,7 +189,7 @@ import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
 import { 
   Cpu, User, VideoPlay, RefreshLeft, Cellphone, 
-  DArrowRight, CircleCheck, Back, CircleClose, InfoFilled 
+  DArrowRight, CircleCheck, Back, CircleClose, InfoFilled, UserFilled 
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
@@ -423,6 +431,38 @@ const stopLottery = () => {
   socket.emit('lottery_action', {
     action: 'stop',
     meeting_id: parseInt(meetingId)
+  })
+}
+
+// Add test participants for testing
+const addTestParticipants = () => {
+  const testUsers = [
+    { id: 9001, name: '张三', department: '技术部', avatar: '' },
+    { id: 9002, name: '李四', department: '市场部', avatar: '' },
+    { id: 9003, name: '王五', department: '财务部', avatar: '' },
+    { id: 9004, name: '赵六', department: '人事部', avatar: '' },
+    { id: 9005, name: '钱七', department: '运营部', avatar: '' },
+    { id: 9006, name: '孙八', department: '研发部', avatar: '' },
+    { id: 9007, name: '周九', department: '设计部', avatar: '' },
+    { id: 9008, name: '吴十', department: '销售部', avatar: '' }
+  ]
+  
+  let count = 0
+  testUsers.forEach((user, index) => {
+    setTimeout(() => {
+      socket.emit('lottery_action', {
+        action: 'join',
+        meeting_id: parseInt(meetingId),
+        user_id: user.id,
+        user_name: user.name,
+        department: user.department,
+        avatar: user.avatar
+      })
+      count++
+      if (count === testUsers.length) {
+        ElMessage.success(`已添加 ${count} 个测试参与者`)
+      }
+    }, index * 200) // Stagger the joins
   })
 }
 
