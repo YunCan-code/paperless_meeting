@@ -28,11 +28,11 @@ data class LotteryHistoryResponse(
 // Socket State Models
 data class LotteryState(
     val status: String,
-    val participants: List<LotteryParticipant>,
-    val current_title: String?,
-    val current_count: Int,
-    val winners: List<LotteryWinnerMap>,
-    val participant_count: Int
+    val participants: List<LotteryParticipant>? = null,
+    val current_title: String? = null,
+    val current_count: Int = 1,
+    val winners: List<LotteryWinnerMap>? = null,
+    val participant_count: Int = 0
 )
 
 data class LotteryParticipant(

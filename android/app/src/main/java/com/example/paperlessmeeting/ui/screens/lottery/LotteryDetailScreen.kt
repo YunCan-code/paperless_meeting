@@ -86,10 +86,10 @@ fun LotteryDetailScreen(
             val isJoined = uiState?.participants?.any {
                 when (it.id) {
                     is String -> it.id == currentUserId.toString()
-                    is Number -> it.id as Int == currentUserId
+                    is Number -> it.id.toInt() == currentUserId
                     else -> false
                 }
-            } == true
+            } ?: false
             
             StatusHeroCard(
                 status = status,

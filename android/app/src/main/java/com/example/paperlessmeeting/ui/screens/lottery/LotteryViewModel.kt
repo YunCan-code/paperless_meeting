@@ -113,15 +113,48 @@ class LotteryViewModel @Inject constructor(
             // 监听参与者更新事件
             socket?.on("lottery_players_update") { args ->
                 if (args.isNotEmpty()) {
-                    val data = args[0] as JSONObject
-                    println("[Lottery] Players update received: $data")
-                    // 更新参与者数量到当前状态
-                    val currentState = _uiState.value
-                    if (currentState != null) {
-                        val updatedState = currentState.copy(
-                            participant_count = data.optInt("count", currentState.participant_count)
-                        )
-                        _uiState.value = updatedState
+                    try {
+                        val data = args[0] as JSONObject
+                        println("[Lottery] Players update received: $data")
+
+                        // 解析参与者列表
+                        val participantsArray = data.optJSONArray("all_participants")
+                        val participantsList = mutableListOf<com.example.paperlessmeeting.domain.model.LotteryParticipant>()
+
+                        if (participantsArray != null) {
+                            for (i in 0 until participantsArray.length()) {
+                                val p = participantsArray.getJSONObject(i)
+                                participantsList.add(
+                                    com.example.paperlessmeeting.domain.model.LotteryParticipant(
+                                        id = p.opt("id") ?: 0,
+                                        name = p.optString("name", ""),
+                                        sid = p.optString("sid", null),
+                                        avatar = p.optString("avatar", null),
+                                        department = p.optString("department", null)
+                                    )
+                                )
+                            }
+                        }
+
+                        // 更新参与者数量和列表到当前状态
+                        val currentState = _uiState.value
+                        if (currentState != null) {
+                            val updatedState = currentState.copy(
+                                participant_count = data.optInt("count", currentState.participant_count),
+                                participants = participantsList
+                            )
+                            _uiState.value = updatedState
+                        } else {
+                            // 如果当前状态为空，创建一个新的状态
+                            _uiState.value = LotteryState(
+                                status = "PREPARING",
+                                participants = participantsList,
+                                participant_count = data.optInt("count", 0)
+                            )
+                        }
+                    } catch (e: Exception) {
+                        println("[Lottery] Error parsing players update: ${e.message}")
+                        e.printStackTrace()
                     }
                 }
             }
