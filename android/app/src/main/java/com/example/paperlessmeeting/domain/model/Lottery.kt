@@ -32,7 +32,8 @@ data class LotteryState(
     val current_title: String? = null,
     val current_count: Int = 1,
     val winners: List<LotteryWinnerMap>? = null,
-    val participant_count: Int = 0
+    val participant_count: Int = 0,
+    val is_joined: Boolean = false // 用户是否已加入
 )
 
 data class LotteryParticipant(

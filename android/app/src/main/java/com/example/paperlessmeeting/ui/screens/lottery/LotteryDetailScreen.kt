@@ -81,15 +81,8 @@ fun LotteryDetailScreen(
         ) {
             // 1. Hero Status Card
             val status = uiState?.status ?: "IDLE"
-            val currentUserId = viewModel.getCurrentUserId()
-            // 检查用户是否已加入（兼容 int 和 string 类型的 id）
-            val isJoined = uiState?.participants?.any {
-                when (it.id) {
-                    is String -> it.id == currentUserId.toString()
-                    is Number -> it.id.toInt() == currentUserId
-                    else -> false
-                }
-            } ?: false
+            // 使用后端返回的 is_joined 字段，而不是手动检查参与者列表
+            val isJoined = uiState?.is_joined ?: false
             
             StatusHeroCard(
                 status = status,
