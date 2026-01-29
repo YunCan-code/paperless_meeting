@@ -36,14 +36,25 @@
       <div class="section">
         <div class="section-header">
           <h4>已创建轮次</h4>
-          <el-button 
-            v-if="history.rounds.length > 0"
-            type="success" 
-            @click="openBigScreen"
-          >
-            <el-icon><Monitor /></el-icon>
-            进入大屏
-          </el-button>
+          <div class="header-actions">
+            <el-button 
+              size="small"
+              @click="fetchHistory"
+              :loading="loading"
+              :icon="Refresh"
+            >
+              刷新
+            </el-button>
+            <el-button 
+              v-if="history.rounds.length > 0"
+              type="success" 
+              size="small"
+              @click="openBigScreen"
+            >
+              <el-icon><Monitor /></el-icon>
+              进入大屏
+            </el-button>
+          </div>
         </div>
         <div v-if="loading" class="loading-state">
           <el-icon class="is-loading"><Loading /></el-icon>
@@ -91,7 +102,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Calendar, Monitor, Loading } from '@element-plus/icons-vue'
+import { Calendar, Monitor, Loading, Refresh } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { io } from 'socket.io-client'
@@ -216,6 +227,17 @@ const initSocket = () => {
   socket.on('connect', () => {
     socket.emit('join_meeting', { meeting_id: props.meetingId })
   })
+  
+  // Auto-refresh on lottery state changes
+  socket.on('lottery_state_change', () => {
+    console.log('[Lottery Manager] State changed, auto-refreshing...')
+    fetchHistory()
+  })
+  
+  socket.on('lottery_state_sync', () => {
+    console.log('[Lottery Manager] State synced, auto-refreshing...')
+    fetchHistory()
+  })
 }
 
 // 关闭处理
@@ -275,6 +297,11 @@ watch(() => props.modelValue, (visible) => {
   margin: 0;
   color: var(--el-text-color-primary);
   font-size: 15px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .section h4 {
