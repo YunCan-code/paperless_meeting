@@ -121,8 +121,8 @@ async def handle_get_lottery_state(sid, data):
         
     response = {
         'status': state['status'],
-        'participants_count': len(db_participants),
-        'all_participants': db_participants, # 返回持久化数据
+        'participant_count': len(db_participants),
+        'participants': db_participants, # 返回持久化数据
         'config': {
             'title': state.get('current_title'),
             'count': state.get('current_count', 1)
@@ -279,8 +279,8 @@ async def lottery_action(sid, data):
         current_list = get_db_participants(meeting_id)
         print(f"[Lottery] Found {len(current_list)} participants in DB: {[p['name'] for p in current_list]}")
         await sio.emit('lottery_players_update', {
-            'count': len(current_list),
-            'all_participants': current_list
+            'participant_count': len(current_list),
+            'participants': current_list
         }, room=room)
     
     # ===== QUIT: 用户退出抽签池 =====

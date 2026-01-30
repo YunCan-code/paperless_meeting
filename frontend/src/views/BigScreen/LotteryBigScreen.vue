@@ -356,17 +356,12 @@ const initSocket = () => {
 
   socket.on('lottery_players_update', (data) => {
     console.log('Players update:', data)
-    console.log('Players update - all_participants:', data.all_participants)
-    console.log('Players update - count:', data.count)
-    // Update participants list
-    if (data.all_participants) {
-      state.value.participants = data.all_participants
-      state.value.participant_count = data.count || data.all_participants.length
+    // Use unified 'participants' field
+    const participants = data.participants || data.all_participants
+    if (participants) {
+      state.value.participants = participants
+      state.value.participant_count = data.participant_count || data.count || participants.length
       console.log('State updated - participants:', state.value.participants)
-      console.log('State updated - count:', state.value.participant_count)
-      console.log('Current status:', state.value.status)
-    } else {
-      console.warn('No all_participants in data!')
     }
   })
 
@@ -396,13 +391,22 @@ const initSocket = () => {
 // State Logic
 const handleStateChange = (newState) => {
   const oldStatus = state.value.status
-  state.value = newState
+  
+  // Normalize incoming data fields
+  const participants = newState.participants || newState.all_participants || state.value.participants
+  const participant_count = newState.participant_count || newState.participants_count || newState.count || participants?.length || 0
+  
+  state.value = {
+    ...newState,
+    participants,
+    participant_count
+  }
 
   // On first state receive, fetch rounds and prepare if needed
   if (!initialStateReceived) {
     initialStateReceived = true
     fetchRoundsAndPrepareFirst()
-  } else if (newState.status === 'IDLE') {
+  } else if (state.value.status === 'IDLE') {
     // Reload on reset
     fetchRoundsAndPrepareFirst()
   }
@@ -658,6 +662,7 @@ onUnmounted(() => {
   font-size: 32px;
   font-weight: 700;
   background: linear-gradient(135deg, #ffffff 0%, #a0aec0 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin: 0;
@@ -892,8 +897,19 @@ onUnmounted(() => {
 }
 
 /* Transitions */
-.list-enter-active, .list-leave-active { transition: all 0.5s ease; }
-.list-enter-from, .list-leave-to { opacity: 0; transform: translateY(20px); }
+.list-move {
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.list-enter-active, .list-leave-active {
+  transition: all 0.5s ease;
+}
+.list-leave-active {
+  position: absolute;
+}
+.list-enter-from, .list-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
 
 /* Next Round Section */
 .next-round-section {
