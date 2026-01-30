@@ -374,6 +374,7 @@ watch(() => props.modelValue, (visible) => {
 
 .round-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
 }
 </style>

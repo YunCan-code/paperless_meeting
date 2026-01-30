@@ -162,15 +162,7 @@
             <el-icon><DArrowRight /></el-icon>
             下一轮抽签
           </el-button>
-          <el-button 
-            v-else
-            type="success"
-            size="large"
-            @click="viewAllResults"
-          >
-            <el-icon><Document /></el-icon>
-            查看所有轮次结果
-          </el-button>
+
           <el-button 
             size="large"
             @click="backToPool"
