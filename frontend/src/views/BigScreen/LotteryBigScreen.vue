@@ -287,22 +287,36 @@ const allFinished = computed(() => {
 
 // Computed: Sort participants (winners first)
 const sortedParticipants = computed(() => {
-  return [...state.value.participants].sort((a, b) => {
-    if (a.is_winner && !b.is_winner) return -1
-    if (!a.is_winner && b.is_winner) return 1
-    if (a.is_winner && b.is_winner) {
-      // Group by round, newer rounds first
-      return (b.winning_lottery_id || 0) - (a.winning_lottery_id || 0)
+  if (!state.value.participants) return []
+  const list = Array.isArray(state.value.participants) 
+    ? state.value.participants 
+    : Object.values(state.value.participants)
+    
+  return [...list].sort((a, b) => {
+    // Winners first
+    const aWin = a.is_winner ? 1 : 0
+    const bWin = b.is_winner ? 1 : 0
+    if (aWin !== bWin) return bWin - aWin
+    
+    // Within winners, newer rounds first
+    if (a.is_winner) {
+      const aRid = a.winning_lottery_id || 0
+      const bRid = b.winning_lottery_id || 0
+      if (aRid !== bRid) return bRid - aRid
     }
-    return a.id - b.id
+    
+    // Default by ID
+    return (a.id || 0) - (b.id || 0)
   })
 })
 
 // Helper: Get winner class based on round index
 const getWinnerClass = (p) => {
   if (!p.is_winner) return ''
+  if (!p.winning_lottery_id) return 'is-winner winner-round-default'
+  
   const roundIndex = rounds.value.findIndex(r => r.id === p.winning_lottery_id)
-  if (roundIndex === -1) return 'is-winner' // Fallback
+  if (roundIndex === -1) return 'is-winner winner-round-default'
   return `is-winner winner-round-${roundIndex % 5}`
 }
 
@@ -787,15 +801,23 @@ onUnmounted(() => {
 
 .participant-card.is-winner {
   animation: pulse 2s infinite;
+  /* Default to Round 0 style if specific round is not found */
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.15);
 }
 
-/* Round Specific Winner Colors */
-.winner-round-0 { /* Round 1 - Gold */
+.participant-card.is-winner .name {
+  color: #fbbf24;
+}
+
+/* Round Specific Winner Colors (override default) */
+.winner-round-0, .winner-round-default { /* Round 1 - Gold */
   border-color: #fbbf24 !important;
   box-shadow: 0 0 20px rgba(251, 191, 36, 0.4) !important;
   background: rgba(251, 191, 36, 0.15) !important;
 }
-.winner-round-0 .name { color: #fbbf24 !important; }
+.winner-round-0 .name, .winner-round-default .name { color: #fbbf24 !important; }
 
 .winner-round-1 { /* Round 2 - Silver/Blue */
   border-color: #60a5fa !important;
