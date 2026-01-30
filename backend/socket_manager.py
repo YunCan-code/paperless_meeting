@@ -391,8 +391,8 @@ async def lottery_action(sid, data):
                     
                     # 2. Add to LotteryWinner table (Only if user exists in User table)
                     if lottery_id:
-                        # 检查用户是否存在于 user 表以避免外键冲突 (测试用户 ID 通常 >= 9000)
-                        if dog.user_id < 9000:
+                        # 检查用户是否存在于 user 表以避免外键冲突 (测试用户 ID 通常较大，真实用户 ID 较小)
+                        if dog.user_id < 10000:
                             winner_record = LotteryWinner(
                                 lottery_id=lottery_id,
                                 user_id=dog.user_id,

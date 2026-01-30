@@ -619,7 +619,9 @@ const addTestParticipants = () => {
   let addedCount = 0
   
   for (let i = 0; i < batchSize; i++) {
-    const id = 9000 + currentCount + i + 1
+    // 使用会议ID作为前缀，确保不同会议之间的测试用户ID不冲突 (Primary Key: meeting_id + user_id)
+    // 同时也为了避免和真实用户ID(通常较小)冲突，使用较大的偏移量
+    const id = parseInt(meetingId) * 10000 + currentCount + i + 1
     const randomSurname = surnames[Math.floor(Math.random() * surnames.length)]
     const randomName = `${randomSurname}测试${id}` // Unique name
     const dept = departments[i % departments.length]
