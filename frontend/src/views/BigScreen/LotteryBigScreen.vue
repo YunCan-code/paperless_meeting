@@ -663,20 +663,23 @@ onUnmounted(() => {
 .main-content {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column; /* Ensure children stack vertically if multiple */
   padding: 40px;
   position: relative;
   z-index: 5;
+  min-height: 0; /* Important for flex children to scroll */
 }
 
 /* Pool View */
 .pool-container {
   width: 100%;
   max-width: 1200px;
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  margin: 0 auto;
+  overflow: hidden; /* Ensure no overflow leaves the container */
 }
 
 .pool-grid {
@@ -737,7 +740,17 @@ onUnmounted(() => {
 .empty-pool .text { font-size: 24px; margin-bottom: 8px; }
 .empty-pool .sub-text { font-size: 16px; opacity: 0.7; }
 
-/* Rolling View */
+/* Rolling & Result View Centering */
+.rolling-container, .result-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+
 .rolling-machine {
   text-align: center;
 }
@@ -877,7 +890,7 @@ onUnmounted(() => {
 .status-badge.idle .status-dot { background: #6B7280; }
 .control-panel { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; padding: 24px; background: rgba(255, 255, 255, 0.03); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); }
 .control-panel .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
-.pool-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.pool-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .pool-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
 .pool-header h2 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0; }
 .pool-count { font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.8); padding: 8px 20px; background: rgba(59, 130, 246, 0.15); border-radius: 20px; }
