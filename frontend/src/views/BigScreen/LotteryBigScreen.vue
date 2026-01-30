@@ -527,17 +527,53 @@ const resetLottery = async () => {
 }
 
 // Back to pool (return from result to preparing)
-const backToPool = () => {
-  const round = rounds.value[currentRoundIndex.value]
-  if (!round) return
-  
-  socket.emit('lottery_action', {
-    action: 'prepare',
-    meeting_id: parseInt(meetingId),
-    lottery_id: round.id,
-    title: round.title,
-    count: round.count
-  })
+const backToPool = async () => {
+  try {
+    // 强制同步一次轮次信息，确保拿到最新的 status
+    const res = await fetch(`/api/lottery/${meetingId}/history`).then(r => r.json())
+    rounds.value = res.rounds || []
+    
+    // 寻找第一个未完成的轮次
+    const firstUnfinished = rounds.value.findIndex(r => r.status !== 'finished')
+    
+    if (firstUnfinished >= 0) {
+      currentRoundIndex.value = firstUnfinished
+      const round = rounds.value[firstUnfinished]
+      console.log('[BackToPool] Advancing to next unfinished round:', round.title)
+      socket.emit('lottery_action', {
+        action: 'prepare',
+        meeting_id: parseInt(meetingId),
+        lottery_id: round.id,
+        title: round.title,
+        count: round.count
+      })
+    } else {
+      // 全部完成，返回最后一轮的池子预览
+      const round = rounds.value[rounds.value.length - 1]
+      if (round) {
+        socket.emit('lottery_action', {
+          action: 'prepare',
+          meeting_id: parseInt(meetingId),
+          lottery_id: round.id,
+          title: round.title,
+          count: round.count
+        })
+      }
+    }
+  } catch (e) {
+    console.error('Failed to sync in backToPool:', e)
+    // 降级原逻辑
+    const round = rounds.value[currentRoundIndex.value]
+    if (round) {
+      socket.emit('lottery_action', {
+        action: 'prepare',
+        meeting_id: parseInt(meetingId),
+        lottery_id: round.id,
+        title: round.title,
+        count: round.count
+      })
+    }
+  }
 }
 
 // Stop lottery (trigger result)
