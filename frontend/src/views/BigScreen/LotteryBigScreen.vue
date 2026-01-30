@@ -678,12 +678,21 @@ onUnmounted(() => {
 }
 
 .pool-grid {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* Critical for nested flex scrolling */
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   justify-content: center;
   align-content: flex-start;
+  padding: 20px;
 }
+
+.pool-grid::-webkit-scrollbar { width: 8px; }
+.pool-grid::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+.pool-grid::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+.pool-grid::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 
 .participant-card {
   background: rgba(255,255,255,0.05);
