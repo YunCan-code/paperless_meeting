@@ -32,10 +32,18 @@
           <el-icon class="notice-icon"><InfoFilled /></el-icon>
           <div class="notice-content">
             <h3 v-if="rounds.length === 0">暂无抽签轮次</h3>
-            <h3 v-else-if="rounds.every(r => r.status === 'finished')">所有轮次已完成</h3>
+            <h3 v-else-if="allFinished">所有轮次已完成</h3>
             <h3 v-else>等待配置中...</h3>
             <p v-if="rounds.length === 0">请先在管理界面创建抽签轮次</p>
-            <p v-else-if="rounds.every(r => r.status === 'finished')">所有抽签轮次已完成,可在历史记录中查看结果</p>
+            <div v-else-if="allFinished">
+              <p>所有抽签轮次已完成,可在历史记录中查看结果</p>
+              <div style="margin-top: 24px;">
+                <el-button type="primary" size="large" @click="resetLottery(true)">
+                  <el-icon><Refresh /></el-icon>
+                  清除记录并重新开始
+                </el-button>
+              </div>
+            </div>
             <p v-else>正在加载抽签配置,请稍候...</p>
           </div>
         </div>
@@ -497,10 +505,11 @@ const startLottery = () => {
 }
 
 // Reset lottery (clear all participants)
-const resetLottery = async () => {
+const resetLottery = async (forceFull = false) => {
   try {
+    const isFull = forceFull === true
     await ElMessageBox.confirm(
-      '确定要重置本轮抽签吗？这将清空所有参与者。',
+      isFull ? '确定要清除所有中奖记录并重新开始吗？该操作不可撤销。' : '确定要重置本轮抽签吗？这将清空当前参与者。',
       '确认重置',
       {
         confirmButtonText: '确定',
@@ -510,8 +519,16 @@ const resetLottery = async () => {
     )
     socket.emit('lottery_action', {
       action: 'reset',
-      meeting_id: parseInt(meetingId)
+      meeting_id: parseInt(meetingId),
+      full_reset: isFull
     })
+    
+    if (isFull) {
+      setTimeout(() => {
+        fetchRoundsAndPrepareFirst()
+      }, 500)
+    }
+    
     ElMessage.success('已重置')
   } catch (e) {
     // User cancelled

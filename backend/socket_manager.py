@@ -429,6 +429,8 @@ async def lottery_action(sid, data):
     
     # ===== RESET: 重置抽签状态 =====
     elif action == 'reset':
+        full_reset = data.get('full_reset', False)
+        
         state["status"] = LotteryState.IDLE
         state["participants"] = {}
         state["winners"] = []
@@ -439,10 +441,33 @@ async def lottery_action(sid, data):
         # [Modified] Clear DB participants for this meeting
         try:
              with get_db_session() as session:
+                # 1. 清空参与者
                 stmt = select(LotteryParticipant).where(LotteryParticipant.meeting_id == meeting_id)
                 results = session.exec(stmt).all()
                 for p in results:
                     session.delete(p)
+                
+                # 2. 如果是完全重置，则清空所有历史中奖记录并重置轮次状态
+                if full_reset:
+                    # 查找该会议的所有轮次
+                    l_stmt = select(Lottery).where(Lottery.meeting_id == meeting_id)
+                    lotteries = session.exec(l_stmt).all()
+                    lottery_ids = [l.id for l in lotteries]
+                    
+                    if lottery_ids:
+                        # 删除中奖记录
+                        w_stmt = select(LotteryWinner).where(LotteryWinner.lottery_id.in_(lottery_ids))
+                        winners = session.exec(w_stmt).all()
+                        for w in winners:
+                            session.delete(w)
+                        
+                        # 重置轮次状态
+                        for l in lotteries:
+                            l.status = "waiting"
+                            session.add(l)
+                    
+                    print(f"[Lottery] Full reset performed for meeting {meeting_id}")
+                
                 session.commit()
         except Exception as e:
             print(f"[Lottery] Reset DB Error: {e}")
