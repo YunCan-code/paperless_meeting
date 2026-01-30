@@ -389,14 +389,18 @@ async def lottery_action(sid, data):
                         "avatar": dog.avatar
                     })
                     
-                    # 2. Add to LotteryWinner table
+                    # 2. Add to LotteryWinner table (Only if user exists in User table)
                     if lottery_id:
-                        winner_record = LotteryWinner(
-                            lottery_id=lottery_id,
-                            user_id=dog.user_id,
-                            user_name=dog.user_name
-                        )
-                        session.add(winner_record)
+                        # 检查用户是否存在于 user 表以避免外键冲突 (测试用户 ID 通常 >= 9000)
+                        if dog.user_id < 9000:
+                            winner_record = LotteryWinner(
+                                lottery_id=lottery_id,
+                                user_id=dog.user_id,
+                                user_name=dog.user_name
+                            )
+                            session.add(winner_record)
+                        else:
+                            print(f"[Lottery] Skipping LotteryWinner record for test user {dog.user_id}")
                     
                     # 3. Update LotteryParticipant is_winner status
                     participant = session.get(LotteryParticipant, (meeting_id, dog.user_id))
@@ -409,8 +413,11 @@ async def lottery_action(sid, data):
                     state["history_winners"].add(dog.user_id)
 
                 session.commit()
+                print(f"[Lottery] Winners saved to DB: {[w['name'] for w in winners_data]}")
         except Exception as e:
              print(f"[Lottery] Save Winner Error: {e}")
+             import traceback
+             traceback.print_exc()
 
         state["winners"] = winners_data
         state["status"] = LotteryState.RESULT

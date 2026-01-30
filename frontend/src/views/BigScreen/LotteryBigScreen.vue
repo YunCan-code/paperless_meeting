@@ -370,8 +370,8 @@ const initSocket = () => {
     // Handle initial state from database
     // Map backend field names to frontend state structure
     state.value.status = data.status || 'IDLE'
-    state.value.participants = data.all_participants || []
-    state.value.participant_count = data.participants_count || 0
+    state.value.participants = data.participants || data.all_participants || []
+    state.value.participant_count = data.participant_count || data.participants_count || state.value.participants.length
     state.value.current_title = data.config?.title || ''
     state.value.current_count = data.config?.count || 1
     state.value.winners = data.last_result || []
