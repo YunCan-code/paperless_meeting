@@ -79,10 +79,10 @@
           <div class="pool-grid" v-if="state.participants.length > 0">
             <transition-group name="list">
               <div 
-                v-for="p in state.participants" 
+                v-for="p in sortedParticipants" 
                 :key="p.id" 
                 class="participant-card"
-                :class="{ 'is-winner': p.is_winner }"
+                :class="getWinnerClass(p)"
               >
                 <div class="avatar-placeholder">
                   <img v-if="p.avatar" :src="p.avatar" :alt="p.name" />
@@ -284,6 +284,27 @@ const hasNextRound = computed(() => {
 const allFinished = computed(() => {
   return rounds.value.length > 0 && rounds.value.every(r => r.status === 'finished')
 })
+
+// Computed: Sort participants (winners first)
+const sortedParticipants = computed(() => {
+  return [...state.value.participants].sort((a, b) => {
+    if (a.is_winner && !b.is_winner) return -1
+    if (!a.is_winner && b.is_winner) return 1
+    if (a.is_winner && b.is_winner) {
+      // Group by round, newer rounds first
+      return (b.winning_lottery_id || 0) - (a.winning_lottery_id || 0)
+    }
+    return a.id - b.id
+  })
+})
+
+// Helper: Get winner class based on round index
+const getWinnerClass = (p) => {
+  if (!p.is_winner) return ''
+  const roundIndex = rounds.value.findIndex(r => r.id === p.winning_lottery_id)
+  if (roundIndex === -1) return 'is-winner' // Fallback
+  return `is-winner winner-round-${roundIndex % 5}`
+}
 
 // Flag to track if initial state has been received
 let initialStateReceived = false
@@ -765,20 +786,44 @@ onUnmounted(() => {
 }
 
 .participant-card.is-winner {
-  border-color: #fbbf24;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
-  background: rgba(251, 191, 36, 0.15);
   animation: pulse 2s infinite;
 }
 
-.participant-card.is-winner .name {
-  color: #fbbf24;
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+/* Round Specific Winner Colors */
+.winner-round-0 { /* Round 1 - Gold */
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4) !important;
+  background: rgba(251, 191, 36, 0.15) !important;
 }
+.winner-round-0 .name { color: #fbbf24 !important; }
 
-.participant-card.is-winner .avatar-text {
-  color: #fbbf24;
+.winner-round-1 { /* Round 2 - Silver/Blue */
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.4) !important;
+  background: rgba(96, 165, 250, 0.15) !important;
 }
+.winner-round-1 .name { color: #60a5fa !important; }
+
+.winner-round-2 { /* Round 3 - Bronze/Orange */
+  border-color: #f97316 !important;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.4) !important;
+  background: rgba(249, 115, 22, 0.15) !important;
+}
+.winner-round-2 .name { color: #f97316 !important; }
+
+.winner-round-3 { /* Round 4 - Emerald */
+  border-color: #10b981 !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
+  background: rgba(16, 185, 129, 0.15) !important;
+}
+.winner-round-3 .name { color: #10b981 !important; }
+
+.winner-round-4 { /* Round 5 - Purple */
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4) !important;
+  background: rgba(168, 85, 247, 0.15) !important;
+}
+.winner-round-4 .name { color: #a855f7 !important; }
 
 .rolling-status {
   font-size: 24px;

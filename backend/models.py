@@ -307,4 +307,5 @@ class LotteryParticipant(SQLModel, table=True):
     department: Optional[str] = None
     status: str = Field(default="joined") # joined: 已加入, left: 已退出
     is_winner: bool = Field(default=False) # 是否已中奖 (防止重复中奖)
+    winning_lottery_id: Optional[int] = Field(default=None) # 中奖轮次ID (用于区分不同轮次变色)
     created_at: datetime = Field(default_factory=datetime.now)

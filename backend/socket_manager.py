@@ -69,6 +69,7 @@ def get_db_participants(meeting_id: int) -> list:
                     "avatar": p.avatar,
                     "department": p.department,
                     "is_winner": p.is_winner, # 返回中奖状态
+                    "winning_lottery_id": p.winning_lottery_id, # 返回中奖轮次ID
                     "sid": None # DB中没有sid，不过前端展示主要靠 id/name
                 })
     except Exception as e:
@@ -401,6 +402,7 @@ async def lottery_action(sid, data):
                     participant = session.get(LotteryParticipant, (meeting_id, dog.user_id))
                     if participant:
                         participant.is_winner = True
+                        participant.winning_lottery_id = lottery_id # 记录中奖轮次
                         session.add(participant)
                     
                     # Update memory history
