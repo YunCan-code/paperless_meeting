@@ -675,6 +675,8 @@ onUnmounted(() => {
   width: 100%;
   max-width: 1200px;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .pool-grid {
