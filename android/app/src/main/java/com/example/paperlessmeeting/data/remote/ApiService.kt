@@ -71,6 +71,16 @@ interface ApiService {
     @GET("vote/meeting/{meetingId}/list")
     suspend fun getVoteList(@retrofit2.http.Path("meetingId") meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
 
+    @GET("vote/{voteId}")
+    suspend fun getVote(@retrofit2.http.Path("voteId") voteId: Int): com.example.paperlessmeeting.domain.model.Vote
+
     @GET("lottery/{meetingId}/history")
     suspend fun getLotteryHistory(@retrofit2.http.Path("meetingId") meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse
+
+    @GET("vote/history")
+    suspend fun getVoteHistory(
+        @retrofit2.http.Query("user_id") userId: Int,
+        @retrofit2.http.Query("skip") skip: Int = 0,
+        @retrofit2.http.Query("limit") limit: Int = 20
+    ): List<com.example.paperlessmeeting.domain.model.Vote>
 }

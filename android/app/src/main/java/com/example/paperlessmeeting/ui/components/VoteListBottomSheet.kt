@@ -9,11 +9,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,16 +30,25 @@ private val WarmBackground = Color(0xFFFAFBFC)
 private val CardBackground = Color(0xFFFFFFFF)
 
 /**
- * 投票列表选择器 BottomSheet
+ * 投票列表选择器 BottomSheet (支持历史记录)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoteListBottomSheet(
-    votes: List<Vote>,
+    activeVotes: List<Vote>,
+    historyVotes: List<Vote>,
+    onTabChange: (Int) -> Unit,
     onVoteSelected: (Vote) -> Unit,
     onDismiss: () -> Unit,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 ) {
+    var selectedTabIndex by remember { mutableStateOf(0) }
+
+    // 当切换到历史记录时，触发回调加载数据
+    LaunchedEffect(selectedTabIndex) {
+        onTabChange(selectedTabIndex)
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -48,50 +58,55 @@ fun VoteListBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp)
         ) {
-            // 标题
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.HowToVote,
-                    contentDescription = null,
-                    tint = PrimaryBlue,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "选择投票",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Text(
-                        text = "共 ${votes.size} 个投票",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = WarmBackground,
+                contentColor = PrimaryBlue,
+                indicator = { tabPositions ->
+                    TabRowDefaults.Indicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                        color = PrimaryBlue
                     )
                 }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // 投票列表 (进行中置顶)
-            val sortedVotes = remember(votes) {
-                votes.sortedByDescending { it.status == "active" }
-            }
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.heightIn(max = 500.dp)
             ) {
-                items(sortedVotes) { vote ->
-                    VoteListItem(
-                        vote = vote,
-                        onClick = { onVoteSelected(vote) }
-                    )
+                Tab(
+                    selected = selectedTabIndex == 0,
+                    onClick = { selectedTabIndex = 0 },
+                    text = { Text("进行中 (${activeVotes.size})") },
+                    icon = { Icon(Icons.Default.HowToVote, contentDescription = null) }
+                )
+                Tab(
+                    selected = selectedTabIndex == 1,
+                    onClick = { selectedTabIndex = 1 },
+                    text = { Text("历史记录") },
+                    icon = { Icon(Icons.Default.History, contentDescription = null) }
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Content
+            val currentVotes = if (selectedTabIndex == 0) activeVotes else historyVotes
+            
+            if (currentVotes.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                    Text("暂无数据", color = Color.Gray)
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    modifier = Modifier.heightIn(max = 500.dp)
+                ) {
+                    items(currentVotes) { vote ->
+                        VoteListItem(
+                            vote = vote,
+                            onClick = { onVoteSelected(vote) }
+                        )
+                    }
                 }
             }
         }
@@ -99,7 +114,7 @@ fun VoteListBottomSheet(
 }
 
 @Composable
-private fun VoteListItem(
+fun VoteListItem(
     vote: Vote,
     onClick: () -> Unit
 ) {
@@ -174,6 +189,13 @@ private fun VoteListItem(
                         maxLines = 2
                     )
                 }
+                // 显示创建时间或截止时间
+               Spacer(Modifier.height(4.dp))
+               Text(
+                   text = vote.created_at.take(10), // Simple date
+                   style = MaterialTheme.typography.labelSmall,
+                   color = Color.LightGray
+               )
             }
 
             Spacer(Modifier.width(12.dp))

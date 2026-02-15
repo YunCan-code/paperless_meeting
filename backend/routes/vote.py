@@ -9,7 +9,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 
 from database import get_session
-from models import Vote, VoteCreate, VoteRead, VoteOption, VoteOptionRead, VoteResult, VoteOptionResult, VoteOptionContent, VoteStatusUpdate, VoteSubmit, User, UserVote
+from models import Vote, VoteCreate, VoteRead, VoteOption, VoteOptionRead, VoteResult, VoteOptionResult, VoteOptionContent, VoteStatusUpdate, VoteSubmit, User, UserVote, MeetingAttendeeLink
 from socket_manager import broadcast_vote_start, broadcast_vote_end, broadcast_vote_update
 
 router = APIRouter(prefix="/vote", tags=["投票管理"])
@@ -273,6 +273,37 @@ def list_meeting_votes(meeting_id: int, session: Session = Depends(get_session))
     """获取会议所有投票"""
     votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
     return [_get_vote_with_options(v.id, session, include_remaining=True) for v in votes]
+
+
+@router.get("/history", response_model=List[VoteRead])
+def get_vote_history(
+    user_id: int, 
+    skip: int = 0, 
+    limit: int = 20, 
+    session: Session = Depends(get_session)
+):
+    """
+    获取用户的投票历史
+    逻辑：查询该用户参与的会议的所有投票 (或者该用户实际投过的票? 需求是"查看自己的历史投票")
+    通常含义: 查看我参与的会议的所有投票 (无论是否已投)，方便补投或查看结果.
+    """
+    # 1. 找出用户参与的所有会议
+    stmt_meetings = select(MeetingAttendeeLink.meeting_id).where(MeetingAttendeeLink.user_id == user_id)
+    meeting_ids_result = session.exec(stmt_meetings).all()
+    
+    if not meeting_ids_result:
+        return []
+
+    # 2. 查询这些会议下的所有投票 (按时间倒序)
+    # 排除草稿状态的投票，只显示 active 和 closed
+    stmt_votes = select(Vote).where(
+        Vote.meeting_id.in_(meeting_ids_result),
+        Vote.status.in_(["active", "closed"])
+    ).order_by(Vote.created_at.desc()).offset(skip).limit(limit)
+    
+    votes = session.exec(stmt_votes).all()
+    
+    return [_get_vote_with_options(v.id, session, include_remaining=False) for v in votes]
 
 
 def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False) -> VoteRead:

@@ -44,6 +44,7 @@ fun DashboardScreen(
     onMeetingClick: (Int) -> Unit,
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
     onLotteryClick: (com.example.paperlessmeeting.domain.model.Meeting) -> Unit = {},
+    onVoteClick: () -> Unit = {},
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -61,44 +62,7 @@ fun DashboardScreen(
         }
     }
 
-    // Vote Sheet Logic
-    val currentVote by viewModel.currentVote.collectAsState()
-    val voteResult by viewModel.voteResult.collectAsState()
-    val hasVoted by viewModel.hasVoted.collectAsState()
-    val showVoteSheet by viewModel.showVoteSheet.collectAsState()
-
-    if (showVoteSheet && currentVote != null) {
-        com.example.paperlessmeeting.ui.components.VoteBottomSheet(
-            vote = currentVote!!,
-            hasVoted = hasVoted,
-            result = voteResult,
-            onSubmit = { optionIds ->
-                viewModel.submitVote(optionIds)
-            },
-            onDismiss = {
-                viewModel.dismissVoteSheet()
-            },
-            onFetchResult = { voteId ->
-                viewModel.fetchVoteResult(voteId)
-            }
-        )
-    }
-
-    // Vote List Sheet Logic
-    val voteList by viewModel.voteList.collectAsState()
-    val showVoteListSheet by viewModel.showVoteListSheet.collectAsState()
-
-    if (showVoteListSheet && voteList.isNotEmpty()) {
-        com.example.paperlessmeeting.ui.components.VoteListBottomSheet(
-            votes = voteList,
-            onVoteSelected = { vote ->
-                viewModel.selectVoteFromList(vote)
-            },
-            onDismiss = {
-                viewModel.dismissVoteListSheet()
-            }
-        )
-    }
+    // Vote List Sheet Logic - REMOVED for clean full screen navigation
 
     when (val state = uiState) {
         is DashboardUiState.Loading -> {
@@ -116,7 +80,7 @@ fun DashboardScreen(
                 state = state, 
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
-                onVoteClick = { viewModel.checkAnyActiveVote() },
+                onVoteClick = onVoteClick,
                 onLotteryClick = {
                     val meeting = state.activeMeetings.firstOrNull()
                     if (meeting != null) {
