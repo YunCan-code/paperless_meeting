@@ -367,8 +367,9 @@ const initSocket = () => {
     console.log('Received vote_end:', data)
     if (data.vote_id == voteId) {
       voteData.value.status = 'closed'
-      results.value = data.results
-      totalVoters.value = data.total_voters
+      // Fix: data.results is the full object {vote_id, title, results: [...]}, so we need data.results.results
+      results.value = data.results.results || []
+      totalVoters.value = data.results.total_voters || data.total_voters || 0
       if (timerInterval) clearInterval(timerInterval)
       if (waitInterval) clearInterval(waitInterval)
       remainingTime.value = 0

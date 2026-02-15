@@ -14,7 +14,8 @@ import javax.inject.Inject
 @HiltViewModel
 class VoteListViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager
 ) : ViewModel() {
 
     data class VoteListUiState(
@@ -29,6 +30,23 @@ class VoteListViewModel @Inject constructor(
 
     init {
         loadData()
+        observeSocketEvents()
+    }
+
+    private fun observeSocketEvents() {
+        viewModelScope.launch {
+            socketManager.voteStartEvent.collect { vote ->
+                // Refresh list when new vote starts
+                loadData()
+            }
+        }
+        
+        // Also listen for end events to auto-refresh list (e.g. to move it to history or update status)
+        viewModelScope.launch {
+            socketManager.voteEndEvent.collect {
+                loadData()
+            }
+        }
     }
 
     fun loadData() {
@@ -97,9 +115,27 @@ class VoteListViewModel @Inject constructor(
                         historyVotes = history
                     ) 
                 }
+                
+                // 4. Connect Socket and Join Rooms
+                joinMeetingRooms(todayMeetings)
+                
             } catch (e: Exception) {
                  _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
+        }
+    }
+    
+    private fun joinMeetingRooms(meetings: List<com.example.paperlessmeeting.domain.model.Meeting>) {
+        try {
+            // Establish connection (idempotent if already connected)
+            // Note: Ideally this URL should come from a centralized config
+            socketManager.connect("https://coso.top")
+            
+            meetings.forEach { meeting ->
+                socketManager.joinMeeting(meeting.id)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
     
