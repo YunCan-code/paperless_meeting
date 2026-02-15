@@ -72,7 +72,7 @@ fun VoteDetailScreen(
                     Box(modifier = Modifier.padding(16.dp)) {
                         Button(
                             onClick = { viewModel.submitVote() },
-                            enabled = uiState.selectedOptionIds.isNotEmpty(),
+                            enabled = uiState.selectedOptionIds.isNotEmpty() && uiState.waitLeft <= 0,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
@@ -99,9 +99,7 @@ fun VoteDetailScreen(
             uiState.vote?.let { vote ->
                 VoteContent(
                     vote = vote,
-                    hasVoted = uiState.hasVoted,
-                    selectedOptions = uiState.selectedOptionIds,
-                    voteResult = uiState.voteResult,
+                    uiState = uiState, // Pass full state
                     onOptionSelected = viewModel::toggleOption,
                     modifier = Modifier.padding(innerPadding)
                 )
@@ -113,12 +111,13 @@ fun VoteDetailScreen(
 @Composable
 fun VoteContent(
     vote: Vote,
-    hasVoted: Boolean,
-    selectedOptions: Set<Int>,
-    voteResult: VoteResult?,
+    uiState: VoteDetailViewModel.VoteDetailUiState,
     onOptionSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val hasVoted = uiState.hasVoted
+    val selectedOptions = uiState.selectedOptionIds
+    val voteResult = uiState.voteResult
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -126,7 +125,7 @@ fun VoteContent(
     ) {
         // 1. 头部信息卡片
         item {
-            VoteHeaderCard(vote, hasVoted)
+            VoteHeaderCard(vote, uiState) // Pass full state for timers
         }
 
         // 2. 状态/结果分割线
@@ -168,7 +167,7 @@ fun VoteContent(
                 VoteOptionItem(
                     option = option,
                     isSelected = selectedOptions.contains(option.id),
-                    enabled = vote.status == "active" && !hasVoted,
+                    enabled = vote.status == "active" && !hasVoted && uiState.waitLeft <= 0,
                     isMultiple = vote.is_multiple,
                     onClick = { onOptionSelected(option.id) }
                 )
@@ -181,7 +180,7 @@ fun VoteContent(
 }
 
 @Composable
-fun VoteHeaderCard(vote: Vote, hasVoted: Boolean) {
+fun VoteHeaderCard(vote: Vote, uiState: VoteDetailViewModel.VoteDetailUiState) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -195,9 +194,11 @@ fun VoteHeaderCard(vote: Vote, hasVoted: Boolean) {
                 verticalAlignment = Alignment.Top
             ) {
                 // 状态标签
+                // Priority: Wait > Active > Closed/Voted
                 val (statusText, statusColor, statusBg) = when {
                     vote.status == "closed" -> Triple("已结束", Color.Gray, Color.Gray.copy(0.1f))
-                    hasVoted -> Triple("已参与", SuccessGreen, SuccessGreen.copy(0.1f))
+                    uiState.waitLeft > 0 -> Triple("即将开始", Color(0xFFE6A23C), Color(0xFFE6A23C).copy(0.1f)) // Orange
+                    uiState.hasVoted -> Triple("已参与", SuccessGreen, SuccessGreen.copy(0.1f))
                     else -> Triple("进行中", PrimaryBlue, PrimaryBlue.copy(0.1f))
                 }
                 
@@ -214,7 +215,38 @@ fun VoteHeaderCard(vote: Vote, hasVoted: Boolean) {
                     )
                 }
                 
-                // 可以在这里放倒计时组件 (参考原 BottomSheet 的 CountdownBadge)
+                // Countdown Badge
+                if (vote.status == "active" && !uiState.hasVoted) {
+                    val countText = if (uiState.waitLeft > 0) {
+                         "${uiState.waitLeft}s"
+                    } else if (uiState.timeLeft > 0) {
+                         formatTime(uiState.timeLeft)
+                    } else {
+                         "Time's Up"
+                    }
+                    
+                    val badgeColor = if (uiState.waitLeft > 0) Color(0xFFE6A23C) else Color.Red
+                    
+                    Surface(
+                         color = badgeColor.copy(alpha = 0.1f),
+                         shape = RoundedCornerShape(12.dp),
+                         border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                             // Icon(Icons.Default.AccessTime, ...)
+                             Text(
+                                 text = countText,
+                                 style = MaterialTheme.typography.labelMedium,
+                                 color = badgeColor,
+                                 fontWeight = FontWeight.Bold,
+                                 modifier = Modifier.padding(start = 2.dp)
+                             )
+                        }
+                    }
+                }
             }
             
             Spacer(Modifier.height(12.dp))
@@ -236,6 +268,13 @@ fun VoteHeaderCard(vote: Vote, hasVoted: Boolean) {
             }
         }
     }
+}
+
+// Helper to format seconds to MM:SS
+fun formatTime(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return "%02d:%02d".format(m, s)
 }
 
 @Composable
