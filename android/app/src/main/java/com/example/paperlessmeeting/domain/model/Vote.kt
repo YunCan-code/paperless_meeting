@@ -17,7 +17,8 @@ data class Vote(
     val created_at: String,
     val options: List<VoteOption>,
     val remaining_seconds: Int?, // 剩余时间（服务端计算）
-    val wait_seconds: Int? = null // 倒计时等待时间
+    val wait_seconds: Int? = null, // 倒计时等待时间
+    val user_voted: Boolean = false // 当前用户是否已投票
 )
 
 /**

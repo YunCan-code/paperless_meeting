@@ -52,10 +52,36 @@ class VoteListViewModel @Inject constructor(
                 )
                 
                 val allActiveVotes = mutableListOf<Vote>()
+                val now = java.time.LocalDateTime.now()
+
                 for (meeting in todayMeetings) {
                     try {
                         val votes = repository.getVoteList(meeting.id)
-                        allActiveVotes.addAll(votes.filter { it.status != "draft" })
+                        val filtered = votes.filter { vote ->
+                            when (vote.status) {
+                                "active" -> true
+                                "closed" -> {
+                                    // Keep closed votes for 10 minutes after expected end time
+                                    // expected_end = started_at + duration
+                                    if (vote.started_at != null) {
+                                        try {
+                                            // Backend uses isoformat(), e.g. "2023-10-27T10:00:00.123456"
+                                            val startedAt = java.time.LocalDateTime.parse(vote.started_at)
+                                            val duration = vote.duration_seconds
+                                            val endTime = startedAt.plusSeconds(duration.toLong())
+                                            val hideTime = endTime.plusMinutes(10)
+                                            now.isBefore(hideTime)
+                                        } catch (e: Exception) {
+                                            false 
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                }
+                                else -> false // "draft" not shown
+                            }
+                        }
+                        allActiveVotes.addAll(filtered)
                     } catch (e: Exception) {
                         continue
                     }

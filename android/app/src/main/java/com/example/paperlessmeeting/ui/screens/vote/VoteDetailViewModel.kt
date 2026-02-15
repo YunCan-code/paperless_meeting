@@ -34,8 +34,11 @@ class VoteDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
+                val userId = userPreferences.getUserId()
+                val validUserId = if (userId != -1) userId else null
+
                 // 1. Get Vote Details
-                val vote = repository.getVote(voteId)
+                val vote = repository.getVote(voteId, validUserId)
                 if (vote == null) {
                     _uiState.update { it.copy(isLoading = false, error = "投票不存在") }
                     return@launch
@@ -43,24 +46,17 @@ class VoteDetailViewModel @Inject constructor(
 
                 // 2. Fetch Result if closed
                 var result: VoteResult? = null
-                if (vote.status == "closed") {
+                if (vote.status == "closed" || vote.user_voted) {
                      result = repository.getVoteResult(voteId)
                 }
-                
-                // TODO: Check if user has voted (API limitation: can't check easily yet without erroring on submit)
-                // For now, assume false unless we have local persistence or API update.
-                // However, if we are in "History", likely we want to show results?
-                // If it's active history, we might want to check.
-                // Current hack: Try to submit? No. 
-                // We will rely on user memory or error message for now.
                 
                 _uiState.update { 
                     it.copy(
                         isLoading = false, 
                         vote = vote,
                         voteResult = result,
-                        // If it's closed, we assume interaction is done.
-                        hasVoted = vote.status == "closed" 
+                        // If it's closed OR user has voted
+                        hasVoted = vote.status == "closed" || vote.user_voted
                     ) 
                 }
             } catch (e: Exception) {

@@ -40,7 +40,7 @@ import com.example.paperlessmeeting.domain.model.Vote
 
 // Minimalist Color Palette
 private val ActiveBlue = Color(0xFF3B82F6) // Softer blue
-private val ClosedGreen = Color(0xFF10B981) // Softer green
+private val ClosedGray = Color(0xFF64748B) // Slate gray for closed
 private val DraftGray = Color(0xFF9CA3AF)
 private val LightBackground = Color(0xFFF9FAFB) // Very light gray background
 private val SurfaceWhite = Color(0xFFFFFFFF)
@@ -184,7 +184,7 @@ private fun MinimalistVoteCard(
     val isActive = vote.status == "active"
     val barColor = when (vote.status) {
         "active" -> ActiveBlue
-        "closed" -> ClosedGreen
+        "closed" -> ClosedGray
         else -> DraftGray
     }
 
@@ -222,7 +222,7 @@ private fun MinimalistVoteCard(
                 modifier = Modifier
                     .width(6.dp)
                     .fillMaxHeight()
-                    .background(if (isActive) barColor else barColor.copy(alpha = 0.5f))
+                    .background(barColor) // Full color, no alpha for closed
             )
 
             // Content Area

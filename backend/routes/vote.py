@@ -116,9 +116,9 @@ def create_vote(data: VoteCreate, session: Session = Depends(get_session)):
 
 
 @router.get("/{vote_id}", response_model=VoteRead)
-def get_vote(vote_id: int, session: Session = Depends(get_session)):
+def get_vote(vote_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
     """获取投票详情"""
-    return _get_vote_with_options(vote_id, session, include_remaining=True)
+    return _get_vote_with_options(vote_id, session, include_remaining=True, user_id=user_id)
 
 
 @router.post("/{vote_id}/start")
@@ -163,13 +163,13 @@ async def close_vote(vote_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/meeting/{meeting_id}/active", response_model=Optional[VoteRead])
-def get_active_vote(meeting_id: int, session: Session = Depends(get_session)):
+def get_active_vote(meeting_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
     """获取会议当前进行中的投票"""
     stmt = select(Vote).where(Vote.meeting_id == meeting_id, Vote.status == "active")
     vote = session.exec(stmt).first()
     if not vote:
         return None
-    return _get_vote_with_options(vote.id, session, include_remaining=True)
+    return _get_vote_with_options(vote.id, session, include_remaining=True, user_id=user_id)
 
 
 @router.post("/{vote_id}/submit")
@@ -269,10 +269,10 @@ def _calculate_vote_result(vote_id: int, session: Session):
 
 
 @router.get("/meeting/{meeting_id}/list", response_model=List[VoteRead])
-def list_meeting_votes(meeting_id: int, session: Session = Depends(get_session)):
+def list_meeting_votes(meeting_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
     """获取会议所有投票"""
     votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
-    return [_get_vote_with_options(v.id, session, include_remaining=True) for v in votes]
+    return [_get_vote_with_options(v.id, session, include_remaining=True, user_id=user_id) for v in votes]
 
 
 @router.get("/history", response_model=List[VoteRead])
@@ -284,29 +284,26 @@ def get_vote_history(
 ):
     """
     获取用户的投票历史
-    逻辑：查询该用户参与的会议的所有投票 (或者该用户实际投过的票? 需求是"查看自己的历史投票")
-    通常含义: 查看我参与的会议的所有投票 (无论是否已投)，方便补投或查看结果.
+    逻辑：查询该用户实际投过票的记录
     """
-    # 1. 找出用户参与的所有会议
-    stmt_meetings = select(MeetingAttendeeLink.meeting_id).where(MeetingAttendeeLink.user_id == user_id)
-    meeting_ids_result = session.exec(stmt_meetings).all()
+    # 1. 查询用户实际参与投票的记录 (UserVote)
+    stmt_voted = select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct()
+    voted_ids = session.exec(stmt_voted).all()
     
-    if not meeting_ids_result:
+    if not voted_ids:
         return []
 
-    # 2. 查询这些会议下的所有投票 (按时间倒序)
-    # 排除草稿状态的投票，只显示 active 和 closed
+    # 2. 获取这些投票详情
     stmt_votes = select(Vote).where(
-        Vote.meeting_id.in_(meeting_ids_result),
-        Vote.status.in_(["active", "closed"])
+        Vote.id.in_(voted_ids)
     ).order_by(Vote.created_at.desc()).offset(skip).limit(limit)
     
     votes = session.exec(stmt_votes).all()
     
-    return [_get_vote_with_options(v.id, session, include_remaining=False) for v in votes]
+    return [_get_vote_with_options(v.id, session, include_remaining=False, user_id=user_id) for v in votes]
 
 
-def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False) -> VoteRead:
+def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False, user_id: Optional[int] = None) -> VoteRead:
     """辅助函数：获取带选项的投票"""
     vote = session.get(Vote, vote_id)
     if not vote:
@@ -321,6 +318,15 @@ def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bo
         elapsed = (datetime.now() - vote.started_at).total_seconds()
         remaining = max(0, vote.duration_seconds - int(elapsed))
     
+    # Check if user voted
+    user_voted = False
+    if user_id:
+        existing = session.exec(
+            select(UserVote).where(UserVote.vote_id == vote_id, UserVote.user_id == user_id)
+        ).first()
+        if existing:
+            user_voted = True
+    
     return VoteRead(
         id=vote.id,
         meeting_id=vote.meeting_id,
@@ -334,5 +340,6 @@ def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bo
         started_at=vote.started_at,
         created_at=vote.created_at,
         options=[VoteOptionRead(id=o.id, content=o.content, sort_order=o.sort_order) for o in options],
-        remaining_seconds=remaining
+        remaining_seconds=remaining,
+        user_voted=user_voted
     )

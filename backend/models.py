@@ -227,6 +227,7 @@ class VoteRead(SQLModel):
     options: List["VoteOptionRead"] = []
     remaining_seconds: Optional[int] = None  # 计算剩余时间
     wait_seconds: Optional[int] = None # 距离开始因该等待的秒数 (倒计时)
+    user_voted: bool = False # 当前用户是否已投票
 
 class VoteOptionRead(SQLModel):
     id: int
