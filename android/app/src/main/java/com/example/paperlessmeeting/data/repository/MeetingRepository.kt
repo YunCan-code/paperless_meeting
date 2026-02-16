@@ -186,11 +186,6 @@ class MeetingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getVoteHistory(userId: Int, skip: Int, limit: Int): List<com.example.paperlessmeeting.domain.model.Vote> {
-        return try {
-            api.getVoteHistory(userId, skip, limit)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
+        return api.getVoteHistory(userId, skip, limit)
     }
 }
