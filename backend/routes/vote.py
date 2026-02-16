@@ -303,32 +303,7 @@ def list_meeting_votes(meeting_id: int, user_id: Optional[int] = None, session: 
     return [_get_vote_with_options(v.id, session, include_remaining=True, user_id=user_id) for v in votes]
 
 
-@router.get("/history", response_model=List[VoteRead])
-def get_vote_history(
-    user_id: int, 
-    skip: int = 0, 
-    limit: int = 20, 
-    session: Session = Depends(get_session)
-):
-    """
-    获取用户的投票历史
-    逻辑：查询该用户实际投过票的记录
-    """
-    # 1. 查询用户实际参与投票的记录 (UserVote)
-    stmt_voted = select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct()
-    voted_ids = session.exec(stmt_voted).all()
-    
-    if not voted_ids:
-        return []
 
-    # 2. 获取这些投票详情
-    stmt_votes = select(Vote).where(
-        Vote.id.in_(voted_ids)
-    ).order_by(Vote.created_at.desc()).offset(skip).limit(limit)
-    
-    votes = session.exec(stmt_votes).all()
-    
-    return [_get_vote_with_options(v.id, session, include_remaining=False, user_id=user_id) for v in votes]
 
 
 def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False, user_id: Optional[int] = None) -> VoteRead:
