@@ -5,7 +5,15 @@ from sqlmodel import create_engine, inspect
 # Ensure we can import from backend
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.database import engine
+try:
+    from backend.database import engine
+except ImportError:
+    try:
+        # In Docker /app, backend might be root
+        from database import engine
+    except ImportError as e:
+        print("Could not import database engine. Checked 'backend.database' and 'database'.")
+        raise e
 
 def check_tables():
     print(f"Checking database at: {engine.url}")
