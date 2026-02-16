@@ -149,6 +149,14 @@ fun VoteListScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = ActiveBlue)
                     }
+                } else if (uiState.error != null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Error: ${uiState.error}",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 } else {
                     val currentVotes = if (targetIndex == 0) uiState.activeVotes else uiState.historyVotes
                     
