@@ -127,7 +127,7 @@ fun MainScreen() {
                             navController.navigate(Screen.VoteList.route)
                         },
                         onLotteryClick = {
-                            navController.navigate(Screen.LotteryDetail.createRoute(it.id, it.title))
+                            navController.navigate(Screen.LotteryList.route)
                         }
                     )
                 }
@@ -195,6 +195,12 @@ fun MainScreen() {
 
                 composable(Screen.VoteList.route) {
                     com.example.paperlessmeeting.ui.screens.vote.VoteListScreen(
+                        navController = navController
+                    )
+                }
+
+                composable(Screen.LotteryList.route) {
+                    com.example.paperlessmeeting.ui.screens.lottery.LotteryListScreen(
                         navController = navController
                     )
                 }

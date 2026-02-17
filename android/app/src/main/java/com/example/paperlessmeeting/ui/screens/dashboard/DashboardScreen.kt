@@ -43,7 +43,7 @@ import java.util.Locale
 fun DashboardScreen(
     onMeetingClick: (Int) -> Unit,
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
-    onLotteryClick: (com.example.paperlessmeeting.domain.model.Meeting) -> Unit = {},
+    onLotteryClick: () -> Unit = {},
     onVoteClick: () -> Unit = {},
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
@@ -81,12 +81,7 @@ fun DashboardScreen(
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
                 onVoteClick = onVoteClick,
-                onLotteryClick = {
-                    val meeting = state.activeMeetings.firstOrNull()
-                    if (meeting != null) {
-                        onLotteryClick(meeting)
-                    }
-                }
+                onLotteryClick = onLotteryClick
             )
         }
     }

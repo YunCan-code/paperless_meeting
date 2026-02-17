@@ -238,7 +238,21 @@ async def lottery_action(sid, data):
         # [Modified] 写入数据库
         try:
             with get_db_session() as session:
-                # 检查是否已存在
+                # 0. 检查用户是否存在 (PostgreSQL FK Constraint Fix)
+                user = session.get(User, user_id)
+                if not user:
+                    print(f"[Lottery] User {user_id} not found in DB. Auto-creating...")
+                    user = User(
+                        id=user_id, 
+                        name=user_name, 
+                        department=user_dept,
+                        role="参会人员"
+                    )
+                    session.add(user)
+                    # Flush to ensure ID exists for FK
+                    session.flush()
+
+                # 1. 检查参与者是否存在
                 participant = session.get(LotteryParticipant, (meeting_id, user_id))
                 if not participant:
                     participant = LotteryParticipant(
@@ -265,6 +279,8 @@ async def lottery_action(sid, data):
             print(f"[Lottery] Join DB Error: {e}")
             import traceback
             traceback.print_exc()
+            await sio.emit('lottery_error', {'message': f'加入失败: {str(e)}'}, to=sid)
+
 
         # 如果是 IDLE 状态，自动切换到 PREPARING
         if state["status"] == LotteryState.IDLE:

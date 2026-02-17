@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -20,4 +21,5 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     }
 
     object VoteList : Screen("vote_list", "投票中心", Icons.Default.HowToVote)
+    object LotteryList : Screen("lottery_list", "抽签中心", Icons.Default.Star)
 }

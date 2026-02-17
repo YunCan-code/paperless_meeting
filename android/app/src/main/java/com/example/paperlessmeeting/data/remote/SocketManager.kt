@@ -96,6 +96,8 @@ class SocketManager @Inject constructor(
             socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
                 Log.e(TAG, "Connection error: ${args.firstOrNull()}")
             }
+            
+            setupLotteryListeners()
 
             // 投票事件
             socket?.on("vote_start") { args ->
@@ -202,6 +204,80 @@ class SocketManager @Inject constructor(
         }
     }
 
+    // Lottery Events
+    private val _lotteryStateEvent = MutableSharedFlow<com.example.paperlessmeeting.domain.model.LotteryState>(extraBufferCapacity = 1)
+    val lotteryStateEvent: SharedFlow<com.example.paperlessmeeting.domain.model.LotteryState> = _lotteryStateEvent.asSharedFlow()
+
+    private val _lotteryPlayersEvent = MutableSharedFlow<JSONObject>(extraBufferCapacity = 1)
+    val lotteryPlayersEvent: SharedFlow<JSONObject> = _lotteryPlayersEvent.asSharedFlow()
+
+    private val _lotteryErrorEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val lotteryErrorEvent: SharedFlow<String> = _lotteryErrorEvent.asSharedFlow()
+
+    fun emitLotteryAction(data: JSONObject) {
+        socket?.emit("lottery_action", data)
+    }
+
+    fun getLotteryState(meetingId: Int, userId: Int) {
+        val data = JSONObject()
+        data.put("meeting_id", meetingId)
+        data.put("user_id", userId)
+        socket?.emit("get_lottery_state", data)
+    }
+
+    private fun setupLotteryListeners() {
+         socket?.on("lottery_state_change") { args ->
+            try {
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    Log.d(TAG, "State change received: $data")
+                    val state = gson.fromJson(data.toString(), com.example.paperlessmeeting.domain.model.LotteryState::class.java)
+                    _lotteryStateEvent.tryEmit(state)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing lottery_state_change", e)
+            }
+        }
+
+        socket?.on("lottery_state_sync") { args ->
+            try {
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    Log.d(TAG, "State sync received: $data")
+                    val state = gson.fromJson(data.toString(), com.example.paperlessmeeting.domain.model.LotteryState::class.java)
+                    _lotteryStateEvent.tryEmit(state)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing lottery_state_sync", e)
+            }
+        }
+
+        socket?.on("lottery_players_update") { args ->
+            try {
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    // Log.d(TAG, "Players update received: $data")
+                    _lotteryPlayersEvent.tryEmit(data)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing lottery_players_update", e)
+            }
+        }
+
+        socket?.on("lottery_error") { args ->
+            try {
+                if (args.isNotEmpty()) {
+                    val data = args[0] as JSONObject
+                    val errorMsg = data.optString("message")
+                    Log.d(TAG, "Error received: $errorMsg")
+                    _lotteryErrorEvent.tryEmit(errorMsg)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing lottery_error", e)
+            }
+        }
+    }
+    
     companion object {
         private const val TAG = "SocketManager"
         private const val CHANNEL_ID = "vote_channel"

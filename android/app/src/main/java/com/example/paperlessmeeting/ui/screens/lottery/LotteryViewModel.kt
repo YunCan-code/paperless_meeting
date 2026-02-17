@@ -5,10 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LotteryState
+import com.example.paperlessmeeting.data.remote.SocketManager
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.socket.client.IO
-import io.socket.client.Socket
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +18,8 @@ import javax.inject.Inject
 @HiltViewModel
 class LotteryViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val socketManager: SocketManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LotteryState?>(null)
@@ -32,7 +32,6 @@ class LotteryViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    private var socket: Socket? = null
     private var meetingId: Int = 0
     private var userId: Int = 0
     private var userName: String = ""
@@ -42,7 +41,12 @@ class LotteryViewModel @Inject constructor(
         this.userId = userPreferences.getUserId()
         this.userName = userPreferences.getUserName() ?: "未知用户"
         fetchHistory()
-        initSocket()
+        initSocketListener()
+        
+        // Ensure connection
+        socketManager.connect("https://coso.top")
+        socketManager.joinMeeting(meetingId)
+        socketManager.getLotteryState(meetingId, userId)
     }
 
     fun getCurrentUserId(): Int = userId
@@ -54,71 +58,26 @@ class LotteryViewModel @Inject constructor(
         }
     }
 
-    private fun initSocket() {
-        if (socket?.connected() == true) return
-        
-        try {
-            // Replace with your actual server URL
-            val options = IO.Options()
-            options.path = "/socket.io"
-            options.transports = arrayOf("websocket")
-            
-            // Assuming we can get the base URL from somewhere, hardcoding for now or need injection
-            // Production URL matching API baseUrl in AppModule.kt
-            val url = "https://coso.top" // Production server
-            // In real app, this should come from config
-            
-            socket = IO.socket(url, options)
-            
-            socket?.on(Socket.EVENT_CONNECT) {
-                println("[Lottery] Socket connected")
-                // Join meeting room
-                val data = JSONObject()
-                data.put("meeting_id", meetingId)
-                socket?.emit("join_meeting", data)
+    private fun initSocketListener() {
+        viewModelScope.launch {
+            socketManager.lotteryStateEvent.collect { state ->
+                println("[Lottery] State change received: ${state.status}")
+                _uiState.value = state
 
-                // Get initial state with user_id
-                val stateData = JSONObject()
-                stateData.put("meeting_id", meetingId)
-                stateData.put("user_id", userId)
-                socket?.emit("get_lottery_state", stateData)
-            }
-
-            socket?.on("lottery_state_change") { args ->
-                if (args.isNotEmpty()) {
-                    val data = args[0] as JSONObject
-                    println("[Lottery] State change received: $data")
-                    val gson = Gson()
-                    val state = gson.fromJson(data.toString(), LotteryState::class.java)
-                    _uiState.value = state
-
-                    // Refresh history if round finished
-                    if (state.status == "RESULT") {
-                        fetchHistory()
-                    }
+                // Refresh history if round finished
+                if (state.status == "RESULT") {
+                    fetchHistory()
                 }
             }
+        }
 
-            // 监听状态同步事件（初始状态）
-            socket?.on("lottery_state_sync") { args ->
-                if (args.isNotEmpty()) {
-                    val data = args[0] as JSONObject
-                    println("[Lottery] State sync received: $data")
-                    val gson = Gson()
-                    val state = gson.fromJson(data.toString(), LotteryState::class.java)
-                    _uiState.value = state
-                }
-            }
-
-            // 监听参与者更新事件
-            socket?.on("lottery_players_update") { args ->
-                if (args.isNotEmpty()) {
-                    try {
-                        val data = args[0] as JSONObject
+        viewModelScope.launch {
+            socketManager.lotteryPlayersEvent.collect { data ->
+                 try {
                         println("[Lottery] Players update received: $data")
 
                         // 解析参与者列表
-                        val participantsArray = data.optJSONArray("all_participants")
+                        val participantsArray = data.optJSONArray("all_participants") ?: data.optJSONArray("participants")
                         val participantsList = mutableListOf<com.example.paperlessmeeting.domain.model.LotteryParticipant>()
 
                         if (participantsArray != null) {
@@ -140,7 +99,7 @@ class LotteryViewModel @Inject constructor(
                         val currentState = _uiState.value
                         if (currentState != null) {
                             val updatedState = currentState.copy(
-                                participant_count = data.optInt("count", currentState.participant_count),
+                                participant_count = data.optInt("participant_count", data.optInt("count", currentState.participant_count)),
                                 participants = participantsList
                             )
                             _uiState.value = updatedState
@@ -149,38 +108,21 @@ class LotteryViewModel @Inject constructor(
                             _uiState.value = LotteryState(
                                 status = "PREPARING",
                                 participants = participantsList,
-                                participant_count = data.optInt("count", 0)
+                                participant_count = data.optInt("participant_count", data.optInt("count", 0))
                             )
                         }
                     } catch (e: Exception) {
                         println("[Lottery] Error parsing players update: ${e.message}")
                         e.printStackTrace()
                     }
-                }
             }
+        }
 
-            socket?.on("lottery_error") { args ->
-                if (args.isNotEmpty()) {
-                    val data = args[0] as JSONObject
-                    val errorMsg = data.optString("message")
-                    println("[Lottery] Error received: $errorMsg")
-                    _error.value = errorMsg
-                }
+        viewModelScope.launch {
+            socketManager.lotteryErrorEvent.collect { errorMsg ->
+                 println("[Lottery] Error received: $errorMsg")
+                 _error.value = errorMsg
             }
-
-            socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-                println("[Lottery] Connection error: ${args.joinToString()}")
-                _error.value = "连接失败"
-            }
-
-            socket?.on(Socket.EVENT_DISCONNECT) {
-                println("[Lottery] Socket disconnected")
-            }
-
-            socket?.connect()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            _error.value = "Connection error: ${e.message}"
         }
     }
     
@@ -190,12 +132,12 @@ class LotteryViewModel @Inject constructor(
             val data = JSONObject()
             data.put("action", "join")
             data.put("meeting_id", meetingId)
-            data.put("user_id", userId) // 发送整数类型，匹配后端期望
+            data.put("user_id", userId) 
             data.put("user_name", userName)
-            data.put("department", "") // 可选字段
-            data.put("avatar", "") // 可选字段
+            data.put("department", "") 
+            data.put("avatar", "") 
             println("[Lottery] Emitting lottery_action with data: $data")
-            socket?.emit("lottery_action", data)
+            socketManager.emitLotteryAction(data)
         }
     }
     
@@ -204,8 +146,8 @@ class LotteryViewModel @Inject constructor(
             val data = JSONObject()
             data.put("action", "quit")
             data.put("meeting_id", meetingId)
-            data.put("user_id", userId) // 发送整数类型
-            socket?.emit("lottery_action", data)
+            data.put("user_id", userId) 
+            socketManager.emitLotteryAction(data)
         }
     }
     
@@ -215,7 +157,17 @@ class LotteryViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        socket?.disconnect()
-        socket?.off()
+        // Do NOT disconnect socketManager as it is global
+        // But maybe leave room?
+        // socketManager.leaveMeeting(meetingId) 
+        // We probably shouldn't leave immediately if we want to receive notifications?
+        // But for Lottery context, maybe leaving is fine.
+        // Dashboard uses joinMeeting too.
+        // If we leave, dashboard might stop receiving updates?
+        // SocketManager doesn't reference count rooms.
+        // So if we leave, we leave.
+        // It's safer NOT to leave if other screens might be interested, or trust user to just close app.
+        // Or if user goes back to list, maybe we should leave?
+        // For now, removing socket disconnect logic.
     }
 }

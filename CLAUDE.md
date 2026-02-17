@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Communication Rules
+
+**MPORTANT:** All responses, thinking processes, and task lists MUST be in **Chinese (Simplified)**.
+**重要：** 所有回复、思考过程及任务清单，必须使用 **简体中文**。
+
 ## Project Overview
 
 Paperless Meeting System - A full-stack meeting management application with real-time features including voting, lottery draws, and document synchronization. Built for large-screen displays and tablet devices.
