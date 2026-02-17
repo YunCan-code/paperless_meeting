@@ -60,6 +60,7 @@
             <el-icon><VideoPlay /></el-icon>
             {{ allFinished ? '抽签结束' : (state.participant_count === 0 ? '等待参与者...' : '开始抽签') }}
           </el-button>
+          <!-- 测试按钮已隐藏
           <el-button 
             size="large" 
             @click="resetLottery"
@@ -75,6 +76,7 @@
             <el-icon><UserFilled /></el-icon>
             添加测试参与者
           </el-button>
+          -->
         </div>
 
         <!-- Participant Pool -->
