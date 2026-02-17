@@ -11,9 +11,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import javax.inject.Inject
+
+// \u2b50 \u4e2d\u5956\u63d0\u793a\u6570\u636e\u7c7b
+data class WinnerAnnouncementData(
+    val roundTitle: String,
+    val userName: String
+)
 
 @HiltViewModel
 class LotteryViewModel @Inject constructor(
@@ -31,6 +40,10 @@ class LotteryViewModel @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    // ⭐ 中奖提示事件
+    private val _winnerAnnouncement = MutableSharedFlow<WinnerAnnouncementData>(extraBufferCapacity = 1)
+    val winnerAnnouncement: SharedFlow<WinnerAnnouncementData> = _winnerAnnouncement.asSharedFlow()
 
     private var meetingId: Int = 0
     private var userId: Int = 0
@@ -61,7 +74,31 @@ class LotteryViewModel @Inject constructor(
     private fun initSocketListener() {
         viewModelScope.launch {
             socketManager.lotteryStateEvent.collect { state ->
-                println("[Lottery] State change received: ${state.status}")
+                val oldStatus = _uiState.value?.status
+                println("[Lottery] ========================================")
+                println("[Lottery] State change received:")
+                println("[Lottery]   Status: $oldStatus -> ${state.status}")
+                println("[Lottery]   Title: ${state.current_title}")
+                println("[Lottery]   Count: ${state.current_count}")
+                println("[Lottery]   Participants: ${state.participants?.size ?: 0}")
+                println("[Lottery]   IsJoined: ${state.is_joined}")
+                println("[Lottery] ========================================")
+                
+                // ⭐ 中奖检测:从ROLLING -> RESULT 且自己在中奖名单中
+                val isWinner = state.status == "RESULT" && 
+                               oldStatus == "ROLLING" &&
+                               state.winners?.any { it.id == userId } == true
+                
+                if (isWinner && state.current_title != null) {
+                    println("[Lottery] 🎉 YOU WON! Triggering winner announcement.")
+                    _winnerAnnouncement.tryEmit(
+                        WinnerAnnouncementData(
+                            roundTitle = state.current_title!!,
+                            userName = userName
+                        )
+                    )
+                }
+                
                 _uiState.value = state
 
                 // Refresh history if round finished
@@ -95,20 +132,27 @@ class LotteryViewModel @Inject constructor(
                             }
                         }
 
+                        // ⭐ 关键修复: 根据参与者列表自动计算 is_joined
+                        val userId = userPreferences.getUserId()
+                        val isJoined = participantsList.any { it.id == userId }
+
                         // 更新参与者数量和列表到当前状态
                         val currentState = _uiState.value
                         if (currentState != null) {
                             val updatedState = currentState.copy(
                                 participant_count = data.optInt("participant_count", data.optInt("count", currentState.participant_count)),
-                                participants = participantsList
+                                participants = participantsList,
+                                is_joined = isJoined  // ⭐ 更新 is_joined 状态
                             )
                             _uiState.value = updatedState
+                            println("[Lottery] Updated state: joined=$isJoined, count=${participantsList.size}")
                         } else {
                             // 如果当前状态为空，创建一个新的状态
                             _uiState.value = LotteryState(
                                 status = "PREPARING",
                                 participants = participantsList,
-                                participant_count = data.optInt("participant_count", data.optInt("count", 0))
+                                participant_count = data.optInt("participant_count", data.optInt("count", 0)),
+                                is_joined = isJoined  // ⭐ 设置 is_joined 状态
                             )
                         }
                     } catch (e: Exception) {

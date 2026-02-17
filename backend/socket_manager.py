@@ -265,9 +265,16 @@ async def lottery_action(sid, data):
                     )
                     session.add(participant)
                 else:
-                    if participant.is_winner:
-                        await sio.emit('lottery_error', {'message': '您已中奖，无法再次参与'}, to=sid)
+                    # ⭐ 只阻止在当前活跃轮次中已中奖的用户
+                    # 如果是历史轮次中奖,允许参与新轮次
+                    current_lottery_id = state.get("current_lottery_id")
+                    if participant.is_winner and participant.winning_lottery_id == current_lottery_id:
+                        await sio.emit('lottery_error', {'message': '您已在当前轮次中奖，无法重复参与'}, to=sid)
                         return
+                    # 重新加入时清除旧的中奖状态(如果不是当前轮次)
+                    if participant.is_winner and participant.winning_lottery_id != current_lottery_id:
+                        participant.is_winner = False
+                        participant.winning_lottery_id = None
                     participant.status = "joined" # 重新加入
                     participant.user_name = user_name
                     participant.department = user_dept

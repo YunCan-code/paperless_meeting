@@ -256,7 +256,7 @@ class SocketManager @Inject constructor(
             try {
                 if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
-                    // Log.d(TAG, "Players update received: $data")
+                    Log.d(TAG, "Players update received: $data")
                     _lotteryPlayersEvent.tryEmit(data)
                 }
             } catch (e: Exception) {
