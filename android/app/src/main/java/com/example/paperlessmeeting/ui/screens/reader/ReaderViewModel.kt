@@ -24,7 +24,7 @@ sealed class ReaderUiState {
     object Loading : ReaderUiState()
     data class Downloading(val progress: Float, val fileName: String) : ReaderUiState()
     data class Ready(val file: File, val initialPage: Int = 0) : ReaderUiState()
-    data class Error(val message: String) : ReaderUiState()
+    data class Error(val message: String, val canRetry: Boolean = true, val lastUrl: String = "", val lastFileName: String = "") : ReaderUiState()
 }
 
 @HiltViewModel
@@ -57,6 +57,10 @@ class ReaderViewModel @Inject constructor(
     private val _oneShotJumpPage = MutableStateFlow<Int?>(null)
     val oneShotJumpPage: StateFlow<Int?> = _oneShotJumpPage.asStateFlow()
 
+    // Store current document info for retry
+    private var currentUrl: String = ""
+    private var currentFileName: String = ""
+
     init {
         cleanupOldCache()
         if (!isPresenter) {
@@ -86,12 +90,16 @@ class ReaderViewModel @Inject constructor(
     fun loadDocument(url: String, fileName: String) {
         if (_uiState.value is ReaderUiState.Ready) return
 
+        // 存储当前文档信息，用于重试
+        currentUrl = url
+        currentFileName = fileName
+
         viewModelScope.launch {
             _uiState.value = ReaderUiState.Loading
             try {
                 val context = getApplication<Application>().applicationContext
                 val cacheDir = context.cacheDir
-                
+
                 // Use URL hash to generate a unique filename, preventing conflicts for same-named files in different meetings
                 val extension = fileName.substringAfterLast(".", "pdf")
                 val uniqueName = "${url.hashCode()}.$extension"
@@ -102,30 +110,35 @@ class ReaderViewModel @Inject constructor(
                     val maxRetries = 3
                     var success = false
                     var lastError: String? = null
-                    
+
                     for (attempt in 1..maxRetries) {
                         _uiState.value = ReaderUiState.Downloading(0f, fileName)
-                        
+
                         success = repository.downloadFileWithProgress(url, file) { progress ->
                             _uiState.value = ReaderUiState.Downloading(progress, fileName)
                         }
-                        
+
                         if (success) break
-                        
+
                         // 下载失败，准备重试
                         if (attempt < maxRetries) {
                             lastError = "下载失败，正在重试 ($attempt/$maxRetries)..."
-                            _uiState.value = ReaderUiState.Error(lastError)
+                            _uiState.value = ReaderUiState.Error(lastError, false, url, fileName)
                             kotlinx.coroutines.delay(2000) // 等待2秒后重试
                             // 删除可能的不完整文件
                             if (file.exists()) file.delete()
                         }
                     }
-                    
+
                     if (!success) {
                         // 删除不完整的文件
                         if (file.exists()) file.delete()
-                        _uiState.value = ReaderUiState.Error("下载失败，请检查网络连接后重试")
+                        _uiState.value = ReaderUiState.Error(
+                            "下载失败：网络连接不稳定或服务器无响应\n\n请稍后点击重试按钮重新下载",
+                            canRetry = true,
+                            lastUrl = url,
+                            lastFileName = fileName
+                        )
                         return@launch
                     }
                 } else {
@@ -138,15 +151,26 @@ class ReaderViewModel @Inject constructor(
                         jsonFile.setLastModified(now)
                     }
                 }
-                
+
                 // Fetch saved progress
                 val savedProgress = readingProgressManager.getProgress(url)
                 val initialPage = savedProgress?.currentPage ?: 0
-                
+
                 _uiState.value = ReaderUiState.Ready(file, initialPage)
             } catch (e: Exception) {
-                _uiState.value = ReaderUiState.Error(e.message ?: "Unknown Error")
+                _uiState.value = ReaderUiState.Error(
+                    "加载失败：${e.message ?: "未知错误"}",
+                    canRetry = true,
+                    lastUrl = url,
+                    lastFileName = fileName
+                )
             }
+        }
+    }
+
+    fun retryDownload() {
+        if (currentUrl.isNotEmpty() && currentFileName.isNotEmpty()) {
+            loadDocument(currentUrl, currentFileName)
         }
     }
 

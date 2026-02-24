@@ -173,6 +173,18 @@ fun ReaderScreen(
     }
     DisposableEffect(Unit) {
         onDispose {
+            // 退出时保存最后阅读位置
+            if (totalPages > 0) {
+                viewModel.saveReadingProgress(
+                    uniqueId = downloadUrl,
+                    fileName = fileName,
+                    page = currentPage,
+                    total = totalPages,
+                    localPath = (uiState as? ReaderUiState.Ready)?.file?.absolutePath
+                )
+            }
+
+            // 恢复系统栏显示
             val window = (context as? Activity)?.window
             if (window != null) {
                 WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
@@ -346,17 +358,68 @@ fun ReaderScreen(
                 }
                 is ReaderUiState.Error -> {
                     Column(
-                        modifier = Modifier.align(Alignment.Center), 
+                        modifier = Modifier.align(Alignment.Center).padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("无法加载文档", color = InkText)
-                        Text(state.message, color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                        // 错误图标
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFF59E0B),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 错误标题
+                        Text(
+                            text = if (state.canRetry) "下载失败" else "加载错误",
+                            color = InkText,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 错误详情
+                        Text(
+                            text = state.message,
+                            color = IconGrey,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // 按钮组
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // 返回按钮
+                            TextButton(onClick = { navController.popBackStack() }) {
+                                Text("返回", color = IconGrey)
+                            }
+
+                            // 重试按钮
+                            if (state.canRetry) {
+                                Button(
+                                    onClick = { viewModel.retryDownload() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("重试")
+                                }
+                            }
+                        }
                     }
                 }
                 is ReaderUiState.Ready -> {
-                    // Restore Progress if needed
+                    // Restore saved reading progress
                     LaunchedEffect(state.initialPage) {
-                        if (currentPage == 0 && initialPage == 0 && state.initialPage > 0) {
+                        // 如果有保存的进度且当前页不等于保存的页码，则恢复
+                        if (state.initialPage > 0 && currentPage != state.initialPage) {
                             currentPage = state.initialPage
                             isProgrammaticScroll = true
                         }
