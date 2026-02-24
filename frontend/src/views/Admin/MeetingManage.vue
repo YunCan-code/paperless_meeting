@@ -282,12 +282,16 @@
         <!-- 右侧：文件管理 -->
         <div class="dialog-right">
           <div class="section-header">
-            <h4 class="section-title">会议资料</h4>
-            <el-upload 
-              action="" 
-              :auto-upload="false" 
-              :show-file-list="false" 
+            <div>
+              <h4 class="section-title">会议资料</h4>
+              <div class="section-tip">仅支持上传 PDF 格式文件（安卓端仅支持 PDF 预览）</div>
+            </div>
+            <el-upload
+              action=""
+              :auto-upload="false"
+              :show-file-list="false"
               :on-change="handleFileSelect"
+              accept="application/pdf"
               multiple
             >
               <el-button type="primary" link size="small"><el-icon class="el-icon--left"><Plus/></el-icon>添加文件</el-button>
@@ -789,6 +793,7 @@ onMounted(async () => {
 .dialog-right { width: 400px; background-color: var(--bg-main); display: flex; flex-direction: column; }
 .section-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-main); }
+.section-tip { font-size: 12px; color: #f59e0b; margin-top: 4px; }
 .file-list-container { flex: 1; padding: 16px; overflow-y: auto; }
 .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); gap: 12px; }
 .file-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; transition: all 0.2s; }
