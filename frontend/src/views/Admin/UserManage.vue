@@ -500,7 +500,7 @@ const handlePageChange = (val) => {
 const importDialogVisible = ref(false)
 
 const downloadTemplate = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/users/template`
+    window.location.href = '/api/users/template'
 }
 
 const handleImport = async (options) => {

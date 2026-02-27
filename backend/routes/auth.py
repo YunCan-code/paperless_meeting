@@ -38,7 +38,7 @@ def login(request: LoginRequest, session: Session = Depends(get_session)):
     results = session.exec(statement).all()
     
     if not results:
-        raise HTTPException(status_code=404, detail="未找到该用户")
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
 
     if len(results) > 1:
         # 如果有多个人匹配 (通常是重名)

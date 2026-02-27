@@ -341,7 +341,10 @@ const initSocket = () => {
   const url = import.meta.env.VITE_API_URL || window.location.origin
   socket = io(url, {
     path: '/socket.io',
-    transports: ['websocket']
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 2000
   })
 
   socket.on('connect', () => {
@@ -349,6 +352,14 @@ const initSocket = () => {
     socket.emit('join_meeting', { meeting_id: meetingId })
     // Fetch initial state - fetchRoundsAndPrepareFirst will be called after state is received
     socket.emit('get_lottery_state', { meeting_id: meetingId })
+  })
+
+  socket.on('disconnect', (reason) => {
+    console.warn('Socket disconnected:', reason)
+  })
+
+  socket.on('connect_error', (err) => {
+    console.error('Socket connect error:', err.message)
   })
 
   socket.on('lottery_state_change', (data) => {
@@ -541,7 +552,7 @@ const resetLottery = async (forceFull = false) => {
 const backToPool = async () => {
   try {
     // 强制同步一次轮次信息，确保拿到最新的 status
-    const res = await fetch(`/api/lottery/${meetingId}/history`).then(r => r.json())
+    const res = await request.get(`/lottery/${meetingId}/history`)
     rounds.value = res.rounds || []
     
     // 寻找第一个未完成的轮次

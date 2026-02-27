@@ -366,81 +366,68 @@ async def lottery_action(sid, data):
         if state["status"] != LotteryState.ROLLING:
             await sio.emit('lottery_error', {'message': '抽签未在进行中'}, to=sid)
             return
-        
+
         import random
-        
-        # [Modified] 从数据库筛选合格候选人
-        candidates = []
+
+        # 在同一个 session 内完成所有操作，保证原子性
+        winners_data = []
         try:
             with get_db_session() as session:
+                # 1. 查询合格候选人
                 stmt = select(LotteryParticipant).where(
                     LotteryParticipant.meeting_id == meeting_id,
                     LotteryParticipant.status == "joined",
                     LotteryParticipant.is_winner == False
                 )
                 candidates = session.exec(stmt).all()
-        except Exception as e:
-            print(f"[Lottery] Stop DB Query Error: {e}")
-            
-        count = min(state["current_count"], len(candidates))
-        
-        # 随机抽取中奖者
-        lucky_dogs = random.sample(candidates, count)
-        
-        winners_data = []
-        
-        try:
-            with get_db_session() as session:
-                lottery_id = state.get("current_lottery_id")
-                # Update Lottery status
-                if lottery_id:
-                     lottery = session.get(Lottery, lottery_id)
-                     if lottery:
-                         lottery.status = "finished"
-                         session.add(lottery)
 
+                count = min(state["current_count"], len(candidates))
+
+                # 2. 随机抽取中奖者
+                lucky_dogs = random.sample(candidates, count)
+
+                lottery_id = state.get("current_lottery_id")
+
+                # 3. 更新 Lottery 状态
+                if lottery_id:
+                    lottery = session.get(Lottery, lottery_id)
+                    if lottery:
+                        lottery.status = "finished"
+                        session.add(lottery)
+
+                # 4. 更新中奖者状态 + 记录 LotteryWinner（同一 session）
                 for dog in lucky_dogs:
-                    # 1. Update Participant
+                    # 直接更新候选人的中奖状态（无需二次查询）
                     dog.is_winner = True
+                    dog.winning_lottery_id = lottery_id
                     session.add(dog)
-                    
-                    # Store in winners_data for frontend
+
                     winners_data.append({
                         "id": dog.user_id,
                         "name": dog.user_name,
                         "department": dog.department,
                         "avatar": dog.avatar
                     })
-                    
-                    # 2. Add to LotteryWinner table (Only if user exists in User table)
-                    if lottery_id:
-                        # 检查用户是否存在于 user 表以避免外键冲突 (测试用户 ID 通常较大，真实用户 ID 较小)
-                        if dog.user_id < 10000:
-                            winner_record = LotteryWinner(
-                                lottery_id=lottery_id,
-                                user_id=dog.user_id,
-                                user_name=dog.user_name
-                            )
-                            session.add(winner_record)
-                        else:
-                            print(f"[Lottery] Skipping LotteryWinner record for test user {dog.user_id}")
-                    
-                    # 3. Update LotteryParticipant is_winner status
-                    participant = session.get(LotteryParticipant, (meeting_id, dog.user_id))
-                    if participant:
-                        participant.is_winner = True
-                        participant.winning_lottery_id = lottery_id # 记录中奖轮次
-                        session.add(participant)
-                    
-                    # Update memory history
+
+                    # 记录到 LotteryWinner 表
+                    if lottery_id and dog.user_id < 10000:
+                        winner_record = LotteryWinner(
+                            lottery_id=lottery_id,
+                            user_id=dog.user_id,
+                            user_name=dog.user_name
+                        )
+                        session.add(winner_record)
+
+                    # 更新内存历史
                     state["history_winners"].add(dog.user_id)
 
+                # 5. 一次性提交
                 session.commit()
                 print(f"[Lottery] Winners saved to DB: {[w['name'] for w in winners_data]}")
         except Exception as e:
-             print(f"[Lottery] Save Winner Error: {e}")
-             import traceback
-             traceback.print_exc()
+            print(f"[Lottery] Stop/Save Winner Error: {e}")
+            import traceback
+            traceback.print_exc()
 
         state["winners"] = winners_data
         state["status"] = LotteryState.RESULT

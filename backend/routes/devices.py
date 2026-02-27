@@ -23,7 +23,8 @@ async def device_heartbeat(
     # 获取IP地址: 优先使用客户端上报的局域网IP，如果没有则使用连接IP
     client_ip = request.client.host
     if "x-forwarded-for" in request.headers:
-        client_ip = request.headers["x-forwarded-for"]
+        # 取最左侧的第一个 IP，即客户端真实 IP（信任链依赖 Nginx 正确配置 proxy_set_header）
+        client_ip = request.headers["x-forwarded-for"].split(",")[0].strip()
 
     final_ip = device_data.ip_address if device_data.ip_address else client_ip
 

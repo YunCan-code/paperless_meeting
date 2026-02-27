@@ -769,7 +769,7 @@ onMounted(() => {
 .text-red-500 { color: #ef4444; }
 .text-blue-500 { color: #3b82f6; }
 .text-gray-400 { color: #94a3b8; }
-.teaxt-green-500 { color: #22c55e; } /* Fix typo from original file */
+.text-green-500 { color: #22c55e; }
 
 /* Version Card Re-design */
 .version-overview-card { border-radius: 12px; }

@@ -325,7 +325,10 @@ const initSocket = () => {
   const url = import.meta.env.VITE_API_URL || window.location.origin
   socket.value = io(url, {
     path: '/socket.io',
-    transports: ['websocket']
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 2000
   })
 
   socket.value.on('connect', () => {
@@ -335,6 +338,14 @@ const initSocket = () => {
       socket.value.emit('join_meeting', { meeting_id: voteData.value.meeting_id })
       console.log('Joined meeting room:', voteData.value.meeting_id)
     }
+  })
+
+  socket.value.on('disconnect', (reason) => {
+    console.warn('Socket disconnected:', reason)
+  })
+
+  socket.value.on('connect_error', (err) => {
+    console.error('Socket connect error:', err.message)
   })
 
   socket.value.on('vote_start', (data) => {

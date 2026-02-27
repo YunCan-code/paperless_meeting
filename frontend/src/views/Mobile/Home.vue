@@ -15,7 +15,9 @@ const router = useRouter()
 const username = ref(localStorage.getItem('user_name') || 'Guest')
 
 const logout = () => {
-  localStorage.clear()
+  localStorage.removeItem('user_id')
+  localStorage.removeItem('user_name')
+  localStorage.removeItem('token')
   router.push('/mobile/login')
 }
 </script>

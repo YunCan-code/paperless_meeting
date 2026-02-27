@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -134,7 +135,7 @@ fun MeetingListContent(
                 )
             }
             
-            items(list, key = { it.id }) { meeting ->
+            itemsIndexed(list, key = { index, meeting -> "${meeting.id}_${header}_$index" }) { _, meeting ->
                 MeetingCard(
                     meeting = meeting,
                     onClick = { onMeetingClick(meeting.id) }

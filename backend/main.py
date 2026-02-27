@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import os
 from contextlib import asynccontextmanager
 
 # 导入数据库初始化函数和路由模块
@@ -9,13 +10,14 @@ from database import create_db_and_tables
 from routes import users, meetings, auth, meeting_types, notes, devices, app_updates, system_settings, sync, vote, lottery
 from socket_manager import sio, socket_app
 
-
-
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 from database import engine
 from models import MeetingType
+
+# 调试模式：生产环境设为 false，避免泄露 traceback
+DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
 # 定义应用生命周期管理器
 @asynccontextmanager
@@ -53,17 +55,31 @@ async def global_exception_handler(request: Request, exc: Exception):
     import traceback
     error_msg = "".join(traceback.format_exception(None, exc, exc.__traceback__))
     print(f"Global Exception: {error_msg}")
-    return JSONResponse(
-        status_code=500,
-        content={"message": "Internal Server Error", "detail": str(exc), "trace": error_msg},
-    )
+    if DEBUG:
+        # 开发环境：返回详细错误信息便于调试
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Internal Server Error", "detail": str(exc), "trace": error_msg},
+        )
+    else:
+        # 生产环境：只返回通用错误消息，traceback 仅输出到日志
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Internal Server Error"},
+        )
+
+# CORS 配置：通过环境变量指定允许的前端域名，多个用逗号分隔
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "*"], 
+    allow_origins=[o.strip() for o in CORS_ORIGINS],
     allow_credentials=True,
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 挂载静态文件目录

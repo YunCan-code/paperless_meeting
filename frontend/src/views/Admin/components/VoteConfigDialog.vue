@@ -219,7 +219,10 @@ const initSocket = () => {
     const url = import.meta.env.VITE_API_URL || window.location.origin
     socket.value = io(url, {
         path: '/socket.io',
-        transports: ['websocket']
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000
     })
     
     socket.value.on('connect', () => {

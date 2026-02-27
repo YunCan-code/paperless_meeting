@@ -6,11 +6,17 @@
         <el-icon class="logo-icon"><Lightning /></el-icon>
         <span class="logo-text">无纸化会议系统</span>
       </div>
-      
-      <a href="https://komari.coso.top" target="_blank" class="probe-link">
-        <el-icon class="link-icon"><Connection /></el-icon>
-        VPS 探针
-      </a>
+
+      <div class="nav-links">
+        <a href="https://komari.coso.top" target="_blank" class="probe-link">
+          <el-icon class="link-icon"><Connection /></el-icon>
+          VPS 探针
+        </a>
+        <a href="https://github.com/YunCan-code/paperless_meeting" target="_blank" class="probe-link">
+          <el-icon class="link-icon"><Link /></el-icon>
+          GitHub
+        </a>
+      </div>
     </nav>
 
     <!-- Hero Section -->
@@ -70,7 +76,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Lightning, ArrowRight, Connection, Cellphone } from '@element-plus/icons-vue'
+import { Lightning, ArrowRight, Connection, Cellphone, Link } from '@element-plus/icons-vue'
 import QrcodeVue from 'qrcode.vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
@@ -86,9 +92,8 @@ const fullDownloadUrl = computed(() => {
     return downloadUrl.value
   }
 
-  // Hardcode VPS Production URL as requested
-  // This ensures the QR code always points to the public VPS address
-  const baseUrl = 'https://coso.top'
+  // 使用当前页面的 origin 作为基础 URL（适配内网部署）
+  const baseUrl = window.location.origin
   return `${baseUrl}${downloadUrl.value.startsWith('/') ? '' : '/'}${downloadUrl.value}`
 })
 
@@ -183,6 +188,12 @@ onMounted(() => {
   color: #3b82f6;
   border-color: #3b82f6;
   background: #eff6ff;
+}
+
+.nav-links {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .link-icon {

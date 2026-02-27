@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy import UniqueConstraint
 
 # 会议和参会人员的多对多关联表
 class MeetingAttendeeLink(SQLModel, table=True):
@@ -12,7 +13,7 @@ class UserBase(SQLModel):
     name: str # 姓名 (Real Name)
 
     email: Optional[str] = None
-    phone: Optional[str] = None
+    phone: Optional[str] = Field(default=None, index=True)
     district: Optional[str] = None # 区县
     department: Optional[str] = None # 部门
     position: Optional[str] = None # 职位
@@ -206,6 +207,9 @@ class VoteOption(SQLModel, table=True):
 
 class UserVote(SQLModel, table=True):
     """用户投票记录"""
+    __table_args__ = (
+        UniqueConstraint("vote_id", "user_id", name="uq_uservote_vote_user"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     vote_id: int = Field(foreign_key="vote.id")
     user_id: int = Field(foreign_key="user.id")

@@ -107,28 +107,20 @@ const tools = [
     color: '#3b82f6'    // blue-500
   },
   {
-    id: 'signin',
-    title: '扫码签到',
-    desc: '生成签到二维码 (开发中)',
-    icon: 'CircleCheck',
-    bgColor: '#f0fdf4', // green-50
-    color: '#22c55e'    // green-500
-  },
-  {
-    id: 'timer',
-    title: '会议计时',
-    desc: '全屏倒计时提醒 (开发中)',
-    icon: 'Timer',
-    bgColor: '#faf5ff', // purple-50
-    color: '#a855f7'    // purple-500
-  },
-  {
     id: 'lottery',
     title: '抽签',
     desc: '随机抽取参会人员',
     icon: 'Trophy',
     bgColor: '#fff7ed', // orange-50
     color: '#f97316'    // orange-500
+  },
+  {
+    id: 'signin',
+    title: '扫码签到',
+    desc: '生成签到二维码 (开发中)',
+    icon: 'CircleCheck',
+    bgColor: '#f0fdf4', // green-50
+    color: '#22c55e'    // green-500
   }
 ]
 

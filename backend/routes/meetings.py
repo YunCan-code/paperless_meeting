@@ -17,6 +17,10 @@ UPLOAD_DIR = Path("uploads")
 # 确保目录存在
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# 文件上传安全限制
+ALLOWED_EXTENSIONS = {'.pdf'}  # 仅允许 PDF 文件（与前端一致）
+MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200MB
+
 @router.post("/", response_model=Meeting)
 def create_meeting(meeting: Meeting, session: Session = Depends(get_session)):
     """
@@ -167,22 +171,32 @@ DEFAULT_IMAGES = {
     "default": "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
 }
 
-from functools import lru_cache
+from cachetools import TTLCache
 import os
 
-@lru_cache(maxsize=32)
+# 带 TTL 的缓存：最多缓存 32 个目录，60 秒后自动失效
+_image_dir_cache = TTLCache(maxsize=32, ttl=60)
+
 def get_images_in_dir_cached(directory: Path) -> List[str]:
-    """Cached directory listing to reduce Disk I/O"""
+    """Cached directory listing to reduce Disk I/O (60s TTL)"""
+    cache_key = str(directory)
+    if cache_key in _image_dir_cache:
+        return _image_dir_cache[cache_key]
+
     if not directory.exists() or not directory.is_dir():
-        return []
-    valid_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
-    try:
-        return [
-            f for f in os.listdir(directory)
-            if os.path.isfile(directory / f) and os.path.splitext(f)[1].lower() in valid_extensions
-        ]
-    except OSError:
-        return []
+        result = []
+    else:
+        valid_extensions = {'.jpg', '.jpeg', '.png', '.webp'}
+        try:
+            result = [
+                f for f in os.listdir(directory)
+                if os.path.isfile(directory / f) and os.path.splitext(f)[1].lower() in valid_extensions
+            ]
+        except OSError:
+            result = []
+
+    _image_dir_cache[cache_key] = result
+    return result
 
 def get_random_image_from_dir(directory: Path, base_url: str) -> Optional[str]:
     """Helper to pick random image with caching"""
@@ -452,8 +466,8 @@ import os
 
 @router.post("/{meeting_id}/upload")
 def upload_file(
-    meeting_id: int, 
-    file: UploadFile = File(...), 
+    meeting_id: int,
+    file: UploadFile = File(...),
     session: Session = Depends(get_session)
 ):
     """
@@ -463,22 +477,45 @@ def upload_file(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
+    # 安全校验：文件名路径穿越防护
+    original_filename = file.filename or "unnamed"
+    # 去除路径分隔符和 .. 防止路径穿越
+    safe_original = os.path.basename(original_filename).replace("..", "")
+    if not safe_original:
+        raise HTTPException(status_code=400, detail="无效的文件名")
+
+    # 安全校验：扩展名白名单
+    _, ext = os.path.splitext(safe_original)
+    if ext.lower() not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件格式 '{ext}'，仅允许: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # 安全校验：文件大小限制（先读取内容检查大小）
+    contents = file.file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件大小超过限制（最大 {MAX_UPLOAD_SIZE // 1024 // 1024}MB）"
+        )
+
     # 生成安全的文件名
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    safe_filename = f"{timestamp}_{file.filename}"
+    safe_filename = f"{timestamp}_{safe_original}"
     file_path = UPLOAD_DIR / safe_filename
 
     # 保存文件
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
+        buffer.write(contents)
+
     # 获取文件大小
-    file_size = os.path.getsize(file_path)
+    file_size = len(contents)
 
     # 记录数据库
     attachment = Attachment(
         filename=safe_filename,
-        display_name=file.filename, # 默认显示原始文件名
+        display_name=safe_original,  # 使用清洗后的原始文件名
         file_path=str(file_path),
         file_size=file_size,
         content_type=file.content_type or "application/octet-stream",

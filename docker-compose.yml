@@ -41,6 +41,10 @@ services:
       - DATABASE_URL=postgresql://paperless:123456@db:5432/paperless_meeting
       # Redis 连接 (用于 Socket.IO 跨 Worker 通信)
       - REDIS_URL=redis://redis:6379
+      # 生产环境关闭调试模式
+      - DEBUG=false
+      # CORS 允许的前端域名（按实际部署修改）
+      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
 
   # === 前端服务 ===
   frontend:

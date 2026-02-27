@@ -5,87 +5,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from database import get_session
 from models import Vote, VoteCreate, VoteRead, VoteOption, VoteOptionRead, VoteResult, VoteOptionResult, VoteOptionContent, VoteStatusUpdate, VoteSubmit, User, UserVote, MeetingAttendeeLink
 from socket_manager import broadcast_vote_start, broadcast_vote_end, broadcast_vote_update
 
 router = APIRouter(prefix="/vote", tags=["投票管理"])
-
-@router.post("/{vote_id}/start")
-async def start_vote(vote_id: int, session: Session = Depends(get_session)):
-    """开始投票"""
-    vote = session.get(Vote, vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="投票不存在")
-    if vote.status != "draft":
-        raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
-    
-    vote.status = "active"
-    # 设置开始时间为当前时间 + 10秒 (倒计时缓冲)
-    vote.started_at = datetime.now() + timedelta(seconds=10)
-    session.add(vote)
-    session.commit()
-    
-    # 广播 vote_start
-    await broadcast_vote_start(vote.meeting_id, {
-        "id": vote.id, 
-        "title": vote.title,
-        "duration_seconds": vote.duration_seconds,
-        "started_at": vote.started_at.isoformat(),
-        "wait_seconds": 10
-    })
-    return {"success": True, "vote_id": vote_id}
-
-# ...
-
-def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False) -> VoteRead:
-    """辅助函数：获取带选项的投票"""
-    vote = session.get(Vote, vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="投票不存在")
-    
-    options = session.exec(
-        select(VoteOption).where(VoteOption.vote_id == vote_id).order_by(VoteOption.sort_order)
-    ).all()
-    
-    remaining = None
-    wait = None
-    if include_remaining and vote.status == "active" and vote.started_at:
-        now = datetime.now()
-        # 计算是否需要等待 (倒计时)
-        diff_start = (vote.started_at - now).total_seconds()
-        
-        if diff_start > 0:
-            # 还在倒计时阶段
-            wait = int(diff_start) + 1 # 向上取整
-            remaining = vote.duration_seconds # 还没开始消耗时间
-        else:
-            # 已经开始
-            wait = 0
-            elapsed = (now - vote.started_at).total_seconds()
-            remaining = max(0, vote.duration_seconds - int(elapsed))
-    
-    return VoteRead(
-        id=vote.id,
-        meeting_id=vote.meeting_id,
-        title=vote.title,
-        description=vote.description,
-        is_multiple=vote.is_multiple,
-        is_anonymous=vote.is_anonymous,
-        max_selections=vote.max_selections,
-        duration_seconds=vote.duration_seconds,
-        status=vote.status,
-        started_at=vote.started_at,
-        created_at=vote.created_at,
-        options=[VoteOptionRead(id=o.id, content=o.content, sort_order=o.sort_order) for o in options],
-        remaining_seconds=remaining,
-        wait_seconds=wait
-    )
-
-
 
 
 
@@ -157,17 +85,20 @@ async def start_vote(vote_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="投票不存在")
     if vote.status != "draft":
         raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
-    
+
     vote.status = "active"
-    vote.started_at = datetime.now()
+    # 设置开始时间为当前时间 + 10秒 (倒计时缓冲)
+    vote.started_at = datetime.now(timezone.utc) + timedelta(seconds=10)
     session.add(vote)
     session.commit()
-    
-    # 广播 vote_start
+
+    # 广播 vote_start（包含 started_at 和 wait_seconds 用于倒计时）
     await broadcast_vote_start(vote.meeting_id, {
-        "id": vote.id, 
+        "id": vote.id,
         "title": vote.title,
-        "duration_seconds": vote.duration_seconds
+        "duration_seconds": vote.duration_seconds,
+        "started_at": vote.started_at.isoformat(),
+        "wait_seconds": 10
     })
     return {"success": True, "vote_id": vote_id}
 
@@ -224,7 +155,11 @@ async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends
     for option_id in data.option_ids:
         user_vote = UserVote(vote_id=vote_id, user_id=data.user_id, option_id=option_id)
         session.add(user_vote)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="您已投过票（并发重复提交）")
     
     # 广播投票更新 (直接await确保执行)
     from socket_manager import broadcast_vote_update
@@ -236,8 +171,6 @@ async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends
     
     return {"success": True}
 
-
-from socket_manager import broadcast_vote_start, broadcast_vote_end
 
 @router.get("/{vote_id}/result")
 def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
@@ -303,24 +236,37 @@ def list_meeting_votes(meeting_id: int, user_id: Optional[int] = None, session: 
     return [_get_vote_with_options(v.id, session, include_remaining=True, user_id=user_id) for v in votes]
 
 
-
-
-
 def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False, user_id: Optional[int] = None) -> VoteRead:
     """辅助函数：获取带选项的投票"""
     vote = session.get(Vote, vote_id)
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
-    
+
     options = session.exec(
         select(VoteOption).where(VoteOption.vote_id == vote_id).order_by(VoteOption.sort_order)
     ).all()
-    
+
     remaining = None
+    wait = None
     if include_remaining and vote.status == "active" and vote.started_at:
-        elapsed = (datetime.now() - vote.started_at).total_seconds()
-        remaining = max(0, vote.duration_seconds - int(elapsed))
-    
+        now = datetime.now(timezone.utc)
+        # 兼容 naive datetime
+        started = vote.started_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        # 计算是否需要等待 (倒计时缓冲)
+        diff_start = (started - now).total_seconds()
+
+        if diff_start > 0:
+            # 还在倒计时阶段
+            wait = int(diff_start) + 1  # 向上取整
+            remaining = vote.duration_seconds  # 还没开始消耗时间
+        else:
+            # 已经开始
+            wait = 0
+            elapsed = (now - started).total_seconds()
+            remaining = max(0, vote.duration_seconds - int(elapsed))
+
     # Check if user voted
     user_voted = False
     if user_id:
@@ -329,7 +275,7 @@ def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bo
         ).first()
         if existing:
             user_voted = True
-    
+
     return VoteRead(
         id=vote.id,
         meeting_id=vote.meeting_id,
@@ -344,5 +290,6 @@ def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bo
         created_at=vote.created_at,
         options=[VoteOptionRead(id=o.id, content=o.content, sort_order=o.sort_order) for o in options],
         remaining_seconds=remaining,
+        wait_seconds=wait,
         user_voted=user_voted
     )

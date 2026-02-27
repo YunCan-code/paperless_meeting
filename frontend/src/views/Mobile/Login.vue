@@ -100,7 +100,7 @@ const handleLogin = async () => {
 /* Left Panel */
 .left-panel {
   flex: 1;
-  background-image: url('https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop');
+  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%);
   background-size: cover;
   background-position: center;
   position: relative;

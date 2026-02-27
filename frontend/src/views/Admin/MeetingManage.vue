@@ -357,7 +357,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, reactive } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -518,6 +518,17 @@ const fetchMeetingTypes = async () => {
 const handleUploadClick = (meeting) => {}
 const handleUploadSuccess = () => { fetchMeetings() }
 
+const handleDeleteMeeting = async () => {
+  if (!currentDetail.value) return
+  try {
+    await ElMessageBox.confirm('确定删除该会议吗？删除后不可恢复。', '警告', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+    await request.delete(`/meetings/${currentDetail.value.id}`)
+    ElMessage.success('会议已删除')
+    detailDialogVisible.value = false
+    fetchMeetings()
+  } catch (e) { /* 用户取消或删除失败 */ }
+}
+
 
 
 // Details
@@ -540,15 +551,23 @@ const attachmentList = ref([])
 // File Actions
 const handleFileSelect = (uploadFile) => {
   const raw = uploadFile.raw
-  // Check dupes by name maybe? Allow same name? User usually prefers unique names but let's allow duplicates to be safe or warn.
-  // Warning only if exact same file added? 
-  // User just wants "new files below existing".
-  attachmentList.value.push({ 
-      id: Date.now() + Math.random(), 
-      name: raw.name, 
-      size: raw.size, 
-      type: 'new', 
-      raw: raw 
+  // 校验文件类型
+  if (!raw.name.toLowerCase().endsWith('.pdf')) {
+    ElMessage.warning('仅支持上传 PDF 格式文件')
+    return
+  }
+  // 校验文件大小（200MB）
+  const maxSize = 200 * 1024 * 1024
+  if (raw.size > maxSize) {
+    ElMessage.warning('文件大小不能超过 200MB')
+    return
+  }
+  attachmentList.value.push({
+      id: Date.now() + Math.random(),
+      name: raw.name,
+      size: raw.size,
+      type: 'new',
+      raw: raw
   })
 }
 
@@ -574,10 +593,6 @@ const fetchSpeakers = async () => {
    try {
       const res = await request.get('/users/', { params: { page: 1, page_size: 100 } })
       const users = res.items || []
-      speakerOptions.value = users.map(u => ({
-          label: u.name,
-          value: u.name
-      }))
       speakerOptions.value = users.map(u => ({
           label: u.name,
           value: u.name
@@ -710,27 +725,10 @@ const handleSubmit = async () => {
 }
 const downloadFile = (file) => {
   if (!file || !file.filename) return
-  if (!file || !file.filename) return
-  const url = import.meta.env.PROD 
-      ? `https://coso.top/static/${file.filename}` 
-      : `/static/${file.filename}` // Local development uses proxy or relative path
-  // Ideally, use relative path if Nginx is configured correctly.
-  // But since user's VPS setup involves complex Nginx layers, let's use the explicit public domain to be safe, 
-  // or better, use relative path `/static/...` which works if hosted correcty.
-  // Providing the simplest fix: relative URL.
-  // const url = `/static/${file.filename}`
-  // WAIT, Nginx serves /static/ -> backend/static/. 
-  // So accessing https://coso.top/static/file.pdf should work.
-  // So relative path `/static/${file.filename}` is correct.
   const downloadUrl = `/static/${file.filename}`
   window.open(downloadUrl, '_blank')
 }
 
-
-onMounted(async () => {
-  await fetchMeetingTypes()
-  await fetchMeetings()
-})
 </script>
 
 <style scoped>
