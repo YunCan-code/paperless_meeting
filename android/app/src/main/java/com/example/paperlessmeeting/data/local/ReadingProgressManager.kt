@@ -87,17 +87,21 @@ class ReadingProgressManager @Inject constructor(
 
             try {
                 val serverList = apiService.getReadingProgress(userId)
-                val localList = serverList.map { item ->
+                val currentLocalMap = getAllProgressLocal().associateBy { it.uniqueId }
+
+                val mergedList = serverList.map { item ->
+                    // 尝试从本地找，如果本地有缓存，保留它的 localPath
+                    val existingLocal = currentLocalMap[item.fileUrl]
                     ReadingProgress(
                         uniqueId = item.fileUrl,
                         fileName = item.fileName,
                         currentPage = item.currentPage,
                         totalPages = item.totalPages,
                         lastReadTime = System.currentTimeMillis(),
-                        localPath = null
+                        localPath = existingLocal?.localPath // 保留本地路径
                     )
                 }
-                val json = gson.toJson(localList)
+                val json = gson.toJson(mergedList)
                 prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
             } catch (e: Exception) {
                 e.printStackTrace()
