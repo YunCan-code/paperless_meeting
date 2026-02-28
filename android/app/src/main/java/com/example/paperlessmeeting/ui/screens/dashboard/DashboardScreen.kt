@@ -16,8 +16,8 @@ import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.HowToVote
-import androidx.compose.material.icons.filled.SupportAgent
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -260,20 +260,21 @@ fun DashboardContent(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 QuickActionButton(
-                    icon = Icons.Default.SupportAgent,
-                    label = "会务",
-                    onClick = { /* TODO */ }
-                )
-                QuickActionButton(
-                    icon = androidx.compose.material.icons.Icons.Default.HowToVote,
+                    icon = Icons.Default.HowToVote,
                     label = "投票",
                     onClick = onVoteClick
                 )
 
                 QuickActionButton(
-                    icon = androidx.compose.material.icons.Icons.Default.Star,
+                    icon = Icons.Default.Refresh,
                     label = "抽签",
                     onClick = onLotteryClick
+                )
+
+                QuickActionButton(
+                    icon = Icons.Default.Edit,
+                    label = "打卡",
+                    onClick = { /* TODO */ }
                 )
             }
         }
