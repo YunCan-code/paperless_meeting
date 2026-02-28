@@ -95,4 +95,43 @@ interface ApiService {
 
     @GET("reading-progress/{userId}")
     suspend fun getReadingProgress(@retrofit2.http.Path("userId") userId: Int): List<com.example.paperlessmeeting.domain.model.ReadingProgressResponse>
+
+    // ===== Check-In API =====
+    @retrofit2.http.POST("checkin/")
+    suspend fun checkIn(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.CheckInRequest): com.example.paperlessmeeting.domain.model.CheckInResponse
+
+    @retrofit2.http.POST("checkin/makeup")
+    suspend fun makeupCheckIn(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.MakeupRequest): com.example.paperlessmeeting.domain.model.CheckInResponse
+
+    @retrofit2.http.DELETE("checkin/{checkinId}")
+    suspend fun cancelCheckIn(@retrofit2.http.Path("checkinId") checkinId: Int): Map<String, String>
+
+    @GET("checkin/today/{userId}")
+    suspend fun getTodayStatus(@retrofit2.http.Path("userId") userId: Int): com.example.paperlessmeeting.domain.model.TodayStatusResponse
+
+    // ===== Dashboard API =====
+    @GET("dashboard/stats/{userId}")
+    suspend fun getDashboardStats(
+        @retrofit2.http.Path("userId") userId: Int,
+        @retrofit2.http.Query("range") range: String = "month"
+    ): com.example.paperlessmeeting.domain.model.DashboardStats
+
+    @GET("dashboard/heatmap/{userId}")
+    suspend fun getHeatmap(@retrofit2.http.Path("userId") userId: Int): com.example.paperlessmeeting.domain.model.HeatmapResponse
+
+    @GET("dashboard/collaborators/{userId}")
+    suspend fun getCollaborators(@retrofit2.http.Path("userId") userId: Int): com.example.paperlessmeeting.domain.model.CollaboratorsResponse
+
+    @GET("dashboard/type-distribution/{userId}")
+    suspend fun getTypeDistribution(
+        @retrofit2.http.Path("userId") userId: Int,
+        @retrofit2.http.Query("range") range: String = "year"
+    ): com.example.paperlessmeeting.domain.model.TypeDistributionResponse
+
+    @GET("dashboard/checkin-history/{userId}")
+    suspend fun getCheckinHistory(
+        @retrofit2.http.Path("userId") userId: Int,
+        @retrofit2.http.Query("skip") skip: Int = 0,
+        @retrofit2.http.Query("limit") limit: Int = 20
+    ): List<com.example.paperlessmeeting.domain.model.CheckInHistoryItem>
 }

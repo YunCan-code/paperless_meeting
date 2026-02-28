@@ -72,6 +72,7 @@ class MeetingBase(SQLModel):
     title: str # 会议标题
     meeting_type_id: Optional[int] = Field(default=None, foreign_key="meetingtype.id") # 关联会议类型
     start_time: datetime # 开始时间
+    end_time: Optional[datetime] = None # 结束时间（可选，方便后期使用）
     location: Optional[str] = None # 会议地点
     speaker: Optional[str] = None # 主讲人
     agenda: Optional[str] = None # 议程 (JSON format: [{"time": "10:00", "content": "Intro"}, ...])
@@ -128,6 +129,20 @@ class ReadingProgress(SQLModel, table=True):
     current_page: int       # 当前页码 (0-indexed)
     total_pages: int        # 总页数
     updated_at: datetime = Field(default_factory=datetime.now)
+
+
+# 签到/打卡模型（非强制，用户自主记录参会数据）
+class CheckIn(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("user_id", "meeting_id", name="uq_checkin_user_meeting"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    meeting_id: int = Field(foreign_key="meeting.id", index=True)
+    check_in_time: datetime = Field(default_factory=datetime.now)  # 签到时间
+    duration_minutes: Optional[int] = None  # 用户可选记录会议时长（分钟）
+    is_makeup: bool = Field(default=False)  # 是否补签
+    remark: Optional[str] = None  # 补签备注
 
 
 class NoteRead(NoteBase):

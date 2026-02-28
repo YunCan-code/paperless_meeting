@@ -22,4 +22,5 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 
     object VoteList : Screen("vote_list", "投票中心", Icons.Default.HowToVote)
     object LotteryList : Screen("lottery_list", "抽签中心", Icons.Default.Star)
+    object CheckInDashboard : Screen("checkin_dashboard", "会议看板", Icons.Default.Home)
 }

@@ -127,7 +127,16 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         },
                         onLotteryClick = {
                             navController.navigate(Screen.LotteryList.route)
+                        },
+                        onCheckInClick = {
+                            navController.navigate(Screen.CheckInDashboard.route)
                         }
+                    )
+                }
+
+                composable(Screen.CheckInDashboard.route) {
+                    com.example.paperlessmeeting.ui.screens.checkin.CheckInDashboardScreen(
+                        onBackClick = { navController.popBackStack() }
                     )
                 }
                 

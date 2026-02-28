@@ -45,6 +45,7 @@ fun DashboardScreen(
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
     onLotteryClick: () -> Unit = {},
     onVoteClick: () -> Unit = {},
+    onCheckInClick: () -> Unit = {},
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -81,7 +82,8 @@ fun DashboardScreen(
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
                 onVoteClick = onVoteClick,
-                onLotteryClick = onLotteryClick
+                onLotteryClick = onLotteryClick,
+                onCheckInClick = onCheckInClick
             )
         }
     }
@@ -94,7 +96,8 @@ fun DashboardContent(
     onMeetingClick: (Int) -> Unit, 
     onReadingClick: (String, String, Int) -> Unit,
     onVoteClick: () -> Unit,
-    onLotteryClick: () -> Unit
+    onLotteryClick: () -> Unit,
+    onCheckInClick: () -> Unit
 ) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
@@ -274,7 +277,7 @@ fun DashboardContent(
                 QuickActionButton(
                     icon = Icons.Default.Edit,
                     label = "打卡",
-                    onClick = { /* TODO */ }
+                    onClick = onCheckInClick
                 )
             }
         }
