@@ -38,9 +38,13 @@ class CheckInDashboardViewModel @Inject constructor(
         loadAll()
     }
 
-    fun loadAll() {
+    fun loadAll(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            if (showLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            } else {
+                _uiState.value = _uiState.value.copy(error = null)
+            }
             val userId = userPreferences.getUserId()
             if (userId == -1) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = "未登录")
@@ -72,7 +76,7 @@ class CheckInDashboardViewModel @Inject constructor(
 
     fun switchRange(range: String) {
         _uiState.value = _uiState.value.copy(selectedRange = range)
-        loadAll()
+        loadAll(showLoading = false)
     }
 
     fun checkIn(meetingId: Int) {
@@ -81,7 +85,7 @@ class CheckInDashboardViewModel @Inject constructor(
             try {
                 apiService.checkIn(CheckInRequest(userId = userId, meetingId = meetingId))
                 _uiState.value = _uiState.value.copy(actionMessage = "签到成功!")
-                loadAll()
+                loadAll(showLoading = false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(actionMessage = "签到失败: ${e.message}")
             }
@@ -93,7 +97,7 @@ class CheckInDashboardViewModel @Inject constructor(
             try {
                 apiService.cancelCheckIn(checkinId)
                 _uiState.value = _uiState.value.copy(actionMessage = "已取消打卡")
-                loadAll()
+                loadAll(showLoading = false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(actionMessage = "取消失败: ${e.message}")
             }
@@ -106,7 +110,7 @@ class CheckInDashboardViewModel @Inject constructor(
             try {
                 apiService.makeupCheckIn(MakeupRequest(userId = userId, meetingId = meetingId, remark = remark))
                 _uiState.value = _uiState.value.copy(actionMessage = "补签成功!")
-                loadAll()
+                loadAll(showLoading = false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(actionMessage = "补签失败: ${e.message}")
             }

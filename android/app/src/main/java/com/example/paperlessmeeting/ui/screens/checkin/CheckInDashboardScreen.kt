@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,7 +58,7 @@ fun CheckInDashboardScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    containerColor = Color.Transparent
                 )
             )
         }
@@ -80,21 +81,31 @@ fun CheckInDashboardScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                // 1. 核心操作区 (Hero Card)
-                item {
-                    HeroCheckInCard(
-                        todayStatus = uiState.todayStatus,
-                        onCheckIn = { meetingId -> viewModel.checkIn(meetingId) },
-                        onMakeup = { meetingId, remark -> viewModel.makeupCheckIn(meetingId, remark) }
-                    )
-                }
-
-                // 2. 时间维度切换器
+                // 1. 时间维度切换器
                 item {
                     TimeRangeSelector(
                         selectedRange = uiState.selectedRange,
                         onRangeSelected = { viewModel.switchRange(it) }
                     )
+                }
+
+                // 2. 核心操作区 & 环保卡片 (一行两个方块)
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        HeroCheckInCard(
+                            todayStatus = uiState.todayStatus,
+                            onCheckIn = { meetingId -> viewModel.checkIn(meetingId) },
+                            onMakeup = { meetingId, remark -> viewModel.makeupCheckIn(meetingId, remark) },
+                            modifier = Modifier.weight(1f).aspectRatio(1f) // 使其成为正方形
+                        )
+                        EcoImpactCard(
+                            readingCount = uiState.stats.readingCount,
+                            modifier = Modifier.weight(1f).aspectRatio(1f)
+                        )
+                    }
                 }
 
                 // 3. 数据概览网格
@@ -118,11 +129,6 @@ fun CheckInDashboardScreen(
                     }
                 }
 
-                // 6. 环保卡片
-                item {
-                    EcoImpactCard(readingCount = uiState.stats.readingCount)
-                }
-
                 item { Spacer(modifier = Modifier.height(32.dp)) }
             }
         }
@@ -131,12 +137,13 @@ fun CheckInDashboardScreen(
 
 @Composable
 fun HeroCheckInCard(
+    modifier: Modifier = Modifier,
     todayStatus: TodayStatusResponse?,
     onCheckIn: (Int) -> Unit,
     onMakeup: (Int, String) -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
@@ -145,10 +152,10 @@ fun HeroCheckInCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (todayStatus == null || todayStatus.todayMeetings.isEmpty()) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("今日无会议安排", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("好好休息，明天继续努力", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("今日无会", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.weight(1f))
             } else {
                 val unchecked = todayStatus.todayMeetings.filter { !it.checkedIn }
                 val checked = todayStatus.todayMeetings.filter { it.checkedIn }
@@ -157,26 +164,28 @@ fun HeroCheckInCard(
                     unchecked.isNotEmpty() -> {
                         // 有未打卡的会议
                         val nextMeeting = unchecked.first()
-                        Text("当前有未打卡的会议", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(36.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(nextMeeting.meetingTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text("开始时间: ${nextMeeting.startTime.replace("T", " ").substring(0, 16)}", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(nextMeeting.meetingTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(nextMeeting.startTime.substring(11, 16), style = MaterialTheme.typography.bodySmall)
+                        Spacer(modifier = Modifier.weight(1f))
                         
                         Button(
                             onClick = { onCheckIn(nextMeeting.meetingId) },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = RoundedCornerShape(16.dp)
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("立即签到打卡", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("签到", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     else -> {
                         // 全部打卡完毕
-                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(64.dp))
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("今日会议全部签到完成！", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("共签到了 ${checked.size} 场会议", style = MaterialTheme.typography.bodyMedium)
+                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("全签到完", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text("共签到 ${checked.size} 次", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -204,32 +213,32 @@ fun TimeRangeSelector(selectedRange: String, onRangeSelected: (String) -> Unit) 
 
 @Composable
 fun StatsGrid(stats: DashboardStats) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(modifier = Modifier.weight(1f), title = "参会总数", value = stats.meetingCount.toString(), subtitle = "场")
-            StatCard(modifier = Modifier.weight(1f), title = "签到数", value = stats.checkinCount.toString(), subtitle = "次")
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StatCard(modifier = Modifier.weight(1f), title = "参会总数", value = stats.meetingCount.toString(), subtitle = "场", color = Color(0xFFE3F2FD), textColor = Color(0xFF1565C0))
+            StatCard(modifier = Modifier.weight(1f), title = "签到数", value = stats.checkinCount.toString(), subtitle = "次", color = Color(0xFFF3E5F5), textColor = Color(0xFF6A1B9A))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(modifier = Modifier.weight(1f), title = "参与类型", value = stats.typeCount.toString(), subtitle = "种")
-            StatCard(modifier = Modifier.weight(1f), title = "阅读文件", value = stats.readingCount.toString(), subtitle = "份")
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StatCard(modifier = Modifier.weight(1f), title = "参与类型", value = stats.typeCount.toString(), subtitle = "种", color = Color(0xFFFFF3E0), textColor = Color(0xFFEF6C00))
+            StatCard(modifier = Modifier.weight(1f), title = "阅读文件", value = stats.readingCount.toString(), subtitle = "份", color = Color(0xFFE0F7FA), textColor = Color(0xFF00838F))
         }
     }
 }
 
 @Composable
-fun StatCard(modifier: Modifier = Modifier, title: String, value: String, subtitle: String) {
+fun StatCard(modifier: Modifier = Modifier, title: String, value: String, subtitle: String, color: Color, textColor: Color) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = color),
+        shape = RoundedCornerShape(20.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(8.dp))
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, color = textColor.copy(alpha = 0.8f), fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(value, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold, color = textColor)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
+                Text(subtitle, style = MaterialTheme.typography.titleSmall, color = textColor.copy(alpha = 0.8f), modifier = Modifier.padding(bottom = 6.dp))
             }
         }
     }
@@ -249,18 +258,19 @@ fun ChartSectionTitle(title: String) {
 fun TypeDistributionChart(data: List<TypeDistributionItem>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val total = data.sumOf { it.count }.toFloat()
             val colors = listOf(Color(0xFF5C6BC0), Color(0xFF26A69A), Color(0xFFFFA726), Color(0xFFAB47BC), Color(0xFFEC407A))
             
             // 简单的环形图
-            Box(modifier = Modifier.size(100.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(110.dp), contentAlignment = Alignment.Center) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     var startAngle = -90f
                     data.forEachIndexed { index, item ->
@@ -300,10 +310,11 @@ fun TypeDistributionChart(data: List<TypeDistributionItem>) {
 fun CollaboratorsCard(collaborators: List<Collaborator>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(20.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             collaborators.forEachIndexed { index, collaborator ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -325,22 +336,24 @@ fun CollaboratorsCard(collaborators: List<Collaborator>) {
 }
 
 @Composable
-fun EcoImpactCard(readingCount: Int) {
+fun EcoImpactCard(modifier: Modifier = Modifier, readingCount: Int) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("🌱 无纸化贡献", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
+        Column(modifier = Modifier.padding(24.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🌱 无纸化", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(12.dp))
             val savedPaper = readingCount * 5 // 假设每份文件看5章/页
             val savedTrees = String.format("%.3f", savedPaper * 0.0001)
             Text(
-                "本时段内您阅读了 $readingCount 份电子文件，相当于节约了 $savedPaper 张 A4 纸打印，拯救了 $savedTrees 棵树木。",
+                "$savedTrees",
                 color = Color(0xFF1B5E20),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
+            Text("棵拯救的树", style = MaterialTheme.typography.bodySmall, color = Color(0xFF2E7D32))
         }
     }
 }
