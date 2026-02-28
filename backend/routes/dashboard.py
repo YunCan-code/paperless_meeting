@@ -134,8 +134,7 @@ def get_collaborators(user_id: int, session: Session = Depends(get_session)):
             GROUP BY c2.user_id, u.name
             ORDER BY co_meetings DESC
             LIMIT 5
-        """),
-        {"uid": user_id}
+        """).bindparams(uid=user_id)
     ).all()
 
     return {
@@ -165,8 +164,7 @@ def get_type_distribution(user_id: int, range: str = "year", session: Session = 
               AND c.check_in_time <= :end_dt
             GROUP BY mt.name
             ORDER BY count DESC
-        """),
-        {"uid": user_id, "start": start_dt, "end_dt": end_dt}
+        """).bindparams(uid=user_id, start=start_dt, end_dt=end_dt)
     ).all()
 
     return {
