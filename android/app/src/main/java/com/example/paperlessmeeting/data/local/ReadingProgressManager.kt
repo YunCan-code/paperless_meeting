@@ -86,10 +86,16 @@ class ReadingProgressManager @Inject constructor(
     suspend fun loadFromServer() {
         withContext(Dispatchers.IO) {
             val userId = userPreferences.getUserId()
+            android.util.Log.d("ReadingProgress", "loadFromServer: userId=$userId")
             if (userId == -1) return@withContext
 
             try {
                 val serverList = apiService.getReadingProgress(userId)
+                android.util.Log.d("ReadingProgress", "loadFromServer: serverList.size=${serverList.size}")
+                for (item in serverList) {
+                    android.util.Log.d("ReadingProgress", "  server item: url=${item.fileUrl}, name=${item.fileName}, page=${item.currentPage}")
+                }
+
                 val currentLocalMap = getAllProgressLocal().associateBy { it.uniqueId }
 
                 val mergedList = serverList.map { item ->
@@ -104,9 +110,11 @@ class ReadingProgressManager @Inject constructor(
                         localPath = existingLocal?.localPath // 保留本地路径
                     )
                 }
+                android.util.Log.d("ReadingProgress", "loadFromServer: mergedList.size=${mergedList.size}")
                 val json = gson.toJson(mergedList)
                 prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
             } catch (e: Exception) {
+                android.util.Log.e("ReadingProgress", "loadFromServer FAILED", e)
                 e.printStackTrace()
             }
         }
