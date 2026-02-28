@@ -33,7 +33,7 @@ import com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen // Will
 import com.example.paperlessmeeting.ui.theme.PaperlessMeetingTheme
 
 @Composable
-fun MainScreen() {
+fun MainScreen(onLogout: () -> Unit = {}) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -120,8 +120,7 @@ fun MainScreen() {
                         onReadingClick = { url, name, page ->
                             val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                             val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-                            val encodedname = java.net.URLEncoder.encode(name, "UTF-8")
-                            navController.navigate("reader?url=$encodedUrl&name=$encodedname&page=$page")
+                            navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$page")
                         },
                         onVoteClick = {
                             navController.navigate(Screen.VoteList.route)
@@ -161,7 +160,7 @@ fun MainScreen() {
                     )
                 }
                 composable(Screen.Settings.route) {
-                    com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(navController = navController)
+                    com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(navController = navController, onLogout = onLogout)
                 }
 
                 composable(

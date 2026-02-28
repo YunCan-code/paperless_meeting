@@ -16,8 +16,10 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 import com.example.paperlessmeeting.domain.model.MeetingSyncState
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 sealed class ReaderUiState {
     object Idle : ReaderUiState()
@@ -223,7 +225,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun saveReadingProgress(uniqueId: String, fileName: String, page: Int, total: Int, localPath: String? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(NonCancellable) {
             if (total > 0) {
                 readingProgressManager.saveProgress(uniqueId, fileName, page, total, localPath)
             }

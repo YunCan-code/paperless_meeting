@@ -1,13 +1,13 @@
 package com.example.paperlessmeeting.data.local
 
 import android.content.Context
-import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.data.remote.ApiService
+import com.example.paperlessmeeting.domain.model.ReadingProgressRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +22,9 @@ data class ReadingProgress(
 
 @Singleton
 class ReadingProgressManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val apiService: ApiService,
+    private val userPreferences: UserPreferences
 ) {
     private val prefs = context.getSharedPreferences("reading_progress_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
@@ -30,11 +32,10 @@ class ReadingProgressManager @Inject constructor(
 
     suspend fun saveProgress(uniqueId: String, fileName: String, page: Int, total: Int, localPath: String? = null) {
         withContext(Dispatchers.IO) {
-            val currentList = getAllProgress().toMutableList()
-            // Remove existing entry for this file if any
+            // 保存到本地
+            val currentList = getAllProgressLocal().toMutableList()
             currentList.removeAll { it.uniqueId == uniqueId }
             
-            // Add new entry
             val newEntry = ReadingProgress(
                 uniqueId = uniqueId,
                 fileName = fileName,
@@ -43,24 +44,72 @@ class ReadingProgressManager @Inject constructor(
                 lastReadTime = System.currentTimeMillis(),
                 localPath = localPath
             )
-            // Add to index 0
             currentList.add(0, newEntry)
             
-            // Limit list size (e.g. keep last 20)
             val trimmedList = if (currentList.size > 20) currentList.take(20) else currentList
-            
             val json = gson.toJson(trimmedList)
             prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
+
+            // 同步到服务端
+            val userId = userPreferences.getUserId()
+            if (userId != -1) {
+                try {
+                    apiService.saveReadingProgress(
+                        ReadingProgressRequest(
+                            userId = userId,
+                            fileUrl = uniqueId,
+                            fileName = fileName,
+                            currentPage = page,
+                            totalPages = total
+                        )
+                    )
+                } catch (e: Exception) {
+                    // 网络失败时静默忽略，本地已保存
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
     suspend fun getProgress(uniqueId: String): ReadingProgress? {
         return withContext(Dispatchers.IO) {
-            getAllProgress().find { it.uniqueId == uniqueId }
+            getAllProgressLocal().find { it.uniqueId == uniqueId }
+        }
+    }
+
+    /**
+     * 从服务端拉取当前用户的阅读进度并写入本地
+     */
+    suspend fun loadFromServer() {
+        withContext(Dispatchers.IO) {
+            val userId = userPreferences.getUserId()
+            if (userId == -1) return@withContext
+
+            try {
+                val serverList = apiService.getReadingProgress(userId)
+                val localList = serverList.map { item ->
+                    ReadingProgress(
+                        uniqueId = item.fileUrl,
+                        fileName = item.fileName,
+                        currentPage = item.currentPage,
+                        totalPages = item.totalPages,
+                        lastReadTime = System.currentTimeMillis(),
+                        localPath = null
+                    )
+                }
+                val json = gson.toJson(localList)
+                prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     suspend fun getAllProgress(): List<ReadingProgress> {
+        return getAllProgressLocal()
+    }
+
+    private suspend fun getAllProgressLocal(): List<ReadingProgress> {
         return withContext(Dispatchers.IO) {
             val json = prefs.getString(KEY_PROGRESS_LIST, null)
             if (json.isNullOrEmpty()) {

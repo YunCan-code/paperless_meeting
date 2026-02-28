@@ -133,8 +133,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun logout() {
+        viewModelScope.launch {
+            readingProgressManager.clearAll()
+        }
         userPreferences.clear()
-        // Navigation side-effect should be handled by UI observing a OneTimeEvent or simply callback
     }
 
     fun changePassword(oldPwd: String, newPwd: String, onSuccess: () -> Unit, onError: (String) -> Unit) {

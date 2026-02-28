@@ -2,6 +2,8 @@ package com.example.paperlessmeeting.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -10,7 +12,17 @@ import javax.inject.Singleton
 class UserPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
+        context, 
+        "user_prefs_encrypted", 
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
     companion object {
         private const val KEY_USER_NAME = "user_name"
@@ -20,6 +32,7 @@ class UserPreferences @Inject constructor(
         private const val KEY_USER_PHONE = "user_phone"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_ROLE = "user_role"
+        private const val KEY_TOKEN = "jwt_token"
     }
 
     fun saveUserId(id: Int) {
@@ -69,13 +82,21 @@ class UserPreferences @Inject constructor(
     fun getUserEmail(): String? {
         return prefs.getString(KEY_USER_EMAIL, null)
     }
-    
+
     fun saveUserRole(role: String) {
         prefs.edit().putString(KEY_USER_ROLE, role).apply()
     }
 
     fun getUserRole(): String? {
-        return prefs.getString(KEY_USER_ROLE, "user")
+        return prefs.getString(KEY_USER_ROLE, null)
+    }
+
+    fun saveToken(token: String) {
+        prefs.edit().putString(KEY_TOKEN, token).apply()
+    }
+
+    fun getToken(): String? {
+        return prefs.getString(KEY_TOKEN, null)
     }
 
     fun clear() {

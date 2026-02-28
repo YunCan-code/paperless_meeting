@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 # 导入数据库初始化函数和路由模块
 from database import create_db_and_tables
-from routes import users, meetings, auth, meeting_types, notes, devices, app_updates, system_settings, sync, vote, lottery
+from routes import users, meetings, auth, meeting_types, notes, devices, app_updates, system_settings, sync, vote, lottery, reading_progress
 from socket_manager import sio, socket_app
 
 from fastapi import Request
@@ -98,6 +98,7 @@ app.include_router(system_settings.router)
 app.include_router(sync.router, prefix="/sync", tags=["Meeting Sync"])
 app.include_router(vote.router)
 app.include_router(lottery.router)
+app.include_router(reading_progress.router)
 
 # 挂载 Socket.IO (WebSocket 端点位于 /socket.io/)
 app.mount("/socket.io", socket_app)

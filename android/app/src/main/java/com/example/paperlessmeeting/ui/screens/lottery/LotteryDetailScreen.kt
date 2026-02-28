@@ -414,7 +414,7 @@ fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRoun
                 }
                 
                 // ⭐ 中奖者标签 - 移除外层Surface,直接显示白色徽章
-                FlowRow(
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.padding(top = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -448,23 +448,4 @@ fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRoun
     }
 }
 
-// Helper for FlowRow if not available in older compose handling
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-fun FlowRow(
-    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
-    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
-    content: @Composable () -> Unit
-) {
-    // Basic implementation reference or use Accompanist if needed
-    // For now simplistic column fallback if flow row complex, 
-    // but better use standard Layout or simple Row/Column if items few.
-    // Assuming simple implementation or usage of latest compose 1.4+ FlowRow
-    // If syntax error, revert to simple Column.
-    // Compose 1.4+
-    androidx.compose.foundation.layout.FlowRow(
-        horizontalArrangement = horizontalArrangement,
-        verticalArrangement = verticalArrangement,
-        content = { content() }
-    )
-}
+// Removed custom FlowRow wrapper, using standard Layout instead

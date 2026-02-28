@@ -6,6 +6,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface MeetingRepository {
+    suspend fun login(request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse
     suspend fun getMeetings(
         skip: Int = 0, 
         limit: Int = 20,
@@ -13,7 +14,7 @@ interface MeetingRepository {
         startDate: String? = null,
         endDate: String? = null
     ): List<Meeting>
-    suspend fun getMeetingById(id: Int): Meeting?
+    suspend fun getMeetingById(id: Int): com.example.paperlessmeeting.utils.Resource<Meeting>
     suspend fun downloadFile(url: String, destFile: java.io.File): Boolean
     suspend fun downloadFileWithProgress(
         url: String, 
@@ -39,6 +40,11 @@ interface MeetingRepository {
 class MeetingRepositoryImpl @Inject constructor(
     private val api: ApiService
 ) : MeetingRepository {
+
+    override suspend fun login(request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse {
+        return api.login(request)
+    }
+
     override suspend fun getMeetings(
         skip: Int, 
         limit: Int,
@@ -49,12 +55,13 @@ class MeetingRepositoryImpl @Inject constructor(
         return api.getMeetings(skip, limit, sort, startDate, endDate)
     }
 
-    override suspend fun getMeetingById(id: Int): Meeting? {
+    override suspend fun getMeetingById(id: Int): com.example.paperlessmeeting.utils.Resource<Meeting> {
         return try {
-            api.getMeeting(id)
+            val meeting = api.getMeeting(id)
+            com.example.paperlessmeeting.utils.Resource.Success(meeting)
         } catch (e: Exception) {
             e.printStackTrace()
-            null
+            com.example.paperlessmeeting.utils.Resource.Error(e.message ?: "Unknown Error")
         }
     }
 

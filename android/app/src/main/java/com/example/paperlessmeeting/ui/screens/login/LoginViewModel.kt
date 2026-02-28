@@ -2,7 +2,7 @@ package com.example.paperlessmeeting.ui.screens.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paperlessmeeting.data.remote.ApiService
+import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LoginRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +12,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val apiService: ApiService,
+    private val repository: MeetingRepository,
     private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
 ) : ViewModel() {
 
@@ -28,9 +28,10 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = LoginUiState.Loading
             try {
-                val response = apiService.login(LoginRequest(query))
+                val response = repository.login(LoginRequest(query))
                 userPreferences.saveUserName(response.name)
                 userPreferences.saveUserId(response.user_id)
+                userPreferences.saveToken(response.token)
                 response.role?.let { userPreferences.saveUserRole(it) }
                 _uiState.value = LoginUiState.Success(response.name)
             } catch (e: Exception) {

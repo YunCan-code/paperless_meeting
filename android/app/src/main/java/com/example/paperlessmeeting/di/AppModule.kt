@@ -21,7 +21,7 @@ object AppModule {
      */
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(userPreferences: com.example.paperlessmeeting.data.local.UserPreferences): OkHttpClient {
         try {
             // Create a trust manager that does not validate certificate chains
             val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
@@ -40,6 +40,14 @@ object AppModule {
             val sslSocketFactory = sslContext.socketFactory
 
             return OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val original = chain.request()
+                    val requestBuilder = original.newBuilder()
+                    userPreferences.getToken()?.let { token ->
+                        requestBuilder.header("Authorization", "Bearer $token")
+                    }
+                    chain.proceed(requestBuilder.build())
+                }
                 .sslSocketFactory(sslSocketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
                 .hostnameVerifier { _, _ -> true } // Trust all hostnames
                 .connectTimeout(15, TimeUnit.SECONDS)

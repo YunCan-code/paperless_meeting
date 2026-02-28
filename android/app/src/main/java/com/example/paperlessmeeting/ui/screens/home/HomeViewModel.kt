@@ -148,10 +148,9 @@ class HomeViewModel @Inject constructor(
     }
 
     suspend fun getMeetingDetails(id: Int): Meeting? {
-        return try {
-            repository.getMeetingById(id)
-        } catch (e: Exception) {
-            null
+        return when (val result = repository.getMeetingById(id)) {
+            is com.example.paperlessmeeting.utils.Resource.Success -> result.data
+            else -> null
         }
     }
 }

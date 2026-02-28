@@ -64,15 +64,15 @@ class DetailViewModel @Inject constructor(
                     _uiState.value = DetailUiState.Error("Invalid Meeting ID")
                     return@launch
                 }
-                val meeting = repository.getMeetingById(id)
-                if (meeting != null) {
-                    _uiState.value = DetailUiState.Success(meeting)
+                val result = repository.getMeetingById(id)
+                if (result is com.example.paperlessmeeting.utils.Resource.Success) {
+                    _uiState.value = DetailUiState.Success(result.data)
                     
                     // Connect Socket when meeting is loaded
                     socketManager.connect(serverUrl)
                     socketManager.joinMeeting(id)
-                } else {
-                    _uiState.value = DetailUiState.Error("Meeting not found")
+                } else if (result is com.example.paperlessmeeting.utils.Resource.Error) {
+                    _uiState.value = DetailUiState.Error(result.message)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

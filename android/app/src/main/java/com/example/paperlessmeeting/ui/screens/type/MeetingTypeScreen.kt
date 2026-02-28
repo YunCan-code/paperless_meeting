@@ -143,7 +143,7 @@ fun MeetingTypeCard(
                 )
                 
                 Text(
-                    text = "${(1..10).random()} Meetings", // Mock count
+                    text = "点击查看",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -156,5 +156,5 @@ fun MeetingTypeCard(
 fun Brush.Companion.brushedGradient(colors: List<Color>) = linearGradient(
     colors = colors,
     start = androidx.compose.ui.geometry.Offset.Zero,
-    end = androidx.compose.ui.geometry.Offset.Infinite
+    end = androidx.compose.ui.geometry.Offset(1000f, 1000f) // Safe fallback for gradient length
 )

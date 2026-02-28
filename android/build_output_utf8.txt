@@ -1,0 +1,102 @@
+﻿> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+./gradlew : e: file:///D:/Prog
+ramData/paperless_meeting/andr
+oid/app/src/main/java/com/exam
+ple/paperlessmeeting/ui/compon
+ents/VoteBottomSheet.kt:155:25
+ Unresolved reference: CardBac
+kground
+所在位置 行:1 字符: 1
++ ./gradlew assembleDebug > bu
+ild_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (e: file:/  
+  //D:/P... CardBackground:   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+e: file:///D:/ProgramData/pape
+rless_meeting/android/app/src/
+main/java/com/example/paperles
+smeeting/ui/components/VoteBot
+tomSheet.kt:488:29 Unresolved 
+reference: CardBackground
+e: file:///D:/ProgramData/pape
+rless_meeting/android/app/src/
+main/java/com/example/paperles
+smeeting/ui/components/VoteBot
+tomSheet.kt:488:45 Unresolved 
+reference: CardBackground
+e: file:///D:/ProgramData/pape
+rless_meeting/android/app/src/
+main/java/com/example/paperles
+smeeting/ui/components/VoteBot
+tomSheet.kt:610:25 Unresolved 
+reference: CardBackground
+
+FAILURE: Build failed with an 
+exception.
+
+* What went wrong:
+Execution failed for task ':ap
+p:compileDebugKotlin'.
+> A failure occurred while exe
+cuting org.jetbrains.kotlin.co
+mpilerRunner.GradleCompilerRun
+nerWithWorkers$GradleKotlinCom
+pilerWorkAction
+   > Compilation error. See lo
+g for more details
+
+* Try:
+> Run with --stacktrace option
+ to get the stack trace.
+> Run with --info or --debug o
+ption to get more log output.
+> Run with --scan to get full 
+insights.
+> Get more help at https://hel
+p.gradle.org.
+
+BUILD FAILED in 6s
+31 actionable tasks: 2 executed, 29 up-to-date

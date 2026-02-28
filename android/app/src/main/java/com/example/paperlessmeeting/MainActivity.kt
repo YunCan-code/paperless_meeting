@@ -20,14 +20,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
+import javax.inject.Inject
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PaperlessMeetingTheme {
-                AppRoot()
+                AppRoot(userPreferences)
             }
         }
         
@@ -39,9 +43,8 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppRoot() {
-    // Simple authentication state management
-    // In a real app, use DataStore or SessionManager
+fun AppRoot(userPreferences: com.example.paperlessmeeting.data.local.UserPreferences) {
+    // 每次启动都要求登录（公共会议室平板场景）
     var isLoggedIn by remember { mutableStateOf(false) }
 
     Surface(
@@ -49,7 +52,9 @@ fun AppRoot() {
         color = MaterialTheme.colorScheme.background
     ) {
         if (isLoggedIn) {
-            com.example.paperlessmeeting.ui.screens.MainScreen()
+            com.example.paperlessmeeting.ui.screens.MainScreen(
+                onLogout = { isLoggedIn = false }
+            )
         } else {
             com.example.paperlessmeeting.ui.screens.login.LoginScreen(
                 onLoginSuccess = {

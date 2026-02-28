@@ -22,12 +22,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.domain.model.Vote
+import com.example.paperlessmeeting.ui.theme.PrimaryBlue
+import com.example.paperlessmeeting.ui.theme.BackgroundLayer
+import com.example.paperlessmeeting.ui.theme.CardBackground
 
-private val PrimaryBlue = Color(0xFF1976D2)
+// Removed: private val PrimaryBlue = Color(0xFF1976D2)
 private val SuccessGreen = Color(0xFF4CAF50)
 private val WarmGray = Color(0xFF9E9E9E)
-private val WarmBackground = Color(0xFFFAFBFC)
-private val CardBackground = Color(0xFFFFFFFF)
 
 /**
  * 投票列表选择器 BottomSheet (支持历史记录)
@@ -52,7 +53,7 @@ fun VoteListBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = WarmBackground,
+        containerColor = BackgroundLayer,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
@@ -63,7 +64,7 @@ fun VoteListBottomSheet(
             // Tabs
             TabRow(
                 selectedTabIndex = selectedTabIndex,
-                containerColor = WarmBackground,
+                containerColor = BackgroundLayer,
                 contentColor = PrimaryBlue,
                 indicator = { tabPositions ->
                     TabRowDefaults.Indicator(

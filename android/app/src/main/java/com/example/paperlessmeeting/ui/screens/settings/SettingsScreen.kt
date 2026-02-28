@@ -35,6 +35,7 @@ import androidx.navigation.NavController
 @Composable
 fun SettingsScreen(
     navController: NavController,
+    onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -217,9 +218,7 @@ fun SettingsScreen(
                         onClick = { 
                             showLogoutDialog = false 
                             viewModel.logout()
-                            navController.navigate("login") {
-                                popUpTo(0) { inclusive = true }
-                            }
+                            onLogout()
                         }
                     ) { Text("退出", color = MaterialTheme.colorScheme.error) }
                 },

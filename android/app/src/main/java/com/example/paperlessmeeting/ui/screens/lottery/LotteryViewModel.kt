@@ -201,17 +201,6 @@ class LotteryViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        // Do NOT disconnect socketManager as it is global
-        // But maybe leave room?
-        // socketManager.leaveMeeting(meetingId) 
-        // We probably shouldn't leave immediately if we want to receive notifications?
-        // But for Lottery context, maybe leaving is fine.
-        // Dashboard uses joinMeeting too.
-        // If we leave, dashboard might stop receiving updates?
-        // SocketManager doesn't reference count rooms.
-        // So if we leave, we leave.
-        // It's safer NOT to leave if other screens might be interested, or trust user to just close app.
-        // Or if user goes back to list, maybe we should leave?
-        // For now, removing socket disconnect logic.
+        socketManager.disconnect()
     }
 }

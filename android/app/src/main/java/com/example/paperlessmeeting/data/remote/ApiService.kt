@@ -88,4 +88,11 @@ interface ApiService {
     ): List<com.example.paperlessmeeting.domain.model.Vote>
     @GET("lottery/history/user/{userId}")
     suspend fun getUserLotteryHistory(@retrofit2.http.Path("userId") userId: Int): List<com.example.paperlessmeeting.domain.model.LotteryHistoryResponse>
+
+    // Reading Progress API
+    @retrofit2.http.POST("reading-progress/")
+    suspend fun saveReadingProgress(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.ReadingProgressRequest): com.example.paperlessmeeting.domain.model.ReadingProgressResponse
+
+    @GET("reading-progress/{userId}")
+    suspend fun getReadingProgress(@retrofit2.http.Path("userId") userId: Int): List<com.example.paperlessmeeting.domain.model.ReadingProgressResponse>
 }

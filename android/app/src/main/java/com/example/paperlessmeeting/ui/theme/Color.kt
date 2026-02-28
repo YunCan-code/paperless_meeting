@@ -47,3 +47,14 @@ val OnSurfaceDark = Color(0xFFE1E2E6)
 // Custom Colors
 val GlassWhite = Color(0xCCFFFFFF)
 val GlassDark = Color(0xCC1F2937)
+
+// Vote & Generic Feature Colors
+val PrimaryBlue = Color(0xFF1976D2)
+val PrimaryBlueLight = Color(0xFF2196F3)
+val BackgroundGray = Color(0xFFF5F7FA)
+val BackgroundLayer = Color(0xFFF8F9FA)
+val CardBackground = Color(0xFFFFFFFF)
+val SurfaceWhite = Color(0xFFFFFFFF)
+val TextPrimary = Color(0xFF212529)
+val TextSecondary = Color(0xFF6C757D)
+val SuccessGreen = Color(0xFF4CAF50)

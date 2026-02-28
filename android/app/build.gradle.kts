@@ -24,7 +24,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -60,6 +61,9 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
+    
+    // Security for EncryptedSharedPreferences
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     
     // Hilt
     implementation(libs.hilt.android)

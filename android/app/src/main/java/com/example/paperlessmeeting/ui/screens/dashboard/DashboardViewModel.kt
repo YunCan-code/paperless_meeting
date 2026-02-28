@@ -90,7 +90,8 @@ class DashboardViewModel @Inject constructor(
                 // 3. Get Recent Files (Mock or separate API call if needed, here just use today's)
                 val recentFiles = todayMeetings.flatMap { it.attachments.orEmpty() }.take(10)
                 
-                // Load Reading Progress
+                // Load Reading Progress from server first, then local
+                readingProgressManager.loadFromServer()
                 val progressList = readingProgressManager.getAllProgress()
 
                 _uiState.value = DashboardUiState.Success(

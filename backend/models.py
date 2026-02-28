@@ -115,6 +115,20 @@ class MeetingSyncState(SQLModel, table=True):
     timestamp: float # Unix timestamp to prevent old commands
     is_syncing: bool = Field(default=False) # Master switch for this meeting
 
+# 阅读进度模型 (用于跨设备同步)
+class ReadingProgress(SQLModel, table=True):
+    """用户阅读进度记录，按 user_id + file_url 唯一"""
+    __table_args__ = (
+        UniqueConstraint("user_id", "file_url", name="uq_readingprogress_user_file"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    file_url: str           # 文档唯一标识 (下载 URL)
+    file_name: str          # 文件显示名
+    current_page: int       # 当前页码 (0-indexed)
+    total_pages: int        # 总页数
+    updated_at: datetime = Field(default_factory=datetime.now)
+
 
 class NoteRead(NoteBase):
     id: int

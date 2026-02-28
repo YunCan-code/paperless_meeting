@@ -34,13 +34,17 @@ import com.example.paperlessmeeting.domain.model.VoteOption
 import com.example.paperlessmeeting.domain.model.VoteResult
 import kotlinx.coroutines.delay
 
+import com.example.paperlessmeeting.ui.theme.PrimaryBlue
+import com.example.paperlessmeeting.ui.theme.PrimaryBlueLight
+import com.example.paperlessmeeting.ui.theme.BackgroundLayer
+import com.example.paperlessmeeting.ui.theme.SurfaceWhite
+import com.example.paperlessmeeting.ui.theme.TextPrimary
+import com.example.paperlessmeeting.ui.theme.TextSecondary
+import com.example.paperlessmeeting.ui.theme.CardBackground
+
 // 升级配色系统
-private val PrimaryBlue = Color(0xFF1976D2)
-private val PrimaryBlueLight = Color(0xFF2196F3)
 private val SuccessGreen = Color(0xFF4CAF50)
 private val WarningOrange = Color(0xFFFF9800)
-private val WarmBackground = Color(0xFFFAFBFC)
-private val CardBackground = Color(0xFFFFFFFF)
 
 /**
  * 投票 BottomSheet 组件
@@ -116,7 +120,7 @@ fun VoteBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = WarmBackground,
+        containerColor = BackgroundLayer,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(

@@ -38,12 +38,12 @@ fun GlassyTopBar(title: String) {
             )
         },
         navigationIcon = {
-            IconButton(onClick = { /* TODO: Open Drawer */ }) {
+            IconButton(onClick = { /* Open Drawer (Not implemented) */ }) {
                 Icon(Icons.Filled.Menu, contentDescription = "Menu")
             }
         },
         actions = {
-            IconButton(onClick = { /* TODO: Notifications */ }) {
+            IconButton(onClick = { /* Notifications (Not implemented) */ }) {
                 Icon(Icons.Outlined.Notifications, contentDescription = "Notifications")
             }
         },

@@ -416,14 +416,6 @@ fun ReaderScreen(
                     }
                 }
                 is ReaderUiState.Ready -> {
-                    // Restore saved reading progress
-                    LaunchedEffect(state.initialPage) {
-                        // 如果有保存的进度且当前页不等于保存的页码，则恢复
-                        if (state.initialPage > 0 && currentPage != state.initialPage) {
-                            currentPage = state.initialPage
-                            isProgrammaticScroll = true
-                        }
-                    }
 
                     if (isEditing && editPageBitmap != null) {
                         // ====== MODE B: Focus/Edit Mode ======
@@ -444,6 +436,7 @@ fun ReaderScreen(
                         // 1. PDF Content
                         PDFViewerContent(
                             file = state.file,
+                            defaultStartPage = state.initialPage,
                             isNightMode = isNightMode,
                             isHorizontalScroll = isHorizontalScroll,
                             currentPage = currentPage,
@@ -454,34 +447,16 @@ fun ReaderScreen(
                                 isProgrammaticScroll = false // User scrolled
                                 currentPage = page
                                 totalPages = count
-                                
+
                                 // Presenter Sync Logic
                                 if (isPresenterSyncing) {
                                     viewModel.onPresenterPageChanged(page)
                                 }
-                                
-                                // Attendee Auto-Detach Logic
-                                if (isFollowing && !isProgrammaticScroll) {
-                                    // If user manually scrolled, stop following (optional, or just keep following)
-                                    // For now, let's keep following unless they explicitly turn it off, 
-                                    // OR we could say manual scroll disables follow.
-                                    // Let's implement: Manual scroll disables follow to avoid fighting.
-                                    // But wait, isProgrammaticScroll is set to false here.
-                                    // The logic to differentiate 'user scroll' vs 'sync jump' is handled by `isProgrammaticScroll` flag passed into PDFViewerContent.
-                                    // In `onPageChange` below, we check if it was programmatic.
-                                    // ACTUALLY, `onPageChange` is called by PDFView in BOTH cases.
-                                    // We need to know if the helper triggered it.
-                                    
-                                    // In this implementation `isProgrammaticScroll` is set to false just above this line. 
-                                    // So how do we distinguish? 
-                                    // Answer: We need to check the scope.
-                                    // Let's use the simplest approach: If user interacts, we disable follow.
-                                    // But PDFView `onPageChange` fires even for programmatic jumps.
-                                    
-                                    // Let's just update Presenter state here.
-                                    // Attendee detach is handled by `isProgrammaticScroll` check if we want to be strict.
-                                    // For now, let's just allow the jump.
-                                }
+                            },
+                            onPdfLoaded = { count ->
+                                // Ensure totalPages is always set when PDF loads,
+                                // regardless of whether onPageChange fires
+                                totalPages = count
                             },
                             onTap = {
                                 showOverlay = !showOverlay
@@ -578,20 +553,26 @@ fun ReaderScreen(
 @Composable
 fun PDFViewerContent(
     file: File,
+    defaultStartPage: Int = 0,
     isNightMode: Boolean,
     isHorizontalScroll: Boolean,
     currentPage: Int,
-    isProgrammaticScroll: Boolean, 
+    isProgrammaticScroll: Boolean,
     pageAnnotations: Map<Int, List<AnnotationStroke>>,
     onPdfViewReady: (PDFView) -> Unit,
     onPageChange: (Int, Int) -> Unit,
+    onPdfLoaded: (Int) -> Unit,
     onTap: () -> Unit,
     onLoadToc: (List<Pair<Int, Bookmark>>) -> Unit,
     modifier: Modifier
 ) {
-    // Fix Stale Closure: Always access latest annotations in onDraw
+    // Fix Stale Closure: Always access latest values via rememberUpdatedState
     val currentAnnotations by rememberUpdatedState(pageAnnotations)
-    
+    val currentPageState by rememberUpdatedState(currentPage)
+    val currentOnPageChange by rememberUpdatedState(onPageChange)
+    val currentOnPdfLoaded by rememberUpdatedState(onPdfLoaded)
+    val currentOnLoadToc by rememberUpdatedState(onLoadToc)
+
     // Local ref for page jumping
     var localPdfViewRef by remember { mutableStateOf<PDFView?>(null) }
     var isPdfLoaded by remember { mutableStateOf(false) }
@@ -612,31 +593,33 @@ fun PDFViewerContent(
             modifier = Modifier.fillMaxSize(),
             update = { pdfView ->
                 // Fix Flicker: Only reload if file/nightmode changes.
-                val configKey = "${file.absolutePath}_${isNightMode}" 
-                
+                val configKey = "${file.absolutePath}_${isNightMode}"
+
                 if (pdfView.tag != configKey) {
                     isPdfLoaded = false // Reset load state on new file
                     pdfView.tag = configKey
                     pdfView.fromFile(file)
-                        .defaultPage(currentPage)
-                        .enableSwipe(true) 
+                        .defaultPage(defaultStartPage)
+                        .enableSwipe(true)
                         .swipeHorizontal(isHorizontalScroll)
                         .pageSnap(false)
-                        .autoSpacing(false) 
+                        .autoSpacing(false)
                         .pageFling(true)
                         .fitEachPage(false)
                         .nightMode(isNightMode)
                         .enableAnnotationRendering(true)
                         .enableAntialiasing(true)
                         .spacing(10)
-                        .onPageChange { page, count -> 
-                             if (page != currentPage) {
-                                 onPageChange(page, count) 
+                        .onPageChange { page, count ->
+                             if (page != currentPageState) {
+                                 currentOnPageChange(page, count)
                              }
                         }
                         .onLoad { nbPages ->
                              isPdfLoaded = true // Mark as loaded
-                             onLoadToc(flattenBookmarks(pdfView.tableOfContents))
+                             currentOnLoadToc(flattenBookmarks(pdfView.tableOfContents))
+                             // Ensure totalPages is always initialized on load
+                             currentOnPdfLoaded(nbPages)
                         }
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
                              // Render Saved Annotations (PDF Coordinates -> View Coordinates)
@@ -680,7 +663,7 @@ fun PDFViewerContent(
         LaunchedEffect(currentPage, isProgrammaticScroll, isPdfLoaded) {
             // Only jump if PDF is fully loaded to prevent race conditions or ignored calls
             if (isPdfLoaded && isProgrammaticScroll && localPdfViewRef != null) {
-                localPdfViewRef?.jumpTo(currentPage, true)
+                localPdfViewRef?.jumpTo(currentPage, false)
             }
         }
     }

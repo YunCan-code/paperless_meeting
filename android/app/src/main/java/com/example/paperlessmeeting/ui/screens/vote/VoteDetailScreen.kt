@@ -27,10 +27,9 @@ import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteOption
 import com.example.paperlessmeeting.domain.model.VoteResult
 
-// 定义统一的配色（建议放入 Theme.kt）
-private val PrimaryBlue = Color(0xFF1976D2)
-private val BackgroundGray = Color(0xFFF5F7FA)
-private val SuccessGreen = Color(0xFF4CAF50)
+import com.example.paperlessmeeting.ui.theme.PrimaryBlue
+import com.example.paperlessmeeting.ui.theme.BackgroundGray
+import com.example.paperlessmeeting.ui.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
