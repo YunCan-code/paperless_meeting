@@ -11,6 +11,9 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import androidx.annotation.Keep
+
+@Keep
 data class ReadingProgress(
     val uniqueId: String, // Typically the URL or a combination
     val fileName: String,
