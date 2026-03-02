@@ -274,11 +274,13 @@ fun DashboardContent(
                     onClick = onLotteryClick
                 )
 
+                /* 暂时隐藏打卡按钮
                 QuickActionButton(
                     icon = Icons.Default.Edit,
                     label = "打卡",
                     onClick = onCheckInClick
                 )
+                */
             }
         }
 
