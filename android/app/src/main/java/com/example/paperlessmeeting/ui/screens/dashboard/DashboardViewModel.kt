@@ -5,24 +5,25 @@ import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 
 sealed class DashboardUiState {
     object Loading : DashboardUiState()
     data class Success(
-        val meetings: List<Meeting>, 
+        val meetings: List<Meeting>,
         val activeMeetings: List<Meeting>,
         val recentFiles: List<com.example.paperlessmeeting.domain.model.Attachment>,
         val readingProgress: List<com.example.paperlessmeeting.data.local.ReadingProgress> = emptyList(),
         val initialPageIndex: Int = 0,
         val userName: String
     ) : DashboardUiState()
+
     data class Error(val message: String) : DashboardUiState()
 }
 
@@ -40,7 +41,11 @@ class DashboardViewModel @Inject constructor(
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage = _toastMessage.asSharedFlow()
 
+    private var socketInitialized = false
+    private var currentMeetingIds: Set<Int> = emptySet()
+
     init {
+        setupSocketIfNeeded()
         loadData()
     }
 
@@ -51,31 +56,27 @@ class DashboardViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             try {
-                // Get user name
                 val userName = userPreferences.getUserName() ?: "用户"
 
-                // 1. Get Today's Meetings (for Hero Card)
                 val todayStr = java.time.LocalDate.now().toString()
                 val todayMeetings = repository.getMeetings(
-                    limit = 100, // Ensure we get all of today's meetings
+                    limit = 100,
                     startDate = todayStr,
                     endDate = todayStr,
                     sort = "asc"
                 )
-                
-                // Parse times for internal logic (focus index)
+
                 val now = java.time.LocalDateTime.now()
                 val activeListWithTimes = todayMeetings.mapNotNull { meeting ->
                     try {
                         val isoTime = meeting.startTime.replace(" ", "T")
                         val time = java.time.LocalDateTime.parse(isoTime)
                         Pair(meeting, time)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null
                     }
-                } // Already sorted from backend
+                }
 
-                // 2. Determine "Focus" Index based on 15-min Logic
                 var startIndex = 0
                 for (i in 0 until activeListWithTimes.size - 1) {
                     val nextMeetingTime = activeListWithTimes[i + 1].second
@@ -87,61 +88,70 @@ class DashboardViewModel @Inject constructor(
                     }
                 }
 
-                // 3. Get Recent Files (Mock or separate API call if needed, here just use today's)
                 val recentFiles = todayMeetings.flatMap { it.attachments.orEmpty() }.take(10)
-                
-                // Load Reading Progress from server first, then local
+
                 readingProgressManager.loadFromServer()
                 val progressList = readingProgressManager.getAllProgress()
 
                 _uiState.value = DashboardUiState.Success(
-                    meetings = todayMeetings,  // Only show today's meetings in raw list if needed, or separate
-                    activeMeetings = todayMeetings, 
+                    meetings = todayMeetings,
+                    activeMeetings = todayMeetings,
                     recentFiles = recentFiles,
                     readingProgress = progressList,
                     initialPageIndex = startIndex,
                     userName = userName
                 )
-                
-                // 初始化 Socket 连接并监听投票事件
-                setupSocket(todayMeetings)
+
+                currentMeetingIds = todayMeetings.map { it.id }.toSet()
+                joinMeetingRooms()
             } catch (e: Exception) {
                 _uiState.value = DashboardUiState.Error(e.message ?: "Unknown error")
             }
         }
     }
 
-    private fun setupSocket(meetings: List<Meeting>) {
+    private fun setupSocketIfNeeded() {
+        if (socketInitialized) return
+        socketInitialized = true
+        setupSocket()
+    }
+
+    private fun joinMeetingRooms() {
+        currentMeetingIds.forEach { meetingId ->
+            socketManager.joinMeeting(meetingId)
+        }
+    }
+
+    private fun setupSocket() {
         viewModelScope.launch {
             try {
-                // 连接 WebSocket 服务器
-                socketManager.connect("https://coso.top") // 使用配置的服务器地址
-                
-                // 等待连接成功后再加入房间
+                socketManager.connect("https://coso.top")
+
                 launch {
                     socketManager.connectionState.collect { connected ->
                         if (connected) {
-                            meetings.forEach { meeting ->
-                                socketManager.joinMeeting(meeting.id)
-                            }
+                            joinMeetingRooms()
                         }
                     }
                 }
-                
-                // 监听投票开始事件
+
                 launch {
                     socketManager.voteStartEvent.collect { vote ->
                         _toastMessage.emit("收到新投票: ${vote.title}")
                     }
                 }
-                
-                // 监听投票结束事件
+
                 launch {
                     socketManager.voteEndEvent.collect { data ->
                         _toastMessage.emit("投票已结束: ${data.title}")
                     }
                 }
-                
+
+                launch {
+                    socketManager.meetingChangedEvent.collect {
+                        loadData()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

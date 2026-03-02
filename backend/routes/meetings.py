@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from database import get_session
 from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase, Vote, VoteOption, UserVote, MeetingAttendeeLink
+from socket_manager import sio, broadcast_meeting_changed
 
 from pydantic import BaseModel
 
@@ -66,6 +67,19 @@ def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(ge
             )
             session.add(link)
         session.commit()
+
+    try:
+        sio.start_background_task(
+            broadcast_meeting_changed,
+            "created",
+            {
+                "meeting_id": meeting.id,
+                "title": meeting.title,
+                "start_time": meeting.start_time.isoformat() if meeting.start_time else None
+            }
+        )
+    except Exception as e:
+        print(f"[Socket.IO] failed to broadcast meeting_changed: {e}")
     
     return meeting
 

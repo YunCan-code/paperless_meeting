@@ -4,7 +4,7 @@ Socket.IO 实时通信管理器
 """
 import socketio
 import os
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 
 # 导入数据库依赖
 from sqlmodel import Session as SQLSession
@@ -157,6 +157,12 @@ async def broadcast_vote_end(meeting_id: int, vote_id: int, final_results: dict)
 async def broadcast_vote_update(meeting_id: int, vote_id: int, results: list):
     room = f"meeting_{meeting_id}"
     await sio.emit('vote_update', {'vote_id': vote_id, 'results': results}, room=room)
+
+async def broadcast_meeting_changed(action: str, meeting_data: Optional[dict] = None):
+    payload = {"action": action}
+    if meeting_data:
+        payload.update(meeting_data)
+    await sio.emit('meeting_changed', payload)
 
 
 # ========== 抽签功能 ==========

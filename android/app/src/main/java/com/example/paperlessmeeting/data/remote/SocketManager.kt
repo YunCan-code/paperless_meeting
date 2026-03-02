@@ -56,6 +56,9 @@ class SocketManager @Inject constructor(
     private val _voteEndEvent = MutableSharedFlow<VoteEndData>(extraBufferCapacity = 1)
     val voteEndEvent: SharedFlow<VoteEndData> = _voteEndEvent.asSharedFlow()
 
+    private val _meetingChangedEvent = MutableSharedFlow<MeetingChangedData>(extraBufferCapacity = 1)
+    val meetingChangedEvent: SharedFlow<MeetingChangedData> = _meetingChangedEvent.asSharedFlow()
+
     private val _connectionState = MutableSharedFlow<Boolean>(replay = 1)
     val connectionState: SharedFlow<Boolean> = _connectionState.asSharedFlow()
 
@@ -135,6 +138,17 @@ class SocketManager @Inject constructor(
                     Log.d(TAG, "Received vote_end: ${data.vote_id}")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing vote_end", e)
+                }
+            }
+
+            socket?.on("meeting_changed") { args ->
+                try {
+                    val json = args[0] as JSONObject
+                    val data = gson.fromJson(json.toString(), MeetingChangedData::class.java)
+                    _meetingChangedEvent.tryEmit(data)
+                    Log.d(TAG, "Received meeting_changed: ${data.action}, meeting=${data.meeting_id}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing meeting_changed", e)
                 }
             }
 
@@ -295,4 +309,11 @@ data class VoteEndData(
     val title: String,
     val total_voters: Int,
     val results: List<VoteOptionResult>
+)
+
+data class MeetingChangedData(
+    val action: String,
+    val meeting_id: Int? = null,
+    val title: String? = null,
+    val start_time: String? = null
 )
