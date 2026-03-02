@@ -733,33 +733,44 @@ const handleSubmit = async () => {
 
   try {
     submitting.value = true
+    let targetId = editingId.value
     if (isEditMode.value) {
-       await request.put(`/meetings/${editingId.value}`, payload)
+       await request.put(`/meetings/${targetId}`, payload)
        ElMessage.success('更新成功')
     } else {
        const res = await request.post('/meetings/', payload)
-       editingId.value = res.id
+       if (!res || !res.id) {
+           throw new Error('创建会议失败，未获取到 ID')
+       }
+       targetId = res.id
+       editingId.value = targetId
     }
     dialogVisible.value = false
     fetchMeetings()
     
     // Process new files...
-    // Process new files...
     const newFiles = attachmentList.value.filter(f => f.type === 'new')
-    for (const f of newFiles) {
-        try {
-            const formData = new FormData()
-            formData.append('file', f.raw)
-            await request.post(`/meetings/${editingId.value}/upload`, formData)
-        } catch(e) {
-            console.error('Upload failed for file', f.name)
+    if (newFiles.length > 0) {
+        if (!targetId) {
+            ElMessage.error('无法上传附件：会议 ID 无效')
+            return
         }
+        for (const f of newFiles) {
+            try {
+                const formData = new FormData()
+                formData.append('file', f.raw)
+                await request.post(`/meetings/${targetId}/upload`, formData)
+            } catch(e) {
+                console.error('Upload failed for file', f.name, e)
+            }
+        }
+        ElMessage.success('附件上传完成')
     }
-    if(newFiles.length > 0) ElMessage.success('附件上传完成')
-  } catch (e) {
-      ElMessage.error('保存失败')
-  } finally {
-      submitting.value = false
+} catch (e) {
+    console.error('Save meeting error:', e)
+    ElMessage.error(e.message || '保存失败')
+} finally {
+    submitting.value = false
   }
 }
 const downloadFile = (file) => {
