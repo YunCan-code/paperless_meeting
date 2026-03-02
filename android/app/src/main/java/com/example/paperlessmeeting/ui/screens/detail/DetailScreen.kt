@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Inbox
+import com.example.paperlessmeeting.BuildConfig
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -439,7 +440,7 @@ fun MeetingDetailContent(
                 if (!meeting.attachments.isNullOrEmpty()) {
                     meeting.attachments.forEach { file ->
                         val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
-                        val fullUrl = "https://coso.top/static/$encodedName"
+                        val fullUrl = "${BuildConfig.STATIC_BASE_URL}$encodedName"
                         
                         // Check for local cached file using exact logic from ReaderViewModel
                         val extension = file.filename.substringAfterLast(".", "pdf")

@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.vote
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Vote
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -129,7 +130,7 @@ class VoteListViewModel @Inject constructor(
         try {
             // Establish connection (idempotent if already connected)
             // Note: Ideally this URL should come from a centralized config
-            socketManager.connect("https://coso.top")
+            socketManager.connect(BuildConfig.SOCKET_BASE_URL)
             
             meetings.forEach { meeting ->
                 socketManager.joinMeeting(meeting.id)

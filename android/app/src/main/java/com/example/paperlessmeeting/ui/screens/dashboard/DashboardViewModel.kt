@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -125,7 +126,7 @@ class DashboardViewModel @Inject constructor(
     private fun setupSocket() {
         viewModelScope.launch {
             try {
-                socketManager.connect("https://coso.top")
+                socketManager.connect(BuildConfig.SOCKET_BASE_URL)
 
                 launch {
                     socketManager.connectionState.collect { connected ->

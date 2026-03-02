@@ -3,6 +3,7 @@ package com.example.paperlessmeeting.ui.screens.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteResult
@@ -45,11 +46,6 @@ class DetailViewModel @Inject constructor(
     private val _showVoteSheet = MutableStateFlow(false)
     val showVoteSheet: StateFlow<Boolean> = _showVoteSheet.asStateFlow()
 
-    // Server URL needed for Socket connection (assuming base URL logic or configurable)
-    // For now, hardcode or retrieve from a config. 
-    // Ideally this should come from a Repository or Config provider.
-    private val serverUrl = "http://10.0.2.2:8000" // Emulator localhost
-
     init {
         loadMeeting()
         observeSocketEvents()
@@ -69,7 +65,7 @@ class DetailViewModel @Inject constructor(
                     _uiState.value = DetailUiState.Success(result.data)
                     
                     // Connect Socket when meeting is loaded
-                    socketManager.connect(serverUrl)
+                    socketManager.connect(BuildConfig.SOCKET_BASE_URL)
                     socketManager.joinMeeting(id)
                 } else if (result is com.example.paperlessmeeting.utils.Resource.Error) {
                     _uiState.value = DetailUiState.Error(result.message)

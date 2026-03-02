@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.lottery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LotteryState
@@ -57,7 +58,7 @@ class LotteryViewModel @Inject constructor(
         initSocketListener()
         
         // Ensure connection
-        socketManager.connect("https://coso.top")
+        socketManager.connect(BuildConfig.SOCKET_BASE_URL)
         socketManager.joinMeeting(meetingId)
         socketManager.getLotteryState(meetingId, userId)
     }
