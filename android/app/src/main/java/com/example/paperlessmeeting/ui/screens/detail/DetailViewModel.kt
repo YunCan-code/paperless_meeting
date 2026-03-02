@@ -138,6 +138,14 @@ class DetailViewModel @Inject constructor(
                      }
                 }
             }
+            launch {
+                socketManager.meetingChangedEvent.collectLatest { data ->
+                    val id = meetingId?.toIntOrNull() ?: return@collectLatest
+                    if (data.meeting_id == id) {
+                        loadMeeting()
+                    }
+                }
+            }
         }
     }
 

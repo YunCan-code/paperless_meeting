@@ -314,6 +314,7 @@ data class VoteEndData(
 data class MeetingChangedData(
     val action: String,
     val meeting_id: Int? = null,
+    val attachment_id: Int? = null,
     val title: String? = null,
     val start_time: String? = null
 )

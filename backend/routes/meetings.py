@@ -607,6 +607,19 @@ def upload_file(
     session.add(attachment)
     session.commit()
     session.refresh(attachment)
+
+    try:
+        sio.start_background_task(
+            broadcast_meeting_changed,
+            "attachment_uploaded",
+            {
+                "meeting_id": meeting.id,
+                "attachment_id": attachment.id
+            }
+        )
+    except Exception as e:
+        print(f"[Socket.IO] failed to broadcast attachment_uploaded: {e}")
+
     return attachment
 
 class AttachmentUpdate(SQLModel):
@@ -632,6 +645,19 @@ def update_attachment(
     session.add(attachment)
     session.commit()
     session.refresh(attachment)
+
+    try:
+        sio.start_background_task(
+            broadcast_meeting_changed,
+            "attachment_updated",
+            {
+                "meeting_id": attachment.meeting_id,
+                "attachment_id": attachment.id
+            }
+        )
+    except Exception as e:
+        print(f"[Socket.IO] failed to broadcast attachment_updated: {e}")
+
     return attachment
 
 @router.delete("/attachments/{attachment_id}")
@@ -640,6 +666,7 @@ def delete_attachment(attachment_id: int, session: Session = Depends(get_session
     attachment = session.get(Attachment, attachment_id)
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
+    meeting_id = attachment.meeting_id
         
     # 删除物理文件
     try:
@@ -650,4 +677,17 @@ def delete_attachment(attachment_id: int, session: Session = Depends(get_session
 
     session.delete(attachment)
     session.commit()
+
+    try:
+        sio.start_background_task(
+            broadcast_meeting_changed,
+            "attachment_deleted",
+            {
+                "meeting_id": meeting_id,
+                "attachment_id": attachment_id
+            }
+        )
+    except Exception as e:
+        print(f"[Socket.IO] failed to broadcast attachment_deleted: {e}")
+
     return {"ok": True}
