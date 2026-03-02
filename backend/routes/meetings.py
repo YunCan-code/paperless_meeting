@@ -7,7 +7,19 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 from database import get_session
-from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase, Vote, VoteOption, UserVote
+from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase, Vote, VoteOption, UserVote, MeetingAttendeeLink
+
+from pydantic import BaseModel
+
+class AttendeeRoleInput(BaseModel):
+    user_id: int
+    meeting_role: str = "参会人员"
+
+class MeetingCreateInput(MeetingBase):
+    attendees_roles: Optional[List[AttendeeRoleInput]] = None
+
+class MeetingUpdateInput(MeetingBase):
+    attendees_roles: Optional[List[AttendeeRoleInput]] = None
 
 # 创建路由器，前缀为 /meetings
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -22,21 +34,39 @@ ALLOWED_EXTENSIONS = {'.pdf'}  # 仅允许 PDF 文件（与前端一致）
 MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200MB
 
 @router.post("/", response_model=Meeting)
-def create_meeting(meeting: Meeting, session: Session = Depends(get_session)):
+def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(get_session)):
     """
     创建新会议
     """
     # 修复: Pydantic 有时未能将 ISO 字符串自动转换为 datetime 对象，导致 SQLite 报错
-    if isinstance(meeting.start_time, str):
+    if isinstance(meeting_in.start_time, str):
         try:
-            # 处理 ISO 格式 (例如 2025-12-16T16:00:00.000Z)
-            meeting.start_time = datetime.fromisoformat(meeting.start_time.replace('Z', '+00:00'))
+            meeting_in.start_time = datetime.fromisoformat(meeting_in.start_time.replace('Z', '+00:00'))
         except ValueError:
-            pass # 如果转换失败，留给数据库报错或保留原值
+            pass
+            
+    if hasattr(meeting_in, 'end_time') and isinstance(meeting_in.end_time, str):
+        try:
+            meeting_in.end_time = datetime.fromisoformat(meeting_in.end_time.replace('Z', '+00:00'))
+        except ValueError:
+            pass
 
+    meeting = Meeting(**meeting_in.model_dump(exclude={"attendees_roles"}))
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
+    
+    # Handle Attendees and Roles
+    if meeting_in.attendees_roles is not None:
+        for attendee in meeting_in.attendees_roles:
+            link = MeetingAttendeeLink(
+                meeting_id=meeting.id,
+                user_id=attendee.user_id,
+                meeting_role=attendee.meeting_role
+            )
+            session.add(link)
+        session.commit()
+    
     return meeting
 
 
@@ -342,8 +372,14 @@ def read_meetings(
         
     return results
 
+class AttendeeRoleOutput(BaseModel):
+    user_id: int
+    name: str
+    meeting_role: str
+
 class MeetingWithAttachments(MeetingCardResponse):
     attachments: List[AttachmentRead] = []
+    attendees: List[AttendeeRoleOutput] = []
 
 @router.get("/{meeting_id}", response_model=MeetingWithAttachments)
 def read_meeting(
@@ -359,8 +395,10 @@ def read_meeting(
         raise HTTPException(status_code=404, detail="Meeting not found")
 
     # 构造响应对象
-    resp = MeetingWithAttachments.model_validate(meeting)
-    
+    # 手动取出标量字典进行构造，以防止 Pydantic 自动去提取 meeting.attendees[User] 导致验证崩溃
+    m_dict = meeting.model_dump()
+    resp = MeetingWithAttachments(**m_dict)
+    resp.attachments = meeting.attachments
     # 补充 computed fields
     m_type = session.get(MeetingType, meeting.meeting_type_id) if meeting.meeting_type_id else None
     resp.meeting_type_name = m_type.name if m_type else "普通会议"
@@ -401,6 +439,23 @@ def read_meeting(
                 final_url = DEFAULT_IMAGES["default"]
 
     resp.card_image_url = final_url
+    
+    # 填充与会者角色列表
+    attendee_links = session.exec(select(MeetingAttendeeLink).where(MeetingAttendeeLink.meeting_id == meeting_id)).all()
+    if attendee_links:
+        user_ids = [link.user_id for link in attendee_links]
+        users = session.exec(select(User).where(User.id.in_(user_ids))).all()
+        user_map = {u.id: u.name for u in users}
+        
+        resp.attendees = [
+            AttendeeRoleOutput(
+                user_id=link.user_id,
+                name=user_map.get(link.user_id, "未知"),
+                meeting_role=link.meeting_role
+            )
+            for link in attendee_links
+        ]
+        
     return resp
 
 class MeetingUpdate(SQLModel):
@@ -411,6 +466,7 @@ class MeetingUpdate(SQLModel):
     status: Optional[str] = None
     speaker: Optional[str] = None
     agenda: Optional[str] = None
+    attendees_roles: Optional[List[AttendeeRoleInput]] = None
 
 @router.put("/{meeting_id}", response_model=Meeting)
 def update_meeting(
@@ -423,7 +479,7 @@ def update_meeting(
     if not db_meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
         
-    meeting_data = meeting_update.model_dump(exclude_unset=True)
+    meeting_data = meeting_update.model_dump(exclude_unset=True, exclude={"attendees_roles"})
     for key, value in meeting_data.items():
         if key == 'start_time' and isinstance(value, str):
              try:
@@ -433,6 +489,19 @@ def update_meeting(
         setattr(db_meeting, key, value)
         
     session.add(db_meeting)
+    
+    if meeting_update.attendees_roles is not None:
+        # 删除旧的关联
+        session.exec(delete(MeetingAttendeeLink).where(MeetingAttendeeLink.meeting_id == meeting_id))
+        # 插入新的关联
+        for attendee in meeting_update.attendees_roles:
+            link = MeetingAttendeeLink(
+                meeting_id=meeting_id,
+                user_id=attendee.user_id,
+                meeting_role=attendee.meeting_role
+            )
+            session.add(link)
+            
     session.commit()
     session.refresh(db_meeting)
     return db_meeting

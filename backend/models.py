@@ -7,6 +7,7 @@ from sqlalchemy import UniqueConstraint
 class MeetingAttendeeLink(SQLModel, table=True):
     meeting_id: Optional[int] = Field(default=None, foreign_key="meeting.id", primary_key=True)
     user_id: Optional[int] = Field(default=None, foreign_key="user.id", primary_key=True)
+    meeting_role: str = Field(default="参会人员") # "主讲人", "参会人员", "特邀嘉宾" 等
 
 # 用户 (参会人员) 模型
 class UserBase(SQLModel):
@@ -17,7 +18,6 @@ class UserBase(SQLModel):
     district: Optional[str] = None # 区县
     department: Optional[str] = None # 部门
     position: Optional[str] = None # 职位
-    role: str = Field(default="参会人员") # 角色: 主讲人/参会人员
     is_active: bool = Field(default=True) # 状态
     password: Optional[str] = None # 密码 (Demo purposes: stored plain text for 'click to show')
     last_login: Optional[datetime] = None

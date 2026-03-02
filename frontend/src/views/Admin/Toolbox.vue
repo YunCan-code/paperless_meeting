@@ -1,9 +1,17 @@
 <template>
   <div class="toolbox-page">
     <div class="page-header">
-      <div class="title-group">
-        <h1 class="page-title">快捷功能</h1>
-        <p class="page-subtitle">常用会议互动工具集合</p>
+      <div class="header-left">
+        <el-button class="collapse-btn" link @click="toggleSidebar">
+          <el-icon size="24" color="#64748b">
+            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+          </el-icon>
+        </el-button>
+        <el-divider direction="vertical" class="header-divider" />
+        <div class="title-group">
+          <h1 class="page-title">快捷功能</h1>
+          <p class="page-subtitle">常用会议互动工具集合</p>
+        </div>
       </div>
     </div>
 
@@ -89,12 +97,15 @@
 import { ref, onMounted, computed } from 'vue'
 import { 
   DataAnalysis, Trophy, CircleCheck, 
-  ArrowRight, MagicStick, Timer 
+  ArrowRight, MagicStick, Timer, Fold, Expand
 } from '@element-plus/icons-vue'
+import { useSidebar } from '@/composables/useSidebar'
 import request from '@/utils/request'
 import VoteConfigDialog from '@/views/Admin/components/VoteConfigDialog.vue'
 import LotteryManagerDrawer from '@/views/Admin/components/LotteryManagerDrawer.vue'
 import { ElMessage } from 'element-plus'
+
+const { isCollapse, toggleSidebar } = useSidebar()
 
 // Tools Configuration
 const tools = [
@@ -116,8 +127,8 @@ const tools = [
   },
   {
     id: 'signin',
-    title: '扫码签到',
-    desc: '生成签到二维码 (开发中)',
+    title: '签到',
+    desc: '功能未完成，敬请期待',
     icon: 'CircleCheck',
     bgColor: '#f0fdf4', // green-50
     color: '#22c55e'    // green-500
@@ -207,10 +218,12 @@ const formatDate = (str) => {
 .toolbox-page {
   padding: 8px; 
 }
-
 .page-header {
+  display: flex;
+  align-items: center;
   margin-bottom: 32px;
 }
+.header-left { display: flex; align-items: center; gap: 12px; }
 .page-title {
   font-size: 24px;
   font-weight: 600;

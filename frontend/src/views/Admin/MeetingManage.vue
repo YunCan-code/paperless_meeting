@@ -140,14 +140,41 @@
               </div>
             </div>
 
-            <div class="meta-card" v-if="currentDetail.speaker">
+            <div class="meta-card" v-if="currentDetail.attendees && currentDetail.attendees.length > 0">
                <div class="meta-icon bg-orange-50 text-orange-500"><el-icon><User /></el-icon></div>
                <div class="meta-info">
-                 <div class="meta-label">主讲人</div>
-                 <div class="meta-value">{{ currentDetail.speaker }}</div>
+                 <div class="meta-label">与会人员 ({{currentDetail.attendees.length}}人)</div>
+                 <div class="meta-value" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                    <el-tag 
+                      v-for="a in [...currentDetail.attendees].sort((x, y) => {
+                        const order = { '主讲人': 0, '特邀嘉宾': 1, '参会人员': 2 }
+                        return (order[x.meeting_role] ?? 3) - (order[y.meeting_role] ?? 3)
+                      })" 
+                      :key="a.user_id" 
+                      size="small" 
+                      :type="a.meeting_role === '主讲人' ? 'danger' : (a.meeting_role === '特邀嘉宾' ? 'warning' : 'info')"
+                    >
+                      {{ a.name }} <span style="opacity: 0.7; font-size: 11px; margin-left: 2px;">[{{ a.meeting_role }}]</span>
+                    </el-tag>
+                 </div>
                </div>
             </div>
 
+            <!-- 议程 meta-card -->
+            <div class="meta-card meta-card-agenda" v-if="currentDetail.agenda && currentDetail.agenda !== '[]'">
+              <div class="meta-icon bg-yellow-50 text-yellow-500"><el-icon><List /></el-icon></div>
+              <div class="meta-info">
+                <div class="meta-label">会议议程</div>
+                <div class="agenda-list" style="margin-top: 6px;">
+                  <div v-for="(item, idx) in parseAgenda(currentDetail.agenda)" :key="idx" class="agenda-item">
+                    <span class="agenda-time">{{ item.time }}</span>
+                    <span class="agenda-content">{{ item.content }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 会议地点（最后显示） -->
             <div class="meta-card">
               <div class="meta-icon bg-purple-50 text-purple-500"><el-icon><LocationInformation /></el-icon></div>
               <div class="meta-info">
@@ -155,17 +182,6 @@
                 <div class="meta-value">{{ currentDetail.location || '线上会议 / 未指定' }}</div>
               </div>
             </div>
-          </div>
-          
-          <!-- 议程展示 -->
-          <div class="detail-agenda-section" v-if="currentDetail.agenda && currentDetail.agenda !== '[]'">
-             <h4 class="section-title" style="margin: 20px 0 12px 0;">会议议程</h4>
-             <div class="agenda-list">
-                <div v-for="(item, idx) in parseAgenda(currentDetail.agenda)" :key="idx" class="agenda-item">
-                   <span class="agenda-time">{{ item.time }}</span>
-                   <span class="agenda-content">{{ item.content }}</span>
-                </div>
-             </div>
           </div>
         </div>
         
@@ -236,23 +252,37 @@
               />
             </el-form-item>
             
-            <el-form-item label="主讲人" prop="speaker">
-              <el-select 
-                 v-model="form.speaker" 
-                 placeholder="请选择主讲人" 
-                 filterable 
-                 allow-create 
-                 default-first-option
-                 style="width: 100%"
-              >
-                 <el-option
-                    v-for="item in speakerOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                 />
-              </el-select>
-            </el-form-item>
+            <div style="margin-bottom: 12px; font-weight: 600; color: #334155;">与会人员分配</div>
+            <div v-for="(attendee, index) in form.attendees_roles" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start;">
+                <el-select 
+                   v-model="attendee.user_id" 
+                   placeholder="选择参会人" 
+                   filterable 
+                   style="flex: 1;"
+                >
+                   <el-option
+                      v-for="item in userOptions"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                   />
+                </el-select>
+                <el-select
+                   v-model="attendee.meeting_role"
+                   placeholder="角色身份"
+                   style="width: 120px; flex-shrink: 0;"
+                >
+                   <el-option label="参会人员" value="参会人员"/>
+                   <el-option label="主讲人" value="主讲人"/>
+                   <el-option label="特邀嘉宾" value="特邀嘉宾"/>
+                </el-select>
+                <el-button type="danger" link @click="removeAttendee(index)">
+                   <el-icon><Delete /></el-icon>
+                </el-button>
+            </div>
+            <el-button type="primary" link @click="addAttendee" style="margin-bottom: 18px;">
+               <el-icon><Plus /></el-icon> 添加与会人员
+            </el-button>
     
             <div style="margin-bottom: 12px; font-weight: 600; color: #334155;">会议议程</div>
             <div v-for="(item, index) in form.agendaItems" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start;">
@@ -363,7 +393,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Calendar, Timer as Clock, User, CircleCheck, Fold, Expand, 
   Document, UploadFilled, Top, Bottom, Delete, Edit, Plus,
-  CollectionTag, LocationInformation, FolderOpened, Download, DataAnalysis
+  CollectionTag, LocationInformation, FolderOpened, Download, DataAnalysis, List
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import SessionCalendar from './components/SessionCalendar.vue'
@@ -411,7 +441,9 @@ const form = ref({
   title: '', 
   meeting_type_id: null, 
   start_time: null, 
-  location: '' 
+  location: '',
+  attendees_roles: [],
+  agendaItems: []
 })
 
 const currentSelectedDate = ref(new Date())
@@ -587,17 +619,24 @@ const removeFile = async (index) => {
 
 
 
-// Speakers
-const speakerOptions = ref([])
-const fetchSpeakers = async () => {
+// Users/Attendees
+const userOptions = ref([])
+const fetchUsers = async () => {
    try {
-      const res = await request.get('/users/', { params: { page: 1, page_size: 100 } })
+      const res = await request.get('/users/', { params: { page: 1, page_size: 500 } })
       const users = res.items || []
-      speakerOptions.value = users.map(u => ({
+      userOptions.value = users.map(u => ({
           label: u.name,
-          value: u.name
+          value: u.id
       }))
    } catch(e) {}
+}
+
+const addAttendee = () => {
+    form.value.attendees_roles.push({ user_id: null, meeting_role: '参会人员' })
+}
+const removeAttendee = (index) => {
+    form.value.attendees_roles.splice(index, 1)
 }
 
 const parseAgenda = (jsonStr) => {
@@ -622,14 +661,14 @@ const handleTimeChange = (val, item) => {
 
 // Actions
 const openCreate = () => {
-  if(speakerOptions.value.length === 0) fetchSpeakers()
+  if(userOptions.value.length === 0) fetchUsers()
   isEditMode.value = false
   editingId.value = null
   const defaultLoc = localStorage.getItem('defaultMeetingLocation') || ''
   
   const defaultAgenda = []
 
-  form.value = { title: '', meeting_type_id: null, start_time: null, location: defaultLoc, speaker: '', agendaItems: defaultAgenda }
+  form.value = { title: '', meeting_type_id: null, start_time: null, location: defaultLoc, attendees_roles: [], agendaItems: defaultAgenda }
   attachmentList.value = []
   dialogVisible.value = true
 }
@@ -651,14 +690,14 @@ const openEdit = () => {
   
   // if(agendaItems.length === 0) agendaItems.push({ timeObj: new Date().setHours(9,0,0), timeStr: '09:00', content: '' })
   
-  if(speakerOptions.value.length === 0) fetchSpeakers()
+  if(userOptions.value.length === 0) fetchUsers()
 
   form.value = { 
       title: m.title, 
       meeting_type_id: m.meeting_type_id, 
       start_time: m.start_time, 
       location: m.location,
-      speaker: m.speaker,
+      attendees_roles: (m.attendees || []).map(a => ({ user_id: a.user_id, meeting_role: a.meeting_role })),
       agendaItems: agendaItems
   }
   editingId.value = m.id

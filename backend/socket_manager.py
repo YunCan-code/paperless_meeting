@@ -245,8 +245,7 @@ async def lottery_action(sid, data):
                     user = User(
                         id=user_id, 
                         name=user_name, 
-                        department=user_dept,
-                        role="参会人员"
+                        department=user_dept
                     )
                     session.add(user)
                     # Flush to ensure ID exists for FK

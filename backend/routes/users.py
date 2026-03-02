@@ -28,8 +28,10 @@ def get_user_stats(session: Session = Depends(get_session)):
     Get User Statistics
     """
     total = session.exec(select(func.count(User.id))).one()
-    speakers = session.exec(select(func.count(User.id)).where(User.role == "主讲人")).one()
-    attendees = session.exec(select(func.count(User.id)).where(User.role == "参会人员")).one()
+    active_users = session.exec(select(func.count(User.id)).where(User.is_active == True)).one()
+    
+    # Calculate departments count (distinct)
+    departments = session.exec(select(func.count(func.distinct(User.department))).where(User.department != None, User.department != "")).one()
     
     # Calculate active_today
     # Logic: last_login >= today 00:00
@@ -41,8 +43,8 @@ def get_user_stats(session: Session = Depends(get_session)):
     
     return {
         "total": total,
-        "speakers": speakers,
-        "attendees": attendees,
+        "active_users": active_users,
+        "departments": departments,
         "active_today": active_today
     }
 
@@ -55,11 +57,11 @@ def download_template():
     ws = wb.active
     ws.title = "用户导入模板"
     # Headers
-    headers = ["姓名", "联系方式", "电子邮箱", "所属区县", "所属部门", "系统角色(主讲人/参会人员)"]
+    headers = ["姓名(*必填)", "区县", "部门", "手机号(*必填)", "密码(*必填)", "邮箱"]
     ws.append(headers)
     
     # Sample Row
-    ws.append(["张三", "13800138000", "zhangsan@example.com", "五华区", "研发部", "参会人员"])
+    ws.append(["张三", "五华区", "研发部", "13800138000", "123456", "zhangsan@example.com"])
     
     # Adjust column width
     for col in range(1, len(headers)+1):
@@ -95,53 +97,61 @@ async def import_users(file: UploadFile = File(...), session: Session = Depends(
 
         # Skip header, iterate rows
         for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            # Row: Name, Phone, Email, District, Dept, Role
-            name, phone, email, district, dept, role = row[0:6]
+            # Row: Name, District, Dept, Phone, Password, Email
+            padded = list(row) + [None] * max(0, 6 - len(row))
+            name, district, dept, phone, password, email = padded[0:6]
 
-            if not name: continue  # Skip empty rows
+            # 校验必填项
+            has_error = False
+            if not name:
+                errors.append(f"第 {i} 行: 姓名不能为空")
+                has_error = True
+            if not phone:
+                errors.append(f"第 {i} 行: 手机号不能为空")
+                has_error = True
+            if not password:
+                errors.append(f"第 {i} 行: 密码不能为空")
+                has_error = True
+
+            if has_error:
+                continue
 
             # 手机号查重
-            phone_str = str(phone).strip() if phone else None
+            phone_str = str(phone).strip()
 
-            if phone_str:
-                # 文件内互查
-                if phone_str in seen_phones:
-                    errors.append(f"第 {i} 行: 手机号 '{phone_str}' 与第 {seen_phones[phone_str]} 行重复")
-                    continue
-                seen_phones[phone_str] = i
+            # 文件内互查
+            if phone_str in seen_phones:
+                errors.append(f"第 {i} 行: 手机号 '{phone_str}' 与第 {seen_phones[phone_str]} 行重复")
+                continue
+            seen_phones[phone_str] = i
 
-                # 与数据库比对
-                existing = session.exec(select(User).where(User.phone == phone_str)).first()
-                if existing:
-                    errors.append(f"第 {i} 行: 手机号 '{phone_str}' 已被用户 '{existing.name}' 使用")
-                    continue
-
-            # Role validation
-            if role not in ["主讲人", "参会人员"]:
-                role = "参会人员"  # Default
+            # 与数据库比对
+            existing = session.exec(select(User).where(User.phone == phone_str)).first()
+            if existing:
+                errors.append(f"第 {i} 行: 手机号 '{phone_str}' 已被系统中的用户 '{existing.name}' 占用")
+                continue
 
             user = User(
-                name=str(name),
+                name=str(name).strip(),
                 phone=phone_str,
-                email=str(email) if email else None,
-                district=str(district) if district else None,
-                department=str(dept) if dept else None,
-                role=str(role),
+                email=str(email).strip() if email else None,
+                district=str(district).strip() if district else None,
+                department=str(dept).strip() if dept else None,
                 is_active=True,
-                password=hash_password("password123")  # 默认密码哈希存储
+                password=str(password).strip()
             )
             users_to_add.append(user)
 
         if errors:
             raise HTTPException(status_code=400, detail={
-                "message": f"导入失败，存在 {len(errors)} 个冲突",
+                "message": f"导入失败，发现 {len(errors)} 个数据错误或冲突",
                 "errors": errors
             })
 
         session.add_all(users_to_add)
         session.commit()
 
-        return {"count": len(users_to_add), "message": f"Successfully imported {len(users_to_add)} users"}
+        return {"count": len(users_to_add), "message": f"新增成功了 {len(users_to_add)} 人"}
 
     except HTTPException:
         raise
@@ -159,9 +169,9 @@ def create_user(user: User, session: Session = Depends(get_session)):
         if existing:
             raise HTTPException(status_code=400, detail="Phone already registered")
 
-    # 对密码进行哈希存储
-    if user.password:
-        user.password = hash_password(user.password)
+    # 如果没有传密码，设置默认密码
+    if not user.password:
+        user.password = "password123"
 
     session.add(user)
     session.commit()
@@ -174,8 +184,10 @@ def read_users(
     page: int = 1,
     page_size: int = 10,
     q: Optional[str] = None,
-    role: Optional[str] = None,
-    is_active: Optional[bool] = None
+    is_active: Optional[bool] = None,
+    districts: Optional[str] = Query(None, description="Comma-separated list of districts"),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None)
 ):
     """
     Get Users List with Pagination and Filtering
@@ -186,10 +198,11 @@ def read_users(
     count_query = select(func.count()).select_from(User)
     if q:
         count_query = count_query.where((User.phone.contains(q)) | (User.name.contains(q)))
-    if role:
-        count_query = count_query.where(User.role == role)
     if is_active is not None:
         count_query = count_query.where(User.is_active == is_active)
+    if districts:
+        dist_list = districts.split(",")
+        count_query = count_query.where(User.district.in_(dist_list))
         
     total = session.exec(count_query).one()
     
@@ -197,12 +210,20 @@ def read_users(
     query = select(User)
     if q:
         query = query.where((User.phone.contains(q)) | (User.name.contains(q)))
-    if role:
-        query = query.where(User.role == role)
     if is_active is not None:
         query = query.where(User.is_active == is_active)
+    if districts:
+        dist_list = districts.split(",")
+        query = query.where(User.district.in_(dist_list))
+
+    # Sorting
+    order_col = User.id.desc() # Default
+    if sort_by == "district":
+        order_col = User.district.asc() if sort_order == "ascending" else User.district.desc()
+    elif sort_by == "department":
+        order_col = User.department.asc() if sort_order == "ascending" else User.department.desc()
         
-    query = query.offset((page - 1) * page_size).limit(page_size).order_by(User.id.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size).order_by(order_col)
     items = session.exec(query).all()
     
     return {
@@ -229,9 +250,6 @@ def update_user(user_id: int, user_data: User, session: Session = Depends(get_se
     user_data_dict = user_data.dict(exclude_unset=True)
     for key, value in user_data_dict.items():
         if key != 'id':  # Prevent ID change
-            # 如果更新密码，且不是已哈希的值，则做哈希
-            if key == 'password' and value and not value.startswith("$2b$"):
-                value = hash_password(value)
             setattr(user, key, value)
 
     session.add(user)
@@ -265,8 +283,8 @@ def change_password(req: ChangePasswordRequest, session: Session = Depends(get_s
     if not verify_password(req.old_password, current_pwd):
         raise HTTPException(status_code=400, detail="旧密码错误")
 
-    # 新密码使用哈希存储
-    user.password = hash_password(req.new_password)
+    # 新密码使用明文存储
+    user.password = req.new_password
     session.add(user)
     session.commit()
 

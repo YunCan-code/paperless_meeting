@@ -146,8 +146,11 @@ fun MeetingCard(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Speaker (if available)
-                        if (!meeting.speaker.isNullOrBlank()) {
+                        // Speaker (if available) derived from attendees or fallback
+                        val speakersList = meeting.attendees?.filter { it.meetingRole == "主讲人" }?.joinToString(", ") { it.name }
+                        val displaySpeaker = if (!speakersList.isNullOrBlank()) speakersList else meeting.speaker
+                        
+                        if (!displaySpeaker.isNullOrBlank()) {
                             Icon(
                                 imageVector = Icons.Filled.Person,
                                 contentDescription = null,
@@ -156,7 +159,7 @@ fun MeetingCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = meeting.speaker,
+                                text = displaySpeaker,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.9f),
                                 maxLines = 1,

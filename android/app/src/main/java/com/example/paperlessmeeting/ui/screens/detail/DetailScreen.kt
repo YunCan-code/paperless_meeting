@@ -326,13 +326,54 @@ fun MeetingDetailContent(
             val InfoSectionContent: @Composable () -> Unit = {
                 SectionHeader(title = "参会信息")
                 Spacer(modifier = Modifier.height(8.dp))
-                if (!meeting.speaker.isNullOrEmpty()) {
+                
+                val attendeesList = meeting.attendees?.sortedBy {
+                    when(it.meetingRole) {
+                        "主讲人" -> 0
+                        "特邀嘉宾" -> 1
+                        "参会人员" -> 2
+                        else -> 3
+                    }
+                } ?: emptyList()
+                
+                if (attendeesList.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        attendeesList.forEach { attendee ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "· ${attendee.name}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.width(80.dp)
+                                )
+                                androidx.compose.material3.Surface(
+                                    color = when(attendee.meetingRole) {
+                                        "主讲人" -> Color(0xFFFFF3E0)
+                                        "特邀嘉宾" -> Color(0xFFF3E5F5)
+                                        else -> Color(0xFFE3F2FD)
+                                    },
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = attendee.meetingRole,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = when(attendee.meetingRole) {
+                                            "主讲人" -> Color(0xFFE65100)
+                                            "特邀嘉宾" -> Color(0xFF4A148C)
+                                            else -> Color(0xFF0D47A1)
+                                        },
+                                        modifier = Modifier.padding(horizontal=6.dp, vertical=2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (!meeting.speaker.isNullOrEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                         Text(meeting.speaker)
                     }
                 } else {
-                    EmptySection("暂无主讲人信息")
+                    EmptySection("暂无参会人员信息")
                 }
             }
             

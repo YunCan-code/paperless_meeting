@@ -58,11 +58,6 @@
             </template>
           </el-input>
 
-          <el-select v-model="roleFilter" placeholder="所有角色" class="role-select" clearable @change="fetchUsers">
-            <el-option label="主讲人" value="主讲人" />
-            <el-option label="参会人员" value="参会人员" />
-          </el-select>
-
           <div class="status-tabs">
             <span 
               v-for="tab in statusOptions" 
@@ -92,6 +87,8 @@
           style="width: 100%"
           :header-cell-style="{ background: 'transparent', color: 'var(--text-secondary)', fontWeight: '600' }"
           row-class-name="user-row"
+          @sort-change="handleSortChange"
+          @filter-change="handleFilterChange"
         >
           <!-- 用户名 / 邮箱 (Enhanced) -->
           <el-table-column label="用户名" min-width="220">
@@ -125,7 +122,14 @@
 
 
           <!-- 区县 -->
-          <el-table-column label="区县" prop="district" min-width="120">
+          <el-table-column 
+            label="区县" 
+            prop="district" 
+            min-width="120"
+            sortable="custom"
+            column-key="district"
+            :filters="districtFilterOptions"
+          >
             <template #default="{ row }">
                <span 
                  class="district-badge"
@@ -140,18 +144,15 @@
             </template>
           </el-table-column>
           
-           <!-- 部门 -->
-          <el-table-column label="部门" prop="department" min-width="120">
+          <!-- 部门 -->
+          <el-table-column 
+            label="部门" 
+            prop="department" 
+            min-width="120"
+            sortable="custom"
+            column-key="department"
+          >
              <template #default="{ row }">{{ row.department || '-' }}</template>
-          </el-table-column>
-
-          <!-- 角色 -->
-          <el-table-column label="角色" min-width="120">
-            <template #default="{ row }">
-              <el-tag :type="row.role === '主讲人' ? 'primary' : 'success'" effect="light" round>
-                {{ row.role }}
-              </el-tag>
-            </template>
           </el-table-column>
 
           <!-- 联系方式 -->
@@ -264,14 +265,6 @@
             </el-form-item>
           </el-col>
 
-          <el-col :span="12">
-            <el-form-item label="系统角色" prop="role">
-              <el-select v-model="form.role" placeholder="选择角色" style="width: 100%">
-                <el-option label="主讲人" value="主讲人" />
-                <el-option label="参会人员" value="参会人员" />
-              </el-select>
-            </el-form-item>
-          </el-col>
            <el-col :span="12">
             <el-form-item label="启用状态">
                <div style="height: 32px; display: flex; align-items: center;">
@@ -344,7 +337,6 @@ const { isCollapse, toggleSidebar } = useSidebar()
 const loading = ref(false)
 const submitting = ref(false)
 const searchQuery = ref('')
-const roleFilter = ref('')
 const statusFilter = ref(null) 
 const statusOptions = [
     { label: '全部', value: null },
@@ -358,12 +350,22 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 
 const districtOptions = ['市辖区', '高新区', '呈贡区', '盘龙区', '官渡区', '西山区', '五华区']
+const districtFilterOptions = districtOptions.map(d => ({ text: d, value: d }))
+
+const sortParams = ref({
+    sort_by: null,
+    sort_order: null
+})
+
+const filterParams = ref({
+    districts: []
+})
 
 // Stats (Reactive)
 const statsData = ref([
   { label: '总用户数', value: '-', icon: 'User', color: 'blue', key: 'total' },
-  { label: '主讲人', value: '-', icon: 'DataLine', color: 'green', key: 'speakers' },
-  { label: '参会人员', value: '-', icon: 'UserFilled', color: 'purple', key: 'attendees' },
+  { label: '正常启用', value: '-', icon: 'UserFilled', color: 'green', key: 'active_users' },
+  { label: '覆盖部门', value: '-', icon: 'DataLine', color: 'purple', key: 'departments' },
   { label: '今日登录', value: '-', icon: 'Trophy', color: 'orange', key: 'active_today' },
 ])
 
@@ -452,8 +454,10 @@ const fetchUsers = async () => {
             page: currentPage.value,
             page_size: pageSize.value,
             q: searchQuery.value || undefined,
-            role: roleFilter.value || undefined,
-            is_active: statusFilter.value
+            is_active: statusFilter.value,
+            sort_by: sortParams.value.sort_by || undefined,
+            sort_order: sortParams.value.sort_order || undefined,
+            districts: filterParams.value.districts.length > 0 ? filterParams.value.districts.join(',') : undefined
         }
         
         // Real API Call
@@ -488,6 +492,22 @@ const handleStatusChange = async (row) => {
 
 const handleStatusFilter = (val) => {
     statusFilter.value = val
+    currentPage.value = 1
+    fetchUsers()
+}
+
+const handleSortChange = ({ column, prop, order }) => {
+    sortParams.value.sort_by = prop
+    sortParams.value.sort_order = order // 'ascending', 'descending' or null
+    currentPage.value = 1
+    fetchUsers()
+}
+
+const handleFilterChange = (filters) => {
+    if (filters.district) {
+        filterParams.value.districts = filters.district
+    }
+    currentPage.value = 1
     fetchUsers()
 }
 
@@ -516,7 +536,13 @@ const handleImport = async (options) => {
         fetchUsers()
         fetchStats()
     } catch (error) {
-        ElMessage.error('导入失败，请检查文件格式')
+        const detail = error.response?.data?.detail
+        if (detail && detail.message) {
+            ElMessage.error(detail.message)
+            // 如果需要展示所有详细冲突行，可以在这里拼接 detail.errors 数组
+        } else {
+            ElMessage.error(detail || '导入失败，请检查文件格式')
+        }
     }
 }
 
@@ -532,14 +558,12 @@ const form = reactive({
     phone: '',
     district: '',
     department: '',
-    role: '参会人员',
     is_active: true,
     password: ''
 })
 
 const rules = {
     name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-    role: [{ required: true, message: '请选择角色', trigger: 'change' }],
 }
 
 const openDialog = (type, row = null) => {
@@ -555,7 +579,6 @@ const openDialog = (type, row = null) => {
         form.phone = ''
         form.district = ''
         form.department = ''
-        form.role = '参会人员'
         form.is_active = true
         form.password = ''
     }
