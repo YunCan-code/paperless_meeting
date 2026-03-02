@@ -254,9 +254,7 @@
 
           <el-col :span="12">
             <el-form-item label="所属区县" prop="district">
-               <el-select v-model="form.district" placeholder="请选择" style="width: 100%">
-                  <el-option v-for="d in districtOptions" :key="d" :label="d" :value="d" />
-               </el-select>
+               <el-input v-model="form.district" placeholder="请输入所属区县" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
