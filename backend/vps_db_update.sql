@@ -27,3 +27,19 @@ BEGIN
         UPDATE meetingattendeelink SET meeting_role = '参会人员' WHERE meeting_role IS NULL;
     END IF;
 END $$;
+
+-- 第三步：处理 user 表的 role 字段 (因为代码中已移除，数据库中需取消非空约束或删除)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'user' AND column_name = 'role'
+    ) THEN
+        -- 取消非空约束，防止插入报错
+        ALTER TABLE "user" ALTER COLUMN role DROP NOT NULL;
+        -- 如果确定不再需要，也可以选择直接删除该列 (可选)
+        -- ALTER TABLE "user" DROP COLUMN role;
+    END IF;
+END $$;
+
