@@ -140,6 +140,16 @@
               </div>
             </div>
 
+            <div class="meta-card">
+              <div class="meta-icon bg-blue-50 text-blue-500"><el-icon><Clock /></el-icon></div>
+              <div class="meta-info">
+                <div class="meta-label">结束时间</div>
+                <div class="meta-value">
+                  {{ currentDetail.end_time ? new Date(currentDetail.end_time).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'}) : '未设置' }}
+                </div>
+              </div>
+            </div>
+
             <div class="meta-card" v-if="currentDetail.attendees && currentDetail.attendees.length > 0">
                <div class="meta-icon bg-orange-50 text-orange-500"><el-icon><User /></el-icon></div>
                <div class="meta-info">
@@ -248,6 +258,15 @@
                 type="datetime" 
                 placeholder="选择会议时间" 
                 style="width: 100%" 
+                format="YYYY-MM-DD HH:mm"
+              />
+            </el-form-item>
+            <el-form-item label="结束时间">
+              <el-date-picker
+                v-model="form.end_time"
+                type="datetime"
+                placeholder="选择结束时间（可选）"
+                style="width: 100%"
                 format="YYYY-MM-DD HH:mm"
               />
             </el-form-item>
@@ -441,6 +460,7 @@ const form = ref({
   title: '', 
   meeting_type_id: null, 
   start_time: null, 
+  end_time: null,
   location: '',
   attendees_roles: [],
   agendaItems: []
@@ -668,7 +688,7 @@ const openCreate = () => {
   
   const defaultAgenda = []
 
-  form.value = { title: '', meeting_type_id: null, start_time: null, location: defaultLoc, attendees_roles: [], agendaItems: defaultAgenda }
+  form.value = { title: '', meeting_type_id: null, start_time: null, end_time: null, location: defaultLoc, attendees_roles: [], agendaItems: defaultAgenda }
   attachmentList.value = []
   dialogVisible.value = true
 }
@@ -696,6 +716,7 @@ const openEdit = () => {
       title: m.title, 
       meeting_type_id: m.meeting_type_id, 
       start_time: m.start_time, 
+      end_time: m.end_time || null,
       location: m.location,
       attendees_roles: (m.attendees || []).map(a => ({ user_id: a.user_id, meeting_role: a.meeting_role })),
       agendaItems: agendaItems

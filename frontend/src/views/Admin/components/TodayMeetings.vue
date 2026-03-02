@@ -18,8 +18,8 @@
       >
         <div class="session-left-bar"></div>
         <div class="session-content">
-           <div class="session-top">
-              <span class="session-time">{{ formatTime(meeting.start_time) }}</span>
+           <div class="session-header">
+              <div class="session-title">{{ meeting.title }}</div>
               <el-tag 
                 size="small" 
                 class="type-tag"
@@ -31,7 +31,9 @@
                 {{ getTypeName(meeting.meeting_type_id) }}
               </el-tag>
            </div>
-           <div class="session-title">{{ meeting.title }}</div>
+           <div class="session-top">
+              <span class="session-time">{{ formatTimeRange(meeting) }}</span>
+           </div>
            <div class="session-footer">
              <!-- Location shown only if specific location exists, otherwise hidden as requested -->
              <span v-if="meeting.location && meeting.location !== '线上'" class="location-text">
@@ -106,6 +108,13 @@ const formatTime = (iso) => {
   if (!iso) return ''
   const d = new Date(iso)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const formatTimeRange = (meeting) => {
+  if (!meeting) return ''
+  const start = formatTime(meeting.start_time)
+  const end = formatTime(meeting.end_time)
+  return end ? `${start} - ${end}` : start
 }
 
 // Helpers
@@ -191,16 +200,23 @@ const getTypeColor = (id) => {
   padding-left: 12px;
 }
 
+.session-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  justify-content: flex-start;
+}
+
 .session-top {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .session-time {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--color-primary);
   line-height: 1;
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -214,11 +230,12 @@ const getTypeColor = (id) => {
 }
 
 .session-title {
-  font-size: 15px;
-  font-weight: 600;
+  flex: 0 1 auto;
+  min-width: auto;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--text-main);
-  margin-bottom: 4px;
-  line-height: 1.4;
+  line-height: 1.2;
 }
 
 .session-footer {

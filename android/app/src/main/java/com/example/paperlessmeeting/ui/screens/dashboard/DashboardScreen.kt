@@ -34,7 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.domain.model.MeetingStatus
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -174,9 +177,11 @@ fun DashboardContent(
                 ) { virtualPage ->
                     // 取模映射到实际索引
                     val actualPage = virtualPage % actualCount
+                    val meeting = state.activeMeetings[actualPage]
                     com.example.paperlessmeeting.ui.components.MeetingCard(
-                        meeting = state.activeMeetings[actualPage],
-                        onClick = { onMeetingClick(state.activeMeetings[actualPage].id) }
+                        meeting = meeting,
+                        statusOverride = resolveTodayMeetingStatus(state.activeMeetings, actualPage),
+                        onClick = { onMeetingClick(meeting.id) }
                     )
                 }
                 
@@ -342,6 +347,52 @@ fun DashboardContent(
 
 
 
+
+private fun resolveTodayMeetingStatus(
+    meetings: List<Meeting>,
+    index: Int,
+    now: LocalDateTime = LocalDateTime.now()
+): MeetingStatus {
+    if (index !in meetings.indices) return MeetingStatus.Draft
+    val meeting = meetings[index]
+    val start = parseMeetingDateTime(meeting.startTime) ?: return meeting.getUiStatus()
+    val endExplicit = parseMeetingDateTime(meeting.endTime)
+
+    val inferredEnd = if (endExplicit != null) {
+        endExplicit
+    } else {
+        val nextStart = meetings
+            .drop(index + 1)
+            .firstNotNullOfOrNull { parseMeetingDateTime(it.startTime) }
+        if (nextStart != null) {
+            nextStart.minusMinutes(15)
+        } else {
+            start.toLocalDate().plusDays(1).atStartOfDay()
+        }
+    }
+
+    val effectiveEnd = if (inferredEnd.isAfter(start)) inferredEnd else start
+
+    return when {
+        now.isBefore(start) -> MeetingStatus.Upcoming
+        !now.isBefore(effectiveEnd) -> MeetingStatus.Finished
+        else -> MeetingStatus.Ongoing
+    }
+}
+
+private fun parseMeetingDateTime(raw: String?): LocalDateTime? {
+    if (raw.isNullOrBlank()) return null
+    val normalized = raw.replace(" ", "T")
+    return try {
+        LocalDateTime.parse(normalized)
+    } catch (_: Exception) {
+        try {
+            OffsetDateTime.parse(normalized).toLocalDateTime()
+        } catch (_: Exception) {
+            null
+        }
+    }
+}
 
 @Composable
 fun RecentFileCard(file: com.example.paperlessmeeting.domain.model.Attachment) {

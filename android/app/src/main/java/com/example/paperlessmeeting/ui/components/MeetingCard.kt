@@ -30,7 +30,8 @@ import com.example.paperlessmeeting.domain.model.MeetingStatus
 @Composable
 fun MeetingCard(
     meeting: Meeting,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    statusOverride: MeetingStatus? = null
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (isPressed) 0.98f else 1f, label = "cardScale")
@@ -125,7 +126,7 @@ fun MeetingCard(
                     }
 
                     // Status Badge (Glass-like)
-                    MeetingStatusBadge(status = meeting.getUiStatus())
+                    MeetingStatusBadge(status = statusOverride ?: meeting.getUiStatus())
                 }
 
                 // Bottom Content: Title & Metada
