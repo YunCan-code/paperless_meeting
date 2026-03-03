@@ -14,10 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import coil.compose.rememberAsyncImagePainter
 
 @Composable
@@ -25,6 +28,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var query by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -32,6 +36,9 @@ fun LoginScreen(
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is LoginUiState.Success -> {
+                val heartbeatRequest = OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.HeartbeatWorker>()
+                    .build()
+                WorkManager.getInstance(context).enqueue(heartbeatRequest)
                 onLoginSuccess()
             }
             is LoginUiState.Error -> {
