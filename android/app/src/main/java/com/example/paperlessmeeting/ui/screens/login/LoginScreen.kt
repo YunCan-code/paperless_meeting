@@ -39,6 +39,8 @@ fun LoginScreen(
                 val heartbeatRequest = OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.HeartbeatWorker>()
                     .build()
                 WorkManager.getInstance(context).enqueue(heartbeatRequest)
+                // Consume success to avoid immediate auto-login when returning to LoginScreen after logout.
+                viewModel.resetState()
                 onLoginSuccess()
             }
             is LoginUiState.Error -> {

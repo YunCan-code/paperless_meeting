@@ -54,9 +54,12 @@ fun RecentReadingCard(
                     .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
-                if (!progress.localPath.isNullOrEmpty()) {
+                val hasLocalFile = !progress.localPath.isNullOrEmpty() &&
+                    java.io.File(progress.localPath).exists()
+
+                if (hasLocalFile) {
                     PdfThumbnail(
-                        filePath = progress.localPath,
+                        filePath = progress.localPath!!,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {

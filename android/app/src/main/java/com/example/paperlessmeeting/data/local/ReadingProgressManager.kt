@@ -99,17 +99,19 @@ class ReadingProgressManager @Inject constructor(
                 val currentLocalMap = getAllProgressLocal().associateBy { it.uniqueId }
 
                 val mergedList = serverList.map { item ->
-                    // 尝试从本地找，如果本地有缓存，保留它的 localPath
                     val existingLocal = currentLocalMap[item.fileUrl]
+                    val localPath = existingLocal?.localPath
+                        ?: findCachedLocalPath(item.fileUrl, item.fileName)
                     ReadingProgress(
                         uniqueId = item.fileUrl,
                         fileName = item.fileName,
                         currentPage = item.currentPage,
                         totalPages = item.totalPages,
                         lastReadTime = System.currentTimeMillis(),
-                        localPath = existingLocal?.localPath // 保留本地路径
+                        localPath = localPath
                     )
                 }
+                
                 android.util.Log.d("ReadingProgress", "loadFromServer: mergedList.size=${mergedList.size}")
                 val json = gson.toJson(mergedList)
                 prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
@@ -117,6 +119,30 @@ class ReadingProgressManager @Inject constructor(
                 android.util.Log.e("ReadingProgress", "loadFromServer FAILED", e)
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun findCachedLocalPath(fileUrl: String, fileName: String): String? {
+        return try {
+            val cacheDir = context.cacheDir
+            val hashPrefix = fileUrl.hashCode().toString()
+            val extension = fileName.substringAfterLast(".", "pdf")
+
+            val preferredFile = java.io.File(cacheDir, "$hashPrefix.$extension")
+            if (preferredFile.exists()) {
+                return preferredFile.absolutePath
+            }
+
+            val fallbackPdfFile = java.io.File(cacheDir, "$hashPrefix.pdf")
+            if (fallbackPdfFile.exists()) {
+                return fallbackPdfFile.absolutePath
+            }
+
+            cacheDir.listFiles()
+                ?.firstOrNull { it.isFile && it.name.startsWith("$hashPrefix.") }
+                ?.absolutePath
+        } catch (_: Exception) {
+            null
         }
     }
 
