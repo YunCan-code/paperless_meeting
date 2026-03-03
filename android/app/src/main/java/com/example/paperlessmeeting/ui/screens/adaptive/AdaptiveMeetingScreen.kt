@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
@@ -111,11 +112,16 @@ fun AdaptiveMeetingScreen(
         val isTablet = maxWidth > 600.dp
         
         if (!isTablet) {
+            var hasForwardedInitialMeeting by rememberSaveable(initialMeetingId) {
+                mutableStateOf(false)
+            }
+
             // === PHONE LAYOUT ===
             // Auto-forward to detail if initial ID is present (and we haven't handled it yet)
             // Note: ideally we consume the event.
-            LaunchedEffect(initialMeetingId) {
-                if (initialMeetingId != null) {
+            LaunchedEffect(initialMeetingId, hasForwardedInitialMeeting) {
+                if (initialMeetingId != null && !hasForwardedInitialMeeting) {
+                    hasForwardedInitialMeeting = true
                     navController.navigate("detail/$initialMeetingId")
                 }
             }

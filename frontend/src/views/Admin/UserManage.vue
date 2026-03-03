@@ -179,12 +179,13 @@
              </template>
           </el-table-column>
 
-          <!-- 状态 -->
-          <el-table-column label="状态" width="100" align="center">
+          <!-- 在线状态 -->
+          <el-table-column label="在线状态" width="100" align="center">
             <template #default="{ row }">
               <div 
                 class="status-indicator" 
-                :class="row.is_active ? 'active' : 'inactive'"
+                :class="row.is_online ? 'active' : 'inactive'"
+                :title="row.is_online ? '在线' : '离线'"
               ></div>
             </template>
           </el-table-column>
@@ -338,8 +339,8 @@ const searchQuery = ref('')
 const statusFilter = ref(null) 
 const statusOptions = [
     { label: '全部', value: null },
-    { label: '启用', value: true },
-    { label: '禁用', value: false }
+    { label: '在线', value: 'online' },
+    { label: '离线', value: 'offline' }
 ]
 
 const userList = ref([])
@@ -452,7 +453,11 @@ const fetchUsers = async () => {
             page: currentPage.value,
             page_size: pageSize.value,
             q: searchQuery.value || undefined,
-            is_active: statusFilter.value,
+            online_status: statusFilter.value === 'online'
+              ? true
+              : statusFilter.value === 'offline'
+                ? false
+                : undefined,
             sort_by: sortParams.value.sort_by || undefined,
             sort_order: sortParams.value.sort_order || undefined,
             districts: filterParams.value.districts.length > 0 ? filterParams.value.districts.join(',') : undefined

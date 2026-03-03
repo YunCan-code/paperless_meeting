@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.domain.model
 
 data class DeviceHeartbeat(
     val device_id: String, // Android ID or Mac Address hash
+    val user_id: Int?,
     val name: String,
     val model: String,
     val os_version: String,

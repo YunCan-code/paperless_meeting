@@ -15,6 +15,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.paperlessmeeting.BuildConfig
+import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.repository.DeviceRepository
 import com.example.paperlessmeeting.domain.model.DeviceHeartbeat
 import dagger.assisted.Assisted
@@ -26,7 +27,8 @@ import java.util.*
 class HeartbeatWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val deviceRepository: DeviceRepository
+    private val deviceRepository: DeviceRepository,
+    private val userPreferences: UserPreferences
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -54,9 +56,18 @@ class HeartbeatWorker @AssistedInject constructor(
             // We use ANDROID_ID as device_id mostly.
             val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
             
+            val loginUserName = userPreferences.getUserName()?.trim().orEmpty()
+            val currentUserId = userPreferences.getUserId().takeIf { it > 0 }
+            val displayName = if (loginUserName.isNotBlank()) {
+                loginUserName
+            } else {
+                "${Build.MANUFACTURER} ${Build.MODEL}"
+            }
+
             val heartbeat = DeviceHeartbeat(
                 device_id = androidId,
-                name = "${Build.MANUFACTURER} ${Build.MODEL}",
+                user_id = currentUserId,
+                name = displayName,
                 model = Build.MODEL,
                 os_version = "Android ${Build.VERSION.RELEASE}",
                 app_version = BuildConfig.VERSION_NAME,

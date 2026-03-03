@@ -4,9 +4,10 @@ from sqlmodel import Session, select, func
 from typing import List, Optional
 import io
 import openpyxl
+from datetime import datetime, timedelta
 from urllib.parse import quote
 from database import get_session
-from models import User, UserRead
+from models import User, UserRead, Device, DeviceUserBinding
 from utils.security import hash_password, verify_password
 
 # Create Router
@@ -185,6 +186,7 @@ def read_users(
     page_size: int = 10,
     q: Optional[str] = None,
     is_active: Optional[bool] = None,
+    online_status: Optional[bool] = Query(None, description="true=online, false=offline"),
     districts: Optional[str] = Query(None, description="Comma-separated list of districts"),
     sort_by: Optional[str] = Query(None),
     sort_order: Optional[str] = Query(None)
@@ -193,6 +195,15 @@ def read_users(
     Get Users List with Pagination and Filtering
     """
     
+    # Online status is inferred from recent device heartbeat bound by user_id
+    heartbeat_threshold = datetime.now() - timedelta(minutes=5)
+    online_user_ids_query = (
+        select(DeviceUserBinding.user_id)
+        .join(Device, Device.device_id == DeviceUserBinding.device_id)
+        .where(Device.status == "active")
+        .where(Device.last_active_at >= heartbeat_threshold)
+    )
+
     # Efficient Count
     # We clone the query conditions for counting
     count_query = select(func.count()).select_from(User)
@@ -200,6 +211,10 @@ def read_users(
         count_query = count_query.where((User.phone.contains(q)) | (User.name.contains(q)))
     if is_active is not None:
         count_query = count_query.where(User.is_active == is_active)
+    if online_status is True:
+        count_query = count_query.where(User.id.in_(online_user_ids_query))
+    elif online_status is False:
+        count_query = count_query.where(~User.id.in_(online_user_ids_query))
     if districts:
         dist_list = districts.split(",")
         count_query = count_query.where(User.district.in_(dist_list))
@@ -212,6 +227,10 @@ def read_users(
         query = query.where((User.phone.contains(q)) | (User.name.contains(q)))
     if is_active is not None:
         query = query.where(User.is_active == is_active)
+    if online_status is True:
+        query = query.where(User.id.in_(online_user_ids_query))
+    elif online_status is False:
+        query = query.where(~User.id.in_(online_user_ids_query))
     if districts:
         dist_list = districts.split(",")
         query = query.where(User.district.in_(dist_list))
@@ -225,9 +244,20 @@ def read_users(
         
     query = query.offset((page - 1) * page_size).limit(page_size).order_by(order_col)
     items = session.exec(query).all()
+
+    online_user_ids = {
+        uid for uid in session.exec(online_user_ids_query).all()
+        if isinstance(uid, int)
+    }
+
+    items_payload = []
+    for user in items:
+        user_dict = user.model_dump()
+        user_dict["is_online"] = user.id in online_user_ids
+        items_payload.append(user_dict)
     
     return {
-        "items": items,
+        "items": items_payload,
         "total": total,
         "page": page,
         "page_size": page_size

@@ -4,13 +4,46 @@ from typing import List, Optional
 from datetime import datetime
 
 from database import get_session
-from models import Device, DeviceRead, DeviceBase
+from models import Device, DeviceRead, DeviceBase, DeviceUserBinding, User
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
+
+class DeviceHeartbeatInput(DeviceBase):
+    user_id: Optional[int] = None
+
+
+def _sync_device_user_binding(session: Session, device_id: str, user_id: Optional[int]) -> None:
+    normalized_user_id = user_id if user_id and user_id > 0 else None
+    existing_binding = session.get(DeviceUserBinding, device_id)
+
+    if normalized_user_id is not None:
+        user_exists = session.get(User, normalized_user_id) is not None
+        if not user_exists:
+            normalized_user_id = None
+
+    if normalized_user_id is None:
+        if existing_binding:
+            session.delete(existing_binding)
+        return
+
+    if existing_binding:
+        existing_binding.user_id = normalized_user_id
+        existing_binding.updated_at = datetime.now()
+        session.add(existing_binding)
+        return
+
+    session.add(
+        DeviceUserBinding(
+            device_id=device_id,
+            user_id=normalized_user_id,
+            updated_at=datetime.now()
+        )
+    )
+
 @router.post("/heartbeat", response_model=DeviceRead)
 async def device_heartbeat(
-    device_data: DeviceBase, 
+    device_data: DeviceHeartbeatInput,
     request: Request,
     session: Session = Depends(get_session)
 ):
@@ -49,14 +82,16 @@ async def device_heartbeat(
         existing_device.storage_available = device_data.storage_available
             
         session.add(existing_device)
+        _sync_device_user_binding(session, existing_device.device_id, device_data.user_id)
         session.commit()
         session.refresh(existing_device)
         return existing_device
     else:
-        new_device = Device.from_orm(device_data)
+        new_device = Device(**device_data.model_dump(exclude={"user_id"}))
         new_device.ip_address = final_ip
         new_device.last_active_at = datetime.now()
         session.add(new_device)
+        _sync_device_user_binding(session, new_device.device_id, device_data.user_id)
         session.commit()
         session.refresh(new_device)
         return new_device

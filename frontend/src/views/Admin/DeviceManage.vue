@@ -167,8 +167,8 @@
                       </div>
                       <div class="device-text-content">
                           <div class="info-primary">
-                              <el-tooltip :content="row.alias ? `原名: ${row.name}` : ''" placement="top" :disabled="!row.alias">
-                                  <span class="info-alias">{{ row.alias || row.name || '未命名设备' }}</span>
+                              <el-tooltip :content="row.alias ? `设备别名: ${row.alias}` : ''" placement="top" :disabled="!row.alias">
+                                  <span class="info-alias">{{ row.name || row.alias || '未命名设备' }}</span>
                               </el-tooltip>
                               <el-icon class="edit-btn" @click.stop="openEditAlias(row)"><Edit /></el-icon>
                           </div>

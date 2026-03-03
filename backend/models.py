@@ -178,6 +178,15 @@ class Device(DeviceBase, table=True):
 class DeviceRead(DeviceBase):
     id: int
 
+class DeviceUserBinding(SQLModel, table=True):
+    """
+    设备与用户的当前登录绑定关系。
+    使用独立表避免对 Device 表做破坏性字段迁移。
+    """
+    device_id: str = Field(primary_key=True, index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
 # APP更新模型
 class AppUpdateBase(SQLModel):
     version_code: int # 安卓版本号 (用于比较)
