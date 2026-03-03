@@ -142,6 +142,14 @@ class DetailViewModel @Inject constructor(
                     }
                 }
             }
+            launch {
+                socketManager.connectionState.collectLatest { connected ->
+                    if (connected) {
+                        val id = meetingId?.toIntOrNull() ?: return@collectLatest
+                        socketManager.joinMeeting(id)
+                    }
+                }
+            }
         }
     }
 
@@ -192,7 +200,8 @@ class DetailViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        socketManager.disconnect()
+        // SocketManager is a Singleton shared by multiple screens.
+        // Do not disconnect here, otherwise other active screens lose realtime updates.
     }
 }
 

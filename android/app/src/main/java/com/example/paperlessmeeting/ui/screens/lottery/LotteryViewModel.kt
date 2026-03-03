@@ -202,6 +202,6 @@ class LotteryViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        socketManager.disconnect()
+        // Keep shared socket alive for other screens (dashboard/detail/vote).
     }
 }

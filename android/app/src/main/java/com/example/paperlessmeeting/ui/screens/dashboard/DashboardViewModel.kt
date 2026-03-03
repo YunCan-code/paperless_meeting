@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -44,6 +46,7 @@ class DashboardViewModel @Inject constructor(
 
     private var socketInitialized = false
     private var currentMeetingIds: Set<Int> = emptySet()
+    private var reconnectJob: Job? = null
 
     init {
         setupSocketIfNeeded()
@@ -59,7 +62,7 @@ class DashboardViewModel @Inject constructor(
             try {
                 val userName = userPreferences.getUserName() ?: "用户"
 
-                val todayStr = java.time.LocalDate.now().toString()
+                val todayStr = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).toString()
                 val todayMeetings = repository.getMeetings(
                     limit = 100,
                     startDate = todayStr,
@@ -131,7 +134,11 @@ class DashboardViewModel @Inject constructor(
                 launch {
                     socketManager.connectionState.collect { connected ->
                         if (connected) {
+                            reconnectJob?.cancel()
+                            reconnectJob = null
                             joinMeetingRooms()
+                        } else {
+                            scheduleReconnect()
                         }
                     }
                 }
@@ -156,6 +163,14 @@ class DashboardViewModel @Inject constructor(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun scheduleReconnect() {
+        if (reconnectJob?.isActive == true) return
+        reconnectJob = viewModelScope.launch {
+            delay(1500)
+            socketManager.connect(BuildConfig.SOCKET_BASE_URL)
         }
     }
 }
