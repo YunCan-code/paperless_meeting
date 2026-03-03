@@ -19,7 +19,15 @@ async def get_latest_version(session: Session = Depends(get_session)):
     """
     获取最新发布的版本信息
     """
-    statement = select(AppUpdate).order_by(AppUpdate.version_code.desc())
+    # Deterministic latest selection:
+    # 1) higher version_code first
+    # 2) if same version_code, newer created_at first
+    # 3) fallback by id desc
+    statement = select(AppUpdate).order_by(
+        AppUpdate.version_code.desc(),
+        AppUpdate.created_at.desc(),
+        AppUpdate.id.desc()
+    )
     latest = session.exec(statement).first()
     return latest
 

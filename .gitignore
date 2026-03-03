@@ -162,3 +162,21 @@ captures/
 
 # Google Services (e.g. APIs key JSON file)
 google-services.json
+
+# =========================
+# Local Tooling Metadata
+# =========================
+.claude/
+.serena/
+
+# =========================
+# Android Local Build Noise
+# =========================
+android/app/release/baselineProfiles/
+android/build_error*.log
+android/build_output*.txt
+android/kotlin_error*.log
+android/kotlin_error*.txt
+android/r8_error.log
+android/out.txt
+android/error.txt

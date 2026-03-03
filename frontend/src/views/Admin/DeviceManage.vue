@@ -517,7 +517,9 @@ const rules = {
 
 const fetchLatestVersion = async () => {
     try {
-        latestVersion.value = await request.get('/updates/latest')
+        latestVersion.value = await request.get('/updates/latest', {
+            params: { t: Date.now() } // avoid stale cache
+        })
         if (latestVersion.value) {
             releaseForm.version_code = latestVersion.value.version_code + 1
         }
@@ -563,12 +565,16 @@ const submitRelease = async () => {
                 formData.append('is_force_update', releaseForm.is_force_update)
                 formData.append('file', releaseFile.value)
                 
-                await request.post('/updates/', formData, {
+                const created = await request.post('/updates/', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 })
+                if (created) {
+                    latestVersion.value = created
+                    releaseForm.version_code = (created.version_code || 0) + 1
+                }
                 ElMessage.success('发布成功')
                 releaseDialogVisible.value = false
-                fetchLatestVersion()
+                await fetchLatestVersion()
             } catch(e) {
                 ElMessage.error('发布失败')
             } finally {
@@ -579,14 +585,10 @@ const submitRelease = async () => {
 }
 
 const blockDevice = async (row) => {
-    await request.put(`/devices/${row.id}/block`)
-    row.status = 'blocked'
-    ElMessage.success('设备已禁用')
+    ElMessage.warning('设备暂停功能暂未实现')
 }
 const unblockDevice = async (row) => {
-    await request.put(`/devices/${row.id}/unblock`)
-    row.status = 'active'
-    ElMessage.success('设备已启用')
+    ElMessage.warning('设备暂停功能暂未实现')
 }
 const deleteDevice = async (row) => {
     try {
