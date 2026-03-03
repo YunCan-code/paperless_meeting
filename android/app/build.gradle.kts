@@ -15,9 +15,9 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8001/api/\"")
-        buildConfigField("String", "SOCKET_BASE_URL", "\"http://10.0.2.2:8001\"")
-        buildConfigField("String", "STATIC_BASE_URL", "\"http://10.0.2.2:8001/static/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://coso.top/api/\"")
+        buildConfigField("String", "SOCKET_BASE_URL", "\"https://coso.top\"")
+        buildConfigField("String", "STATIC_BASE_URL", "\"https://coso.top/static/\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
