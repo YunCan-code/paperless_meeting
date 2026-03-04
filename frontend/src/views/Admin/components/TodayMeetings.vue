@@ -136,18 +136,19 @@ const getTypeColor = (id) => {
 
 <style scoped>
 .today-sessions {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   border-radius: 16px;
   border: none;
-  background: var(--card-bg); /* Simplified from gradient to solid card background for consistency */
+  background: var(--card-bg);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
-
 .today-sessions :deep(.el-card__body) {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

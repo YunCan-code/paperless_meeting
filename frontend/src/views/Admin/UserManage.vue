@@ -58,20 +58,7 @@
             </template>
           </el-input>
 
-          <el-select
-            v-model="districtFilterValue"
-            placeholder="区县筛选"
-            clearable
-            class="district-select"
-            @change="handleDistrictFilterChange"
-          >
-            <el-option
-              v-for="item in districtFilterOptions"
-              :key="item.value"
-              :label="item.text"
-              :value="item.value"
-            />
-          </el-select>
+
 
           <div class="status-tabs">
             <span 
@@ -137,11 +124,42 @@
 
           <!-- 区县 -->
           <el-table-column 
-            label="区县" 
             prop="district" 
-            min-width="120"
+            min-width="140"
             sortable="custom"
           >
+            <template #header>
+              <span style="order:0">区县</span>
+              <el-popover placement="bottom" :width="160" trigger="click" :teleported="true">
+                <template #reference>
+                  <el-icon 
+                    class="district-filter-icon" 
+                    :class="{ active: districtFilterValue }"
+                    style="order:2"
+                  >
+                    <Filter />
+                  </el-icon>
+                </template>
+                <div class="district-filter-dropdown">
+                  <div 
+                    class="district-filter-item"
+                    :class="{ active: !districtFilterValue }"
+                    @click="districtFilterValue = null; handleDistrictFilterChange()"
+                  >
+                    全部
+                  </div>
+                  <div 
+                    v-for="item in districtFilterOptions" 
+                    :key="item.value"
+                    class="district-filter-item"
+                    :class="{ active: districtFilterValue === item.value }"
+                    @click="districtFilterValue = item.value; handleDistrictFilterChange()"
+                  >
+                    {{ item.text }}
+                  </div>
+                </div>
+              </el-popover>
+            </template>
             <template #default="{ row }">
                <span 
                  class="district-badge"
@@ -151,7 +169,7 @@
                     borderColor: getDistrictStyle(row.district).border
                  }"
                >
-                 {{ row.district || '-' }}
+                  {{ row.district || '-' }}
                </span>
             </template>
           </el-table-column>
@@ -336,7 +354,7 @@ import {
   User, UserFilled, DataLine, Trophy, 
   Search, Plus, Upload, Download, UploadFilled,
   Top, Bottom, EditPen, Delete,
-  Fold, Expand, View, Hide
+  Fold, Expand, View, Hide, Filter
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import request from '@/utils/request'
@@ -788,5 +806,51 @@ onMounted(() => {
 :deep(.el-table__fixed-right) {
   z-index: 6;
   box-shadow: -10px 0 14px -12px rgba(15, 23, 42, 0.25);
+}
+
+/* District Column Header Filter */
+.district-column-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+:deep(.el-table .el-table__header th .cell) {
+  display: inline-flex;
+  align-items: center;
+}
+/* 区县列头顺序：文字(order:0) → 排序箭头(order:1) → 筛选图标(order:2) */
+:deep(.caret-wrapper) {
+  order: 1;
+}
+.district-filter-icon {
+  cursor: pointer;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 14px;
+  transition: color 0.2s;
+}
+.district-filter-icon:hover,
+.district-filter-icon.active {
+  color: var(--color-primary, #3b82f6);
+}
+.district-filter-dropdown {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.district-filter-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-main, #334155);
+  transition: all 0.15s;
+}
+.district-filter-item:hover {
+  background-color: var(--color-slate-100, #f1f5f9);
+}
+.district-filter-item.active {
+  color: var(--color-primary, #3b82f6);
+  font-weight: 600;
+  background-color: #eff6ff;
 }
 </style>
