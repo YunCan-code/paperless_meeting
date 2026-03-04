@@ -838,7 +838,8 @@ const downloadFile = (file) => {
 .header-left { display: flex; align-items: center; gap: 12px; }
 
 /* 主体区域等高与弹性 */
-.main-content-row { display: flex; align-items: stretch; margin-bottom: 24px; }
+.stats-row { row-gap: 20px; }
+.main-content-row { display: flex; align-items: stretch; margin-bottom: 24px; row-gap: 24px; }
 .main-content-row > .el-col { display: flex; flex-direction: column; }
 
 @media screen and (min-width: 992px) {
@@ -846,7 +847,13 @@ const downloadFile = (file) => {
   .today-wrapper { position: absolute; top: 0; left: 12px; right: 12px; bottom: 0; }
 }
 @media screen and (max-width: 991px) {
+  .today-col { margin-top: 24px; }
   .today-wrapper { height: 500px; display: flex; flex-direction: column; }
+}
+@supports (row-gap: 1px) {
+  @media screen and (max-width: 991px) {
+    .today-col { margin-top: 0; }
+  }
 }
 .today-component { height: 100%; }
 

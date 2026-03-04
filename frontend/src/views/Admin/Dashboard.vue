@@ -64,7 +64,7 @@
           </div>
           
           <el-menu-item index="/admin/settings">
-            <el-icon><Setting /></el-icon>
+            <el-icon class="settings-icon-adjust"><Setting /></el-icon>
             <template #title>系统设置</template>
           </el-menu-item>
         </el-menu>
@@ -298,7 +298,9 @@ onUnmounted(() => {
 .theme-toggle-wrapper {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
   height: 40px;
+  line-height: 40px;
   padding: 0 20px;
   margin: 0 0 2px 0;
   border-radius: 6px;
@@ -309,7 +311,13 @@ onUnmounted(() => {
   transition: all 0.2s;
 }
 .theme-toggle-wrapper .el-icon {
+  width: var(--el-menu-icon-width, 24px);
   margin-right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
   font-size: 18px;
   flex-shrink: 0;
 }
@@ -326,6 +334,10 @@ onUnmounted(() => {
 }
 .theme-toggle-label {
   white-space: nowrap;
+}
+
+:deep(.settings-icon-adjust) {
+  transform: translateX(-1px);
 }
 
 </style>
