@@ -142,7 +142,7 @@ const getTypeColor = (id) => {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 686px;
   overflow: hidden;
 }
 .today-sessions :deep(.el-card__body) {

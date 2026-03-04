@@ -810,9 +810,7 @@ const downloadFile = (file) => {
 }
 
 /* 主体区域：日历与今日会议等高 */
-.main-content-row {
-  align-items: stretch !important;
-}
+.main-content-row { margin-bottom: 24px; }
 .main-content-row > .el-col {
   display: flex;
   flex-direction: column;
