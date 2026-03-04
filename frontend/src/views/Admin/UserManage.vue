@@ -58,6 +58,21 @@
             </template>
           </el-input>
 
+          <el-select
+            v-model="districtFilterValue"
+            placeholder="区县筛选"
+            clearable
+            class="district-select"
+            @change="handleDistrictFilterChange"
+          >
+            <el-option
+              v-for="item in districtFilterOptions"
+              :key="item.value"
+              :label="item.text"
+              :value="item.value"
+            />
+          </el-select>
+
           <div class="status-tabs">
             <span 
               v-for="tab in statusOptions" 
@@ -88,7 +103,6 @@
           :header-cell-style="{ background: 'transparent', color: 'var(--text-secondary)', fontWeight: '600' }"
           row-class-name="user-row"
           @sort-change="handleSortChange"
-          @filter-change="handleFilterChange"
         >
           <!-- 用户名 / 邮箱 (Enhanced) -->
           <el-table-column label="用户名" min-width="220">
@@ -127,8 +141,6 @@
             prop="district" 
             min-width="120"
             sortable="custom"
-            column-key="district"
-            :filters="districtFilterOptions"
           >
             <template #default="{ row }">
                <span 
@@ -319,7 +331,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { 
   User, UserFilled, DataLine, Trophy, 
   Search, Plus, Upload, Download, UploadFilled,
@@ -348,16 +360,18 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 
-const districtOptions = ['市辖区', '高新区', '呈贡区', '盘龙区', '官渡区', '西山区', '五华区']
-const districtFilterOptions = districtOptions.map(d => ({ text: d, value: d }))
+const DISTRICT_EMPTY_FILTER_VALUE = '__EMPTY__'
+const DEFAULT_DISTRICT_OPTIONS = ['市辖区', '高新区', '呈贡区', '盘龙区', '官渡区', '西山区', '五华区']
+const districtOptions = ref([...DEFAULT_DISTRICT_OPTIONS])
+const districtFilterOptions = computed(() => [
+    ...districtOptions.value.map(d => ({ text: d, value: d })),
+    { text: '未填写', value: DISTRICT_EMPTY_FILTER_VALUE }
+])
+const districtFilterValue = ref(null)
 
 const sortParams = ref({
     sort_by: null,
     sort_order: null
-})
-
-const filterParams = ref({
-    districts: []
 })
 
 // Stats (Reactive)
@@ -378,6 +392,17 @@ const fetchStats = async () => {
         })
     } catch (error) {
         console.error("Failed to fetch stats", error)
+    }
+}
+
+const fetchDistrictOptions = async () => {
+    try {
+        const res = await request.get('/users/district-options')
+        if (Array.isArray(res) && res.length > 0) {
+            districtOptions.value = [...new Set(res.map(v => String(v).trim()).filter(Boolean))]
+        }
+    } catch (error) {
+        console.error('Failed to fetch district options', error)
     }
 }
 
@@ -460,7 +485,7 @@ const fetchUsers = async () => {
                 : undefined,
             sort_by: sortParams.value.sort_by || undefined,
             sort_order: sortParams.value.sort_order || undefined,
-            districts: filterParams.value.districts.length > 0 ? filterParams.value.districts.join(',') : undefined
+            districts: districtFilterValue.value || undefined
         }
         
         // Real API Call
@@ -506,10 +531,7 @@ const handleSortChange = ({ column, prop, order }) => {
     fetchUsers()
 }
 
-const handleFilterChange = (filters) => {
-    if (filters.district) {
-        filterParams.value.districts = filters.district
-    }
+const handleDistrictFilterChange = () => {
     currentPage.value = 1
     fetchUsers()
 }
@@ -538,6 +560,7 @@ const handleImport = async (options) => {
         importDialogVisible.value = false
         fetchUsers()
         fetchStats()
+        fetchDistrictOptions()
     } catch (error) {
         const detail = error.response?.data?.detail
         if (detail && detail.message) {
@@ -608,6 +631,7 @@ const handleSubmit = () => {
             }
             dialogVisible.value = false
             fetchUsers()
+            fetchDistrictOptions()
         } catch (error) {
             ElMessage.error(error.response?.data?.detail || '操作失败')
         } finally {
@@ -626,6 +650,7 @@ const handleDelete = (row) => {
             await request.delete(`/users/${row.id}`)
             ElMessage.success('删除成功')
             fetchUsers()
+            fetchDistrictOptions()
         } catch (error) {
             ElMessage.error('删除失败')
         }
@@ -633,6 +658,7 @@ const handleDelete = (row) => {
 }
 
 onMounted(() => {
+    fetchDistrictOptions()
     fetchUsers()
     fetchStats()
 })
@@ -698,6 +724,7 @@ onMounted(() => {
 .toolbar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
 .toolbar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .search-input { width: 240px; }
+.district-select { width: 140px; }
 .role-select { width: 140px; }
 .status-tabs { background: var(--color-slate-100, #f1f5f9); padding: 4px; border-radius: 8px; display: flex; gap: 4px; }
 .status-tabs span { padding: 4px 12px; font-size: 13px; border-radius: 6px; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; }
@@ -749,4 +776,17 @@ onMounted(() => {
 .action-buttons { opacity: 0.4; transition: opacity 0.2s; display: flex; justify-content: flex-end; gap: 8px; }
 :deep(.el-table__row:hover) .action-buttons { opacity: 1; }
 .pagination-wrapper { margin-top: 24px; display: flex; justify-content: flex-end; }
+
+/* Keep fixed-right action column visually isolated while horizontal scrolling */
+:deep(.el-table__fixed-right),
+:deep(.el-table__fixed-right-patch),
+:deep(.el-table__fixed-right .el-table__cell),
+:deep(.el-table .el-table-fixed-column--right) {
+  background-color: var(--card-bg, #ffffff);
+}
+
+:deep(.el-table__fixed-right) {
+  z-index: 6;
+  box-shadow: -10px 0 14px -12px rgba(15, 23, 42, 0.25);
+}
 </style>

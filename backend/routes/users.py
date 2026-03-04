@@ -13,6 +13,8 @@ from utils.security import hash_password, verify_password
 # Create Router
 router = APIRouter(prefix="/users", tags=["users"])
 
+DISTRICT_EMPTY_FILTER_VALUE = "__EMPTY__"
+
 # Response Model using Pydantic Generic not supported directly in simple setup, so we return dict or specific schema
 # For list with pagination, we can return { "items": [...], "total": ... }
 
@@ -204,6 +206,29 @@ def read_users(
         .where(Device.last_active_at >= heartbeat_threshold)
     )
 
+    def apply_district_filter(stmt, districts_query: Optional[str]):
+        if not districts_query:
+            return stmt
+
+        raw_values = [item.strip() for item in districts_query.split(",") if item and item.strip()]
+        if not raw_values:
+            return stmt
+
+        include_empty = DISTRICT_EMPTY_FILTER_VALUE in raw_values
+        district_values = [item for item in raw_values if item != DISTRICT_EMPTY_FILTER_VALUE]
+
+        district_expr = None
+        if district_values:
+            district_expr = User.district.in_(district_values)
+
+        if include_empty:
+            empty_expr = User.district.is_(None) | (User.district == "")
+            district_expr = empty_expr if district_expr is None else (district_expr | empty_expr)
+
+        if district_expr is not None:
+            stmt = stmt.where(district_expr)
+        return stmt
+
     # Efficient Count
     # We clone the query conditions for counting
     count_query = select(func.count()).select_from(User)
@@ -215,9 +240,7 @@ def read_users(
         count_query = count_query.where(User.id.in_(online_user_ids_query))
     elif online_status is False:
         count_query = count_query.where(~User.id.in_(online_user_ids_query))
-    if districts:
-        dist_list = districts.split(",")
-        count_query = count_query.where(User.district.in_(dist_list))
+    count_query = apply_district_filter(count_query, districts)
         
     total = session.exec(count_query).one()
     
@@ -231,9 +254,7 @@ def read_users(
         query = query.where(User.id.in_(online_user_ids_query))
     elif online_status is False:
         query = query.where(~User.id.in_(online_user_ids_query))
-    if districts:
-        dist_list = districts.split(",")
-        query = query.where(User.district.in_(dist_list))
+    query = apply_district_filter(query, districts)
 
     # Sorting
     order_col = User.id.desc() # Default
@@ -262,6 +283,18 @@ def read_users(
         "page": page,
         "page_size": page_size
     }
+
+@router.get("/district-options", response_model=List[str])
+def get_district_options(session: Session = Depends(get_session)):
+    stmt = (
+        select(User.district)
+        .where(User.district.is_not(None))
+        .where(User.district != "")
+        .distinct()
+        .order_by(User.district.asc())
+    )
+    values = session.exec(stmt).all()
+    return [v.strip() for v in values if isinstance(v, str) and v.strip()]
 
 @router.get("/{user_id}", response_model=UserRead)
 def read_user(user_id: int, session: Session = Depends(get_session)):

@@ -136,10 +136,20 @@ const getTypeColor = (id) => {
 
 <style scoped>
 .today-sessions {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   border-radius: 16px;
   border: none;
   background: var(--card-bg); /* Simplified from gradient to solid card background for consistency */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.today-sessions :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .card-header {
   display: flex;
@@ -164,6 +174,10 @@ const getTypeColor = (id) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .session-item {

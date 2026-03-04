@@ -50,14 +50,14 @@
 
     <!-- 主体区域: 日历 (2/3) + 今日会议 (1/3) -->
     <el-row :gutter="24" class="main-content-row">
-      <el-col :xs="24" :sm="24" :md="16" :span="16">
+      <el-col :xs="24" :sm="24" :md="16" :span="16" class="calendar-col">
         <SessionCalendar 
            :meetings="meetings" 
            @create="openCreate" 
            @select-date="(val) => currentSelectedDate = val"
         />
       </el-col>
-      <el-col :xs="24" :sm="24" :md="8" :span="8">
+      <el-col :xs="24" :sm="24" :md="8" :span="8" class="today-col">
         <TodayMeetings 
            :meetings="meetings" 
            :meeting-types="meetingTypes" 
@@ -807,6 +807,31 @@ const downloadFile = (file) => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.main-content-row {
+  align-items: stretch;
+}
+
+.main-content-row > .calendar-col,
+.main-content-row > .today-col {
+  display: flex;
+  min-height: 0;
+}
+
+.main-content-row > .today-col {
+  max-height: 100%;
+}
+
+.main-content-row > .today-col :deep(.today-sessions) {
+  height: 100%;
+}
+
+@media (max-width: 991px) {
+  .main-content-row > .calendar-col,
+  .main-content-row > .today-col {
+    display: block;
+  }
 }
 
 /* 详情样式优化 */
