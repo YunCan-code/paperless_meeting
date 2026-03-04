@@ -144,11 +144,20 @@ const getTypeColor = (id) => {
   flex-direction: column;
   height: 100%;
 }
+
+:deep(.el-card__header) {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-color);
+  min-height: 70px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 4px;
 }
 .header-title h3 {
   margin: 0;

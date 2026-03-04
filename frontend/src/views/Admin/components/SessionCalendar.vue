@@ -142,6 +142,13 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
   height: 100%;
   box-sizing: border-box;
 }
+
+:deep(.el-card__header) {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-color);
+  min-height: 70px;
+  box-sizing: border-box;
+}
 .calendar-header-new {
   display: flex;
   justify-content: space-between;

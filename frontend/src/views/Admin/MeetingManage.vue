@@ -57,8 +57,8 @@
            @select-date="(val) => currentSelectedDate = val"
         />
       </el-col>
-      <el-col :xs="24" :sm="24" :md="8" :span="8" class="today-col">
-        <div class="today-wrapper">
+      <el-col :xs="24" :sm="24" :md="8" :span="8" :class="{ 'today-col': hasMeetingsToday }">
+        <div :class="{ 'today-wrapper': hasMeetingsToday }">
           <TodayMeetings 
              class="today-component"
              :meetings="meetings" 
@@ -470,6 +470,15 @@ const form = ref({
 })
 
 const currentSelectedDate = ref(new Date())
+
+const hasMeetingsToday = computed(() => {
+  if (!meetings.value || meetings.value.length === 0) return false
+  const targetDateStr = currentSelectedDate.value.toDateString()
+  return meetings.value.some(m => {
+    if (!m.start_time) return false
+    return new Date(m.start_time).toDateString() === targetDateStr
+  })
+})
 
 // Stats State
 const stats = ref({
