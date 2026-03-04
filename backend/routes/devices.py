@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select, SQLModel
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database import get_session
 from models import Device, DeviceRead, DeviceBase, DeviceUserBinding, User
@@ -11,6 +11,10 @@ router = APIRouter(prefix="/devices", tags=["devices"])
 
 class DeviceHeartbeatInput(DeviceBase):
     user_id: Optional[int] = None
+
+
+class DeviceOfflineInput(SQLModel):
+    device_id: str
 
 
 def _sync_device_user_binding(session: Session, device_id: str, user_id: Optional[int]) -> None:
@@ -110,6 +114,26 @@ async def list_devices(
         
     devices = session.exec(query.offset(skip).limit(limit)).all()
     return devices
+
+
+@router.post("/offline")
+async def report_device_offline(
+    payload: DeviceOfflineInput,
+    session: Session = Depends(get_session)
+):
+    """Client proactively reports offline state."""
+    statement = select(Device).where(Device.device_id == payload.device_id)
+    device = session.exec(statement).first()
+    if not device:
+        return {"ok": True}
+
+    forced_offline_time = datetime.now() - timedelta(minutes=6)
+    if device.last_active_at > forced_offline_time:
+        device.last_active_at = forced_offline_time
+        session.add(device)
+        session.commit()
+
+    return {"ok": True}
 
 @router.delete("/{device_id}")
 async def delete_device(device_id: int, session: Session = Depends(get_session)):

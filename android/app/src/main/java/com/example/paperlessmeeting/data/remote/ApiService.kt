@@ -29,6 +29,9 @@ interface ApiService {
     @retrofit2.http.POST("devices/heartbeat")
     suspend fun deviceHeartbeat(@retrofit2.http.Body heartbeat: com.example.paperlessmeeting.domain.model.DeviceHeartbeat): com.example.paperlessmeeting.domain.model.DeviceResponse
 
+    @retrofit2.http.POST("devices/offline")
+    suspend fun deviceOffline(@retrofit2.http.Body payload: com.example.paperlessmeeting.domain.model.DeviceOfflineReport): Map<String, Boolean>
+
     @retrofit2.http.GET("updates/latest")
     suspend fun checkAppUpdate(): com.example.paperlessmeeting.domain.model.AppUpdateCheck?
 

@@ -3,6 +3,7 @@ package com.example.paperlessmeeting.data.repository
 import com.example.paperlessmeeting.data.remote.ApiService
 import com.example.paperlessmeeting.domain.model.AppUpdateCheck
 import com.example.paperlessmeeting.domain.model.DeviceHeartbeat
+import com.example.paperlessmeeting.domain.model.DeviceOfflineReport
 import com.example.paperlessmeeting.domain.model.DeviceResponse
 import javax.inject.Inject
 
@@ -22,6 +23,15 @@ class DeviceRepository @Inject constructor(
         return try {
             val response = apiService.checkAppUpdate()
             Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun sendOfflineReport(deviceId: String): Result<Unit> {
+        return try {
+            apiService.deviceOffline(DeviceOfflineReport(device_id = deviceId))
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

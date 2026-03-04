@@ -16,6 +16,10 @@ data class DeviceHeartbeat(
     val status: String
 )
 
+data class DeviceOfflineReport(
+    val device_id: String
+)
+
 data class DeviceResponse(
     val device_id: String,
     val name: String,

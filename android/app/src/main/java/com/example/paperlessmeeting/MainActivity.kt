@@ -19,6 +19,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.paperlessmeeting.worker.HeartbeatWorker
+import com.example.paperlessmeeting.worker.OfflineReportWorker
+import java.util.concurrent.TimeUnit
 
 import javax.inject.Inject
 
@@ -36,9 +44,40 @@ class MainActivity : ComponentActivity() {
         }
         
         // Trigger immediate heartbeat when app opens to update status
-        val authRequest = androidx.work.OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.HeartbeatWorker>()
+        val authRequest = OneTimeWorkRequestBuilder<HeartbeatWorker>()
             .build()
-        androidx.work.WorkManager.getInstance(this).enqueue(authRequest)
+        WorkManager.getInstance(this).enqueue(authRequest)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        WorkManager.getInstance(this).cancelUniqueWork(OFFLINE_REPORT_WORK_NAME)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        scheduleOfflineReport()
+    }
+
+    private fun scheduleOfflineReport() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val request = OneTimeWorkRequestBuilder<OfflineReportWorker>()
+            .setInitialDelay(20, TimeUnit.SECONDS)
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            OFFLINE_REPORT_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    companion object {
+        private const val OFFLINE_REPORT_WORK_NAME = "OfflineReportWork"
     }
 }
 
