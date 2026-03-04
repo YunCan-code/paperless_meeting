@@ -139,6 +139,8 @@ const hasMeeting = (day) => getMeetingCount(day) > 0
   border-radius: 12px;
   border: 1px solid var(--border-color);
   background-color: var(--card-bg);
+  height: 100%;
+  box-sizing: border-box;
 }
 .calendar-header-new {
   display: flex;

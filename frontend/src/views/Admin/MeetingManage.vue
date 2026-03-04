@@ -57,14 +57,17 @@
            @select-date="(val) => currentSelectedDate = val"
         />
       </el-col>
-      <el-col :xs="24" :sm="24" :md="8" :span="8">
-        <TodayMeetings 
-           :meetings="meetings" 
-           :meeting-types="meetingTypes" 
-           :date="currentSelectedDate"
-           @create="openCreate" 
-           @view="viewDetails" 
-        />
+      <el-col :xs="24" :sm="24" :md="8" :span="8" class="today-col">
+        <div class="today-wrapper">
+          <TodayMeetings 
+             class="today-component"
+             :meetings="meetings" 
+             :meeting-types="meetingTypes" 
+             :date="currentSelectedDate"
+             @create="openCreate" 
+             @view="viewDetails" 
+          />
+        </div>
       </el-col>
     </el-row>
 
@@ -833,6 +836,20 @@ const downloadFile = (file) => {
 /* 头部样式调整 */
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px; }
 .header-left { display: flex; align-items: center; gap: 12px; }
+
+/* 主体区域等高与弹性 */
+.main-content-row { display: flex; align-items: stretch; margin-bottom: 24px; }
+.main-content-row > .el-col { display: flex; flex-direction: column; }
+
+@media screen and (min-width: 992px) {
+  .today-col { position: relative; }
+  .today-wrapper { position: absolute; top: 0; left: 12px; right: 12px; bottom: 0; }
+}
+@media screen and (max-width: 991px) {
+  .today-wrapper { height: 500px; display: flex; flex-direction: column; }
+}
+.today-component { height: 100%; }
+
 .collapse-btn { padding: 8px; border-radius: 8px; transition: background-color 0.2s; height: auto; }
 .collapse-btn:hover { background-color: var(--bg-main); }
 .header-divider { height: 24px; border-color: var(--border-color); margin: 0 4px; }
@@ -850,6 +867,7 @@ const downloadFile = (file) => {
 .stat-value { 
     font-size: 24px; font-weight: 700; color: var(--text-main); margin: 4px 0; 
     display: flex; align-items: flex-end; gap: 8px; /* Added flex for trend alignment */
+    white-space: nowrap;
 }
 .stat-trend { font-size: 13px; font-weight: 600; display: flex; align-items: center; margin-bottom: 3px; }
 .stat-trend.up { color: #10b981; } .stat-trend.down { color: #ef4444; }

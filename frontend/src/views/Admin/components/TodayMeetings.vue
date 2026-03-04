@@ -140,6 +140,9 @@ const getTypeColor = (id) => {
   border: none;
   background: var(--card-bg); /* Simplified from gradient to solid card background for consistency */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 .card-header {
   display: flex;
@@ -160,10 +163,39 @@ const getTypeColor = (id) => {
   display: block;
 }
 
+:deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 0px;
+}
+
 .session-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  padding-bottom: 16px;
+}
+
+.session-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.session-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-list::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300, #cbd5e1);
+  border-radius: 4px;
+}
+
+.session-list::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-400, #94a3b8);
 }
 
 .session-item {
@@ -177,6 +209,7 @@ const getTypeColor = (id) => {
   cursor: pointer;
   transition: all 0.3s ease;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .session-item:hover {
