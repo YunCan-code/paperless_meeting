@@ -1,6 +1,7 @@
 package com.example.paperlessmeeting
 
 import android.app.Application
+import android.app.ActivityManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -13,6 +14,8 @@ import javax.inject.Inject
 
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import okhttp3.OkHttpClient
 
 @HiltAndroidApp
@@ -23,10 +26,27 @@ class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
     @Inject lateinit var okHttpClient: OkHttpClient
 
     override fun newImageLoader(): ImageLoader {
+        val memoryCachePercent = if (isLowRamDevice()) 0.15 else 0.25
         return ImageLoader.Builder(this)
             .okHttpClient(okHttpClient)
             .crossfade(true)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(memoryCachePercent)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(256L * 1024L * 1024L)
+                    .build()
+            }
             .build()
+    }
+
+    private fun isLowRamDevice(): Boolean {
+        val activityManager = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
+        return activityManager?.isLowRamDevice ?: false
     }
 
     override val workManagerConfiguration: Configuration

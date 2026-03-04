@@ -54,6 +54,8 @@ data class Meeting(
     val meetingTypeName: String? = null,
     @com.google.gson.annotations.SerializedName("card_image_url")
     val cardImageUrl: String? = null,
+    @com.google.gson.annotations.SerializedName("card_image_thumb_url")
+    val cardImageThumbUrl: String? = null,
     val speaker: String? = null,
     val agenda: String? = null,
     val attachments: List<Attachment>? = emptyList(),

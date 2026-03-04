@@ -5,6 +5,7 @@ from typing import List, Optional
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 from database import get_session
 from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase, Vote, VoteOption, UserVote, MeetingAttendeeLink
@@ -203,6 +204,7 @@ import os
 # Enhanced Response Model
 class MeetingCardResponse(MeetingRead):
     card_image_url: Optional[str] = None
+    card_image_thumb_url: Optional[str] = None
     meeting_type_name: Optional[str] = None
     attachments: List[AttachmentRead] = []
 
@@ -220,6 +222,135 @@ import os
 
 # 带 TTL 的缓存：最多缓存 32 个目录，60 秒后自动失效
 _image_dir_cache = TTLCache(maxsize=32, ttl=60)
+
+THUMB_WIDTH = 960
+THUMB_HEIGHT = 540
+THUMB_QUALITY = 72
+THUMB_DIR = UPLOAD_DIR / "thumbnails"
+THUMB_DIR.mkdir(parents=True, exist_ok=True)
+
+try:
+    from PIL import Image, ImageOps  # type: ignore
+    PIL_AVAILABLE = True
+except Exception:
+    PIL_AVAILABLE = False
+
+
+def _optimize_unsplash_url(
+    url: str,
+    width: int = THUMB_WIDTH,
+    height: int = THUMB_HEIGHT,
+    quality: int = THUMB_QUALITY
+) -> str:
+    """Return a lower-cost Unsplash URL for list thumbnails."""
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if "images.unsplash.com" not in host:
+            return url
+
+        existing = parse_qsl(parsed.query, keep_blank_values=True)
+        filtered = [
+            (k, v)
+            for (k, v) in existing
+            if k.lower() not in {"w", "h", "q", "fit", "auto"}
+        ]
+        filtered.extend(
+            [
+                ("auto", "format"),
+                ("fit", "crop"),
+                ("w", str(width)),
+                ("h", str(height)),
+                ("q", str(quality)),
+            ]
+        )
+        return urlunparse(parsed._replace(query=urlencode(filtered)))
+    except Exception:
+        return url
+
+
+def _resolve_local_source_path(image_url: str) -> Optional[Path]:
+    """
+    Resolve /static/... image URL to local file path under uploads/.
+    Returns None for external URLs.
+    """
+    if not image_url:
+        return None
+
+    parsed = urlparse(image_url)
+    path = parsed.path or image_url
+    if not path.startswith("/static/"):
+        return None
+
+    rel = path.replace("/static/", "", 1)
+    rel_path = Path(rel)
+    if any(part == ".." for part in rel_path.parts):
+        return None
+
+    try:
+        source = (UPLOAD_DIR / rel_path).resolve()
+        upload_root = UPLOAD_DIR.resolve()
+        if upload_root not in source.parents and source != upload_root:
+            return None
+        if not source.is_file():
+            return None
+        return source
+    except Exception:
+        return None
+
+
+def _build_thumbnail_for_local_file(source_path: Path) -> Optional[Path]:
+    """
+    Build (or reuse) WebP thumbnail file for local image and return relative path under uploads/.
+    """
+    if not PIL_AVAILABLE:
+        return None
+
+    try:
+        relative_source = source_path.resolve().relative_to(UPLOAD_DIR.resolve())
+    except Exception:
+        return None
+
+    ext = source_path.suffix.lower().lstrip(".") or "img"
+    thumb_name = f"{source_path.stem}_{ext}_{THUMB_WIDTH}x{THUMB_HEIGHT}.webp"
+    thumb_relative = Path("thumbnails") / relative_source.parent / thumb_name
+    thumb_path = (UPLOAD_DIR / thumb_relative).resolve()
+
+    try:
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+
+        source_mtime = source_path.stat().st_mtime
+        if thumb_path.exists() and thumb_path.stat().st_mtime >= source_mtime:
+            return thumb_relative
+
+        resample = Image.Resampling.LANCZOS if hasattr(Image, "Resampling") else Image.LANCZOS
+        with Image.open(source_path) as img:
+            img = ImageOps.exif_transpose(img).convert("RGB")
+            fitted = ImageOps.fit(img, (THUMB_WIDTH, THUMB_HEIGHT), method=resample)
+            fitted.save(thumb_path, format="WEBP", quality=THUMB_QUALITY, method=6)
+
+        return thumb_relative
+    except Exception as e:
+        print(f"[thumb] failed to build thumbnail for {source_path}: {e}")
+        return None
+
+
+def build_thumbnail_url(image_url: Optional[str], base_url: str) -> Optional[str]:
+    """
+    Create thumbnail URL for local static images; for Unsplash, return optimized URL.
+    Fallback is original URL.
+    """
+    if not image_url:
+        return None
+
+    source = _resolve_local_source_path(image_url)
+    if source is not None:
+        thumb_relative = _build_thumbnail_for_local_file(source)
+        if thumb_relative is not None:
+            return f"{base_url}static/{thumb_relative.as_posix()}"
+        return image_url
+
+    return _optimize_unsplash_url(image_url)
 
 def get_images_in_dir_cached(directory: Path) -> List[str]:
     """Cached directory listing to reduce Disk I/O (60s TTL)"""
@@ -381,6 +512,7 @@ def read_meetings(
 
         
         resp.card_image_url = final_url
+        resp.card_image_thumb_url = build_thumbnail_url(final_url, base_url)
         resp.meeting_type_name = m_type.name if m_type else "普通会议"
         results.append(resp)
         
@@ -453,6 +585,7 @@ def read_meeting(
                 final_url = DEFAULT_IMAGES["default"]
 
     resp.card_image_url = final_url
+    resp.card_image_thumb_url = build_thumbnail_url(final_url, base_url)
     
     # 填充与会者角色列表
     attendee_links = session.exec(select(MeetingAttendeeLink).where(MeetingAttendeeLink.meeting_id == meeting_id)).all()
