@@ -35,7 +35,7 @@
             <div class="stat-info">
               <div class="stat-label">{{ stat.title }}</div>
               <div class="stat-value">
-                <span class="stat-value-text">{{ stat.value }}</span>
+                {{ stat.value }}
                 <span class="stat-trend" :class="stat.trend >= 0 ? 'up' : 'down'" v-if="stat.trend !== undefined">
                   <el-icon><component :is="stat.trend >= 0 ? 'Top' : 'Bottom'" /></el-icon>
                   {{ Math.abs(stat.trend) }}%
@@ -809,17 +809,6 @@ const downloadFile = (file) => {
   gap: 24px;
 }
 
-/* 主体区域：日历与今日会议等高 */
-.main-content-row { margin-bottom: 24px; }
-.main-content-row > .el-col {
-  display: flex;
-  flex-direction: column;
-}
-.main-content-row > .el-col > * {
-  flex: 1;
-  min-height: 0;
-}
-
 /* 详情样式优化 */
 .detail-header-section { margin-bottom: 24px; }
 .detail-main-title { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3; }
@@ -859,25 +848,10 @@ const downloadFile = (file) => {
 .stat-info { flex: 1; }
 .stat-label { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
 .stat-value { 
-    font-size: 24px; font-weight: 700; color: var(--text-main); margin: 4px 0;
-    display: flex; align-items: flex-end; gap: 8px;
-    flex-wrap: nowrap;
-    min-width: 0;
+    font-size: 24px; font-weight: 700; color: var(--text-main); margin: 4px 0; 
+    display: flex; align-items: flex-end; gap: 8px; /* Added flex for trend alignment */
 }
-.stat-value-text {
-    white-space: nowrap;
-    line-height: 1.1;
-    flex-shrink: 0;
-}
-.stat-trend {
-    font-size: 13px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    margin-bottom: 3px;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
+.stat-trend { font-size: 13px; font-weight: 600; display: flex; align-items: center; margin-bottom: 3px; }
 .stat-trend.up { color: #10b981; } .stat-trend.down { color: #ef4444; }
 .stat-desc { font-size: 12px; color: var(--text-secondary); }
 
@@ -950,16 +924,5 @@ html.dark .meta-label {
 }
 html.dark .meta-value {
     color: #e2e8f0;
-}
-
-@media (max-width: 1024px) {
-  .stat-value {
-    font-size: 20px;
-    gap: 6px;
-  }
-  .stat-trend {
-    font-size: 12px;
-    margin-bottom: 2px;
-  }
 }
 </style>

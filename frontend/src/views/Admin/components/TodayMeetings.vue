@@ -138,19 +138,8 @@ const getTypeColor = (id) => {
 .today-sessions {
   border-radius: 16px;
   border: none;
-  background: var(--card-bg);
+  background: var(--card-bg); /* Simplified from gradient to solid card background for consistency */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  display: flex;
-  flex-direction: column;
-  height: 686px;
-  overflow: hidden;
-}
-.today-sessions :deep(.el-card__body) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 .card-header {
   display: flex;
@@ -175,10 +164,6 @@ const getTypeColor = (id) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .session-item {
