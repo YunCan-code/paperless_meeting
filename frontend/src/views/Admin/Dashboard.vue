@@ -48,10 +48,6 @@
             <el-icon><MagicStick /></el-icon>
             <template #title>快捷功能</template>
           </el-menu-item>
-          <el-menu-item index="/admin/followup">
-            <el-icon><Notebook /></el-icon>
-            <template #title>笔记</template>
-          </el-menu-item>
           <div class="menu-divider"></div>
           
           <!-- Theme Toggle Button -->
@@ -79,7 +75,7 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting, Notebook, Cellphone, MoonNight, Sunrise, PieChart, MagicStick } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting, Cellphone, MoonNight, Sunrise, PieChart, MagicStick } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import { useTheme } from '@/composables/useTheme'
 import { ref, onMounted, onUnmounted } from 'vue'

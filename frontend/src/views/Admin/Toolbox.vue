@@ -94,9 +94,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
-  DataAnalysis, Trophy, CircleCheck, 
+  DataAnalysis, Trophy, CircleCheck, Notebook,
   ArrowRight, MagicStick, Timer, Fold, Expand
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
@@ -106,6 +107,7 @@ import LotteryManagerDrawer from '@/views/Admin/components/LotteryManagerDrawer.
 import { ElMessage } from 'element-plus'
 
 const { isCollapse, toggleSidebar } = useSidebar()
+const router = useRouter()
 
 // Tools Configuration
 const tools = [
@@ -124,6 +126,14 @@ const tools = [
     icon: 'Trophy',
     bgColor: '#fff7ed', // orange-50
     color: '#f97316'    // orange-500
+  },
+  {
+    id: 'followup',
+    title: '笔记',
+    desc: '查看和管理会议笔记（仅 Web 端使用）',
+    icon: 'Notebook',
+    bgColor: '#f5f3ff', // violet-50
+    color: '#8b5cf6'    // violet-500
   },
   {
     id: 'signin',
@@ -156,7 +166,9 @@ const currentMeeting = computed(() => {
 })
 
 const handleToolClick = (tool) => {
-  if (tool.id === 'vote' || tool.id === 'lottery') {
+  if (tool.id === 'followup') {
+    router.push('/admin/followup')
+  } else if (tool.id === 'vote' || tool.id === 'lottery') {
     activeToolId.value = tool.id
     openMeetingSelect()
   } else {

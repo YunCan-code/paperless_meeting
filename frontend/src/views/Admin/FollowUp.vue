@@ -5,10 +5,10 @@
         <el-button 
           class="collapse-btn" 
           link 
-          @click="toggleSidebar"
+          @click="goBackToToolbox"
         >
           <el-icon size="24" color="#64748b">
-            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+            <ArrowLeft />
           </el-icon>
         </el-button>
         <el-divider direction="vertical" class="header-divider" />
@@ -83,12 +83,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus, MoreFilled, Fold, Expand } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { Plus, MoreFilled, ArrowLeft } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useSidebar } from '@/composables/useSidebar'
 
-const { isCollapse, toggleSidebar } = useSidebar()
+const router = useRouter()
 
 const notes = ref([])
 const dialogVisible = ref(false)
@@ -115,6 +115,10 @@ const openCreate = () => {
     isEdit.value = false
     form.value = { title: '', content: '' }
     dialogVisible.value = true
+}
+
+const goBackToToolbox = () => {
+    router.push('/admin/toolbox')
 }
 
 const handleCommand = (cmd, note) => {
