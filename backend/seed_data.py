@@ -3,12 +3,17 @@
 用法:
   本地:  cd backend && python seed_data.py
   Docker: docker compose exec backend python seed_data.py
+
+  强制重置（清空旧数据）:
+  本地:  cd backend && python seed_data.py --force
+  Docker: docker compose exec backend python seed_data.py --force
 """
 
 import json
 import random
-from datetime import datetime, timedelta
-from sqlmodel import Session, select
+import sys
+from datetime import datetime
+from sqlmodel import Session, select, delete
 from database import engine
 from models import User, MeetingType, Meeting, MeetingAttendeeLink
 
@@ -347,13 +352,24 @@ MEETINGS_TEMPLATE = [
 ]
 
 
-def seed():
+def seed(force: bool = False):
     with Session(engine) as session:
         # 检查是否已有数据
         existing = session.exec(select(User)).first()
         if existing:
-            print("⚠️  数据库中已有用户数据，跳过种子填充。如需重新生成，请先清空相关表。")
-            return
+            if not force:
+                print("⚠️  数据库中已有用户数据，跳过种子填充。")
+                print("    如需重新生成，请使用 --force 参数：")
+                print("    docker compose exec backend python seed_data.py --force")
+                return
+            else:
+                print("🗑️  --force 模式：清空旧数据...")
+                session.exec(delete(MeetingAttendeeLink))
+                session.exec(delete(Meeting))
+                session.exec(delete(MeetingType))
+                session.exec(delete(User))
+                session.commit()
+                print("    ✅ 旧数据已清空")
 
         print("🌱 开始填充种子数据...")
 
@@ -446,4 +462,5 @@ def seed():
 
 
 if __name__ == "__main__":
-    seed()
+    force = "--force" in sys.argv
+    seed(force=force)
