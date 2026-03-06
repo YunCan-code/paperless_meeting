@@ -61,11 +61,14 @@ def _to_read(item: MediaItem, session: Session) -> MediaItemRead:
 def list_items(
     parent_id: Optional[int] = None,
     kind: Optional[str] = None,
+    visible_on_android: Optional[bool] = None,
     session: Session = Depends(get_session),
 ):
     stmt = select(MediaItem).where(MediaItem.parent_id == parent_id)
     if kind and kind != "all":
         stmt = stmt.where(MediaItem.kind == kind)
+    if visible_on_android is not None:
+        stmt = stmt.where(MediaItem.visible_on_android == visible_on_android)
     stmt = stmt.order_by(MediaItem.kind, MediaItem.updated_at.desc())
     items = session.exec(stmt).all()
     return [_to_read(i, session) for i in items]

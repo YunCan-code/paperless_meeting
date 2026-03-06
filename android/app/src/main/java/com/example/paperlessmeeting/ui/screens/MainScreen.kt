@@ -41,6 +41,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     val items = listOf(
         Screen.Dashboard,
         Screen.Meetings,
+        Screen.Media,
         Screen.Settings
     )
 
@@ -167,6 +168,9 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         meetingTypeName = typeName,
                         navController = navController
                     )
+                }
+                composable(Screen.Media.route) {
+                    com.example.paperlessmeeting.ui.screens.media.MediaScreen()
                 }
                 composable(Screen.Settings.route) {
                     com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(navController = navController, onLogout = onLogout)

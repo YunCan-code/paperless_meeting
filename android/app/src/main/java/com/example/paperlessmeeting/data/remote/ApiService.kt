@@ -112,6 +112,19 @@ interface ApiService {
     @GET("checkin/today/{userId}")
     suspend fun getTodayStatus(@retrofit2.http.Path("userId") userId: Int): com.example.paperlessmeeting.domain.model.TodayStatusResponse
 
+    // ===== Media API =====
+    @GET("media/items")
+    suspend fun getMediaItems(
+        @retrofit2.http.Query("parent_id") parentId: Int? = null,
+        @retrofit2.http.Query("kind") kind: String? = null,
+        @retrofit2.http.Query("visible_on_android") visibleOnAndroid: Boolean? = null
+    ): List<com.example.paperlessmeeting.domain.model.MediaItem>
+
+    @GET("media/ancestors/{item_id}")
+    suspend fun getMediaAncestors(
+        @retrofit2.http.Path("item_id") itemId: Int
+    ): List<com.example.paperlessmeeting.domain.model.MediaBreadcrumb>
+
     // ===== Dashboard API =====
     @GET("dashboard/stats/{userId}")
     suspend fun getDashboardStats(
