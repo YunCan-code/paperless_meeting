@@ -338,16 +338,15 @@ onMounted(fetchTypes)
 }
 
 .page-title {
-  font-size: 26px;
-  font-weight: 700;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
   color: var(--text-main);
-  margin: 0 0 4px 0;
-  letter-spacing: -0.5px;
   line-height: 1.2;
 }
 .page-subtitle {
   color: var(--text-secondary);
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.4;
 }

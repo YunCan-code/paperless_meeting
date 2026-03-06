@@ -228,24 +228,32 @@ const formatDate = (str) => {
 
 <style scoped>
 .toolbox-page {
-  padding: 8px; 
+  padding: 0;
 }
 .page-header {
   display: flex;
-  align-items: center;
-  margin-bottom: 32px;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 24px;
+  padding: 0 4px;
 }
 .header-left { display: flex; align-items: center; gap: 12px; }
+.collapse-btn { padding: 8px; border-radius: 8px; transition: background-color 0.2s; height: auto; }
+.collapse-btn:hover { background-color: var(--bg-main, #f8fafc); }
+.header-divider { height: 24px; border-color: var(--border-color, #e2e8f0); margin: 0 4px; }
+.title-group { display: flex; flex-direction: column; }
 .page-title {
+  margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: var(--text-main);
-  margin: 0 0 8px 0;
+  color: var(--text-main, #0f172a);
+  line-height: 1.2;
 }
 .page-subtitle {
-  color: var(--text-secondary);
+  margin: 4px 0 0;
+  color: var(--text-secondary, #64748b);
   font-size: 14px;
-  margin: 0;
+  line-height: 1.4;
 }
 
 .tool-card {

@@ -169,7 +169,7 @@ onMounted(fetchNotes)
 </script>
 
 <style scoped>
-.follow-up-page { padding: 0 10px; }
+.follow-up-page { padding: 0; }
 
 /* Page Header */
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; padding: 0 4px; }

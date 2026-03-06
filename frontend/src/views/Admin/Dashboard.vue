@@ -44,6 +44,10 @@
             <el-icon><Cellphone /></el-icon>
             <template #title>设备管理</template>
           </el-menu-item>
+          <el-menu-item index="/admin/media">
+            <el-icon><VideoCamera /></el-icon>
+            <template #title>媒体</template>
+          </el-menu-item>
           <el-menu-item index="/admin/toolbox">
             <el-icon><MagicStick /></el-icon>
             <template #title>快捷功能</template>
@@ -75,7 +79,7 @@
 </template>
 
 <script setup>
-import { Calendar, User, List, Monitor, Fold, Expand, Setting, Cellphone, MoonNight, Sunrise, PieChart, MagicStick } from '@element-plus/icons-vue'
+import { Calendar, User, List, Monitor, Fold, Expand, Setting, Cellphone, MoonNight, Sunrise, PieChart, MagicStick, VideoCamera } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import { useTheme } from '@/composables/useTheme'
 import { ref, onMounted, onUnmounted } from 'vue'

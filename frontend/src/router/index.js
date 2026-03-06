@@ -44,6 +44,11 @@ const router = createRouter({
                     component: () => import('../views/Admin/DeviceManage.vue')
                 },
                 {
+                    path: 'media',
+                    name: 'media',
+                    component: () => import('../views/Admin/Media.vue')
+                },
+                {
                     path: 'toolbox',
                     name: 'toolbox',
                     component: () => import('../views/Admin/Toolbox.vue')

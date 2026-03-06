@@ -352,3 +352,44 @@ class LotteryParticipant(SQLModel, table=True):
     is_winner: bool = Field(default=False) # 是否已中奖 (防止重复中奖)
     winning_lottery_id: Optional[int] = Field(default=None) # 中奖轮次ID (用于区分不同轮次变色)
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+# ==================== 媒体库模型 ====================
+
+class MediaItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    kind: str  # "folder" / "image" / "video"
+    title: str
+    parent_id: Optional[int] = Field(default=None, foreign_key="mediaitem.id", index=True)
+    filename: Optional[str] = None
+    file_path: Optional[str] = None
+    file_size: int = Field(default=0)
+    content_type: Optional[str] = None
+    extension: Optional[str] = None
+    visible_on_android: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class MediaItemRead(SQLModel):
+    id: int
+    kind: str
+    title: str
+    parent_id: Optional[int]
+    extension: Optional[str]
+    file_size: int
+    visible_on_android: bool
+    created_at: datetime
+    updated_at: datetime
+    size: str = ""
+    previewUrl: str = ""
+    children_count: int = 0
+
+
+class MediaItemUpdate(SQLModel):
+    title: Optional[str] = None
+    visible_on_android: Optional[bool] = None
+
+
+class MediaItemMove(SQLModel):
+    parent_id: Optional[int] = None
