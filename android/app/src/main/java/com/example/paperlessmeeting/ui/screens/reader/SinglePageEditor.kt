@@ -49,7 +49,12 @@ private val HighlighterColors = listOf(
 )
 
 private const val HIGHLIGHTER_ALPHA = 0.35f
-private const val HIGHLIGHTER_WIDTH = 24f
+
+private enum class HighlighterSize(val width: Float, val dotWidth: Float, val dotHeight: Float) {
+    THIN(12f, 8f, 4f),
+    MEDIUM(24f, 12f, 6f),
+    THICK(40f, 18f, 8f),
+}
 
 private enum class StrokeSize(val width: Float, val dotSize: Float) {
     THIN(3f, 6f),
@@ -123,6 +128,7 @@ fun InlineAnnotationOverlay(
     var selectedColor by remember { mutableStateOf(PenColors[0]) }
     var highlighterColor by remember { mutableStateOf(HighlighterColors[0]) }
     var strokeSize by remember { mutableStateOf(StrokeSize.MEDIUM) }
+    var highlighterSize by remember { mutableStateOf(HighlighterSize.MEDIUM) }
 
     val canMap = pageRenderWidth > 0f && pageRenderHeight > 0f
 
@@ -132,7 +138,7 @@ fun InlineAnnotationOverlay(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(toolMode, strokeSize, selectedColor, highlighterColor, pageIndex, canMap) {
+                .pointerInput(toolMode, strokeSize, highlighterSize, selectedColor, highlighterColor, pageIndex, canMap) {
                     if (!canMap) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -188,7 +194,7 @@ fun InlineAnnotationOverlay(
                                 strokes = strokes + AnnotationStroke(
                                     points = normalizedPoints,
                                     color = activeColor.toArgb(),
-                                    strokeWidth = if (isHL) HIGHLIGHTER_WIDTH else strokeSize.width,
+                                    strokeWidth = if (isHL) highlighterSize.width else strokeSize.width,
                                     isHighlighter = isHL
                                 )
                             }
@@ -236,7 +242,7 @@ fun InlineAnnotationOverlay(
                 val isHL = toolMode == ToolMode.HIGHLIGHTER
                 val drawColor = if (isHL)
                     highlighterColor.copy(alpha = HIGHLIGHTER_ALPHA) else selectedColor
-                val drawWidth = if (isHL) HIGHLIGHTER_WIDTH else strokeSize.width
+                val drawWidth = if (isHL) highlighterSize.width else strokeSize.width
                 val cap = if (isHL) StrokeCap.Square else StrokeCap.Round
                 drawPath(
                     path = path,
@@ -381,6 +387,28 @@ fun InlineAnnotationOverlay(
                                     )
                                     .clickable { highlighterColor = color }
                             )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        VerticalDivider(modifier = Modifier.height(28.dp), color = Color.LightGray)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        HighlighterSize.entries.forEach { size ->
+                            val isSel = highlighterSize == size
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSel) highlighterColor.copy(alpha = 0.18f) else Color.Transparent)
+                                    .clickable { highlighterSize = size },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(size.dotWidth.dp)
+                                        .height(size.dotHeight.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(if (isSel) highlighterColor.copy(alpha = 0.7f) else OverlayIconGrey.copy(alpha = 0.4f))
+                                )
+                            }
                         }
                     }
                     ToolMode.ERASER -> {
