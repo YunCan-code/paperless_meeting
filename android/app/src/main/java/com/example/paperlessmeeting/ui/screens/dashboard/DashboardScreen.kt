@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -121,26 +122,31 @@ fun DashboardContent(
         now.format(DateTimeFormatter.ofPattern("yy年MM月dd日 EEEE", Locale.CHINA))
     }
 
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val isPhone = screenWidthDp < 600
+    val contentPadding = if (isPhone) 16.dp else 24.dp
+    val heroCardHeight = if (isPhone) 160.dp else 200.dp
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp)
+            .padding(contentPadding)
     ) {
         // 1. Header
         Text(
             text = "$greeting, ${state.userName}",
-            style = MaterialTheme.typography.headlineMedium,
+            style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
             text = "今天是 $currentDate",
-            style = MaterialTheme.typography.bodyLarge,
+            style = if (isPhone) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(if (isPhone) 20.dp else 32.dp))
 
         // 2. Hero Card (Up Next)
         Text(
@@ -148,11 +154,10 @@ fun DashboardContent(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         if (state.activeMeetings.isNotEmpty()) {
             val actualCount = state.activeMeetings.size
-            // 使用适中的页数模拟循环轮播 (避免Int.MAX_VALUE导致内存溢出)
             val loopMultiplier = 1000
             val virtualPageCount = if (actualCount > 1) actualCount * loopMultiplier else 1
             val startPage = if (actualCount > 1) (virtualPageCount / 2) - ((virtualPageCount / 2) % actualCount) + state.initialPageIndex else 0
@@ -172,8 +177,8 @@ fun DashboardContent(
             Column {
                 HorizontalPager(
                     state = pagerState,
-                    pageSpacing = 16.dp,
-                    modifier = Modifier.fillMaxWidth().height(200.dp) 
+                    pageSpacing = if (isPhone) 12.dp else 16.dp,
+                    modifier = Modifier.fillMaxWidth().height(heroCardHeight) 
                 ) { virtualPage ->
                     // 取模映射到实际索引
                     val actualPage = virtualPage % actualCount
@@ -210,11 +215,10 @@ fun DashboardContent(
                 }
             }
         } else {
-             // Improved Empty State
              Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(if (isPhone) 120.dp else 160.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.linearGradient(
@@ -244,7 +248,7 @@ fun DashboardContent(
              }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(if (isPhone) 16.dp else 24.dp))
 
         // Quick Actions Card
         Text(
@@ -252,7 +256,7 @@ fun DashboardContent(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -289,7 +293,7 @@ fun DashboardContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(if (isPhone) 20.dp else 32.dp))
 
         // 3. Recent Reading (Using reading progress)
         Text(
@@ -297,7 +301,7 @@ fun DashboardContent(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         
         if (state.readingProgress.isNotEmpty()) {
             LazyRow(
@@ -341,7 +345,7 @@ fun DashboardContent(
             }
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }
 
@@ -451,13 +455,16 @@ fun QuickActionButton(
     label: String,
     onClick: () -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val btnSize = if (isPhone) 48.dp else 56.dp
+    val iconSize = if (isPhone) 24.dp else 28.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(8.dp)
     ) {
         FilledTonalIconButton(
             onClick = onClick,
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(btnSize),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             )
@@ -465,7 +472,7 @@ fun QuickActionButton(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(iconSize),
                 tint = MaterialTheme.colorScheme.primary
             )
         }

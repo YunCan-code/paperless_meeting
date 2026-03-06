@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -49,13 +50,15 @@ fun SettingsScreen(
     val passwordSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val profileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    val isPhone = LocalConfiguration.current.screenWidthDp < 600
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { 
                     Text(
                         "设置", 
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
                     ) 
                 },
@@ -73,7 +76,7 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
+            contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             // 1. Profile Card
             item {

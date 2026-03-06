@@ -16,19 +16,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayCircleFilled
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,7 +53,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.domain.model.MediaItem
+import androidx.compose.ui.platform.LocalConfiguration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -84,22 +81,25 @@ fun MediaScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var previewItem by remember { mutableStateOf<MediaItem?>(null) }
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val isPhone = screenWidthDp < 600
+    val hPadding = if (isPhone) 16.dp else 28.dp
+    val vPadding = if (isPhone) 16.dp else 24.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp, vertical = 24.dp)
+                .padding(horizontal = hPadding, vertical = vPadding)
         ) {
-            // Header — GoodNotes style large title
             Text(
                 text = if (uiState.currentFolderId == null) "媒体" else uiState.breadcrumbs.lastOrNull()?.title ?: "媒体",
-                style = MaterialTheme.typography.headlineLarge,
+                style = if (isPhone) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(if (isPhone) 14.dp else 20.dp))
 
             // Breadcrumbs (only when inside a folder)
             if (uiState.currentFolderId != null) {
@@ -117,9 +117,8 @@ fun MediaScreen(
                 onFilterChange = { viewModel.setFilter(it) }
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(if (isPhone) 16.dp else 24.dp))
 
-            // Content
             when {
                 uiState.isLoading -> {
                     Box(
@@ -172,10 +171,10 @@ fun MediaScreen(
                 }
                 else -> {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 150.dp),
-                        contentPadding = PaddingValues(bottom = 32.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                        columns = GridCells.Adaptive(minSize = if (isPhone) 100.dp else 150.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isPhone) 16.dp else 24.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(uiState.items, key = { it.id }) { item ->
@@ -195,33 +194,7 @@ fun MediaScreen(
             }
         }
 
-        // Floating back button when inside a folder
-        if (uiState.currentFolderId != null) {
-            IconButton(
-                onClick = {
-                    val crumbs = uiState.breadcrumbs
-                    if (crumbs.size >= 2) {
-                        viewModel.goToBreadcrumb(crumbs[crumbs.size - 2])
-                    } else {
-                        viewModel.goToRoot()
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(28.dp)
-                    .size(48.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        CircleShape
-                    )
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
+    
     }
 
     if (previewItem != null) {
@@ -383,25 +356,35 @@ private fun FolderThumbnail() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1f),
+            .aspectRatio(1.25f),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
-        ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val r = w * 0.08f
+            val r = w * 0.06f
 
-            // Back panel (slightly larger, offset up)
+            // Shadow
+            val shadowPath = Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        rect = Rect(
+                            offset = Offset(w * 0.02f, h * 0.22f),
+                            size = Size(w * 0.96f, h * 0.78f)
+                        ),
+                        cornerRadius = CornerRadius(r, r)
+                    )
+                )
+            }
+            drawPath(shadowPath, color = FolderBlueDark.copy(alpha = 0.15f))
+
+            // Back panel
             val backPath = Path().apply {
                 addRoundRect(
                     RoundRect(
                         rect = Rect(
-                            offset = Offset(0f, h * 0.08f),
-                            size = Size(w, h * 0.88f)
+                            offset = Offset(w * 0.02f, h * 0.12f),
+                            size = Size(w * 0.96f, h * 0.82f)
                         ),
                         cornerRadius = CornerRadius(r, r)
                     )
@@ -409,35 +392,39 @@ private fun FolderThumbnail() {
             }
             drawPath(backPath, color = FolderBlueDark)
 
-            // Tab on top-left
+            // Tab
+            val tabW = w * 0.38f
             val tabPath = Path().apply {
-                moveTo(0f, h * 0.15f + r)
-                quadraticBezierTo(0f, h * 0.15f, r, h * 0.15f)
-                lineTo(w * 0.35f, h * 0.15f)
-                quadraticBezierTo(w * 0.40f, h * 0.15f, w * 0.42f, h * 0.22f)
-                lineTo(w - r, h * 0.22f)
-                quadraticBezierTo(w, h * 0.22f, w, h * 0.22f + r)
-                lineTo(w, h - r)
-                quadraticBezierTo(w, h, w - r, h)
-                lineTo(r, h)
-                quadraticBezierTo(0f, h, 0f, h - r)
+                moveTo(w * 0.06f, h * 0.12f)
+                lineTo(w * 0.06f, h * 0.04f + r * 0.6f)
+                quadraticBezierTo(w * 0.06f, h * 0.04f, w * 0.06f + r * 0.6f, h * 0.04f)
+                lineTo(w * 0.06f + tabW - r, h * 0.04f)
+                quadraticBezierTo(w * 0.06f + tabW, h * 0.04f, w * 0.06f + tabW + r * 0.4f, h * 0.12f)
                 close()
             }
-            drawPath(tabPath, color = FolderBlue)
+            drawPath(tabPath, color = FolderBlueDark)
 
-            // Front panel highlight (lighter strip at top of body)
-            val highlightPath = Path().apply {
+            // Front body
+            val bodyPath = Path().apply {
                 addRoundRect(
                     RoundRect(
                         rect = Rect(
-                            offset = Offset(w * 0.04f, h * 0.24f),
-                            size = Size(w * 0.92f, h * 0.12f)
+                            offset = Offset(0f, h * 0.20f),
+                            size = Size(w, h * 0.80f)
                         ),
-                        cornerRadius = CornerRadius(r * 0.5f, r * 0.5f)
+                        cornerRadius = CornerRadius(r, r)
                     )
                 )
             }
-            drawPath(highlightPath, color = FolderBlueLight.copy(alpha = 0.5f))
+            drawPath(bodyPath, color = FolderBlue)
+
+            // Top edge highlight
+            drawRoundRect(
+                color = FolderBlueLight.copy(alpha = 0.6f),
+                topLeft = Offset(w * 0.04f, h * 0.22f),
+                size = Size(w * 0.92f, h * 0.06f),
+                cornerRadius = CornerRadius(r * 0.4f, r * 0.4f)
+            )
         }
     }
 }

@@ -1,9 +1,11 @@
 package com.example.paperlessmeeting.ui.screens.detail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.platform.LocalContext
 import com.example.paperlessmeeting.ui.components.PdfThumbnail
@@ -40,13 +42,21 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -177,302 +187,304 @@ fun MeetingDetailContent(
     onAttachmentClick: (String, String) -> Unit
 ) {
     val context = LocalContext.current
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Hero Image Area
-        val bgImage = meeting.cardImageUrl ?: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val isPhone = screenWidthDp < 600
+    val isWideScreen = screenWidthDp > 700
+    val heroHeight = if (isPhone) 200.dp else 280.dp
+    val heroHeightPx = with(LocalDensity.current) { heroHeight.toPx() }
+    val scrollState = rememberScrollState()
+    val bgImage = meeting.cardImageUrl ?: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
+
+    val collapseProgress by remember {
+        derivedStateOf { (scrollState.value / heroHeightPx).coerceIn(0f, 1f) }
+    }
+
+    val EmptySection: @Composable (String) -> Unit = { text ->
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AsyncImage(
-                model = bgImage,
+            Icon(
+                imageVector = Icons.Default.Inbox,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                tint = Color.LightGray.copy(alpha = 0.5f),
+                modifier = Modifier.size(40.dp)
             )
-            
-            // Gradient Overlay for Text Visibility
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.2f),
-                                Color.Black.copy(alpha = 0.1f),
-                                Color.Black.copy(alpha = 0.6f)
-                            )
-                        )
-                    )
-            )
-
-            // TOP LEFT: Status + Type Badges
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MeetingStatusBadge(status = meeting.getUiStatus())
-                if (!meeting.meetingTypeName.isNullOrEmpty()) {
-                    androidx.compose.material3.Surface(
-                       color = Color.White.copy(alpha = 0.2f),
-                       shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                    ) {
-                         Text(
-                             text = meeting.meetingTypeName,
-                             style = MaterialTheme.typography.labelMedium,
-                             color = Color.White,
-                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                         )
-                    }
-                }
-            }
-
-            // BOTTOM: Title + Location + Time
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                // Title
-                Text(
-                    text = meeting.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // Location & Time Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Location
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = meeting.location ?: "地点待定",
-                            color = Color.White.copy(alpha = 0.9f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    
-                    // Time
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = try {
-                                java.time.LocalDateTime.parse(meeting.startTime.substringBefore("."))
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                            } catch (e: Exception) {
-                                meeting.startTime.substringBefore("T")
-                            },
-                            color = Color.White.copy(alpha = 0.9f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.height(8.dp))
+            Text(text, color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
         }
+    }
 
-        // Content Body
-        // Content Body
-        BoxWithConstraints(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-            val isWideScreen = maxWidth > 700.dp
-            
-            // Define sections as local composables to reuse logic
-            // Define sections as local composables to reuse logic
-            val EmptySection: @Composable (String) -> Unit = { text ->
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Inbox,
-                        contentDescription = null,
-                        tint = Color.LightGray.copy(alpha = 0.5f),
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(text, color = Color.LightGray, style = MaterialTheme.typography.bodyMedium)
-                }
+    var attendeesExpanded by remember { mutableStateOf(false) }
+    val maxVisibleAttendees = 5
+
+    val InfoSectionContent: @Composable () -> Unit = {
+        SectionHeader(title = "与会人员")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val attendeesList = meeting.attendees?.sortedBy {
+            when (it.meetingRole) {
+                "主讲人" -> 0
+                "特邀嘉宾" -> 1
+                "参会人员" -> 2
+                else -> 3
             }
+        } ?: emptyList()
 
-            val InfoSectionContent: @Composable () -> Unit = {
-                SectionHeader(title = "参会信息")
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                val attendeesList = meeting.attendees?.sortedBy {
-                    when(it.meetingRole) {
-                        "主讲人" -> 0
-                        "特邀嘉宾" -> 1
-                        "参会人员" -> 2
-                        else -> 3
-                    }
-                } ?: emptyList()
-                
-                if (attendeesList.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        attendeesList.forEach { attendee ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "· ${attendee.name}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.width(80.dp)
-                                )
-                                androidx.compose.material3.Surface(
-                                    color = when(attendee.meetingRole) {
-                                        "主讲人" -> Color(0xFFFFF3E0)
-                                        "特邀嘉宾" -> Color(0xFFF3E5F5)
-                                        else -> Color(0xFFE3F2FD)
-                                    },
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = attendee.meetingRole,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = when(attendee.meetingRole) {
-                                            "主讲人" -> Color(0xFFE65100)
-                                            "特邀嘉宾" -> Color(0xFF4A148C)
-                                            else -> Color(0xFF0D47A1)
-                                        },
-                                        modifier = Modifier.padding(horizontal=6.dp, vertical=2.dp)
-                                    )
-                                }
-                            }
+        if (attendeesList.isNotEmpty()) {
+            val displayList = if (attendeesExpanded || attendeesList.size <= maxVisibleAttendees)
+                attendeesList else attendeesList.take(maxVisibleAttendees)
+            val remainingCount = attendeesList.size - maxVisibleAttendees
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                displayList.forEach { attendee ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "· ${attendee.name}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.width(80.dp)
+                        )
+                        androidx.compose.material3.Surface(
+                            color = when (attendee.meetingRole) {
+                                "主讲人" -> Color(0xFFFFF3E0)
+                                "特邀嘉宾" -> Color(0xFFF3E5F5)
+                                else -> Color(0xFFE3F2FD)
+                            },
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = attendee.meetingRole,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = when (attendee.meetingRole) {
+                                    "主讲人" -> Color(0xFFE65100)
+                                    "特邀嘉宾" -> Color(0xFF4A148C)
+                                    else -> Color(0xFF0D47A1)
+                                },
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
                     }
-                } else if (!meeting.speaker.isNullOrEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                        Text(meeting.speaker)
-                    }
-                } else {
-                    EmptySection("暂无参会人员信息")
+                }
+                if (!attendeesExpanded && remainingCount > 0) {
+                    Text(
+                        text = "...还有 $remainingCount 人，点击展开",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { attendeesExpanded = true }
+                            .padding(vertical = 4.dp)
+                    )
+                } else if (attendeesExpanded && attendeesList.size > maxVisibleAttendees) {
+                    Text(
+                        text = "收起",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { attendeesExpanded = false }
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
-            
-            val AgendaSectionContent: @Composable () -> Unit = {
-                 val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
-                 val hasValidDescription = !meeting.description.isNullOrEmpty()
-                 
-                 SectionHeader(title = "会议内容 / 议程")
-                 Spacer(modifier = Modifier.height(8.dp))
+        } else if (!meeting.speaker.isNullOrEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("主讲人： ", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(meeting.speaker)
+            }
+        } else {
+            EmptySection("暂无参会人员信息")
+        }
+    }
 
-                 if (hasValidAgenda || hasValidDescription) {
-                    if (hasValidAgenda) {
-                        val agendaItems = parseAgenda(meeting.agenda!!)
-                        if (agendaItems.isNotEmpty()) {
-                            agendaItems.forEach { item ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    if (item.time.isNotEmpty()) {
-                                        Text(
-                                            text = item.time,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.width(60.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = item.content,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        lineHeight = 24.sp
-                                    )
-                                }
+    val AgendaSectionContent: @Composable () -> Unit = {
+        val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
+        val hasValidDescription = !meeting.description.isNullOrEmpty()
+
+        SectionHeader(title = "会议内容 / 议程")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (hasValidAgenda || hasValidDescription) {
+            if (hasValidAgenda) {
+                val agendaItems = parseAgenda(meeting.agenda!!)
+                if (agendaItems.isNotEmpty()) {
+                    agendaItems.forEach { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            if (item.time.isNotEmpty()) {
+                                Text(
+                                    text = item.time,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.width(60.dp)
+                                )
                             }
-                        } else if (hasValidDescription) {
                             Text(
-                                text = meeting.description!!,
+                                text = item.content,
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 lineHeight = 24.sp
                             )
                         }
-                    } else if (hasValidDescription) {
-                        Text(
-                            text = meeting.description!!,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 24.sp
-                        )
                     }
-                 } else {
-                     EmptySection("暂无议程安排")
-                 }
-            }
-            
-            val MaterialsSectionContent: @Composable () -> Unit = {
-                SectionHeader(title = "会议资料")
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                if (!meeting.attachments.isNullOrEmpty()) {
-                    meeting.attachments.forEach { file ->
-                        val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
-                        val fullUrl = "${BuildConfig.STATIC_BASE_URL}$encodedName"
-                        
-                        // Check for local cached file using exact logic from ReaderViewModel
-                        val extension = file.filename.substringAfterLast(".", "pdf")
-                        val uniqueName = "${fullUrl.hashCode()}.$extension"
-                        val localFile = File(context.cacheDir, uniqueName)
-                        
-                        FileItem(
-                            name = file.displayName, 
-                            size = formatFileSize(file.fileSize),
-                            localFile = if (localFile.exists()) localFile else null,
-                            onClick = { onAttachmentClick(fullUrl, file.displayName) }
-                        )
-                    }
-                } else {
-                     Text(
-                        text = "本次会议暂无上传附件",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                } else if (hasValidDescription) {
+                    Text(
+                        text = meeting.description!!,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 24.sp
                     )
+                }
+            } else if (hasValidDescription) {
+                Text(
+                    text = meeting.description!!,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 24.sp
+                )
+            }
+        } else {
+            EmptySection("暂无议程安排")
+        }
+    }
+
+    val MaterialsSectionContent: @Composable () -> Unit = {
+        SectionHeader(title = "会议资料")
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (!meeting.attachments.isNullOrEmpty()) {
+            meeting.attachments.forEach { file ->
+                val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
+                val fullUrl = "${BuildConfig.STATIC_BASE_URL}$encodedName"
+                val extension = file.filename.substringAfterLast(".", "pdf")
+                val uniqueName = "${fullUrl.hashCode()}.$extension"
+                val localFile = File(context.cacheDir, uniqueName)
+
+                FileItem(
+                    name = file.displayName,
+                    size = formatFileSize(file.fileSize),
+                    localFile = if (localFile.exists()) localFile else null,
+                    onClick = { onAttachmentClick(fullUrl, file.displayName) }
+                )
+            }
+        } else {
+            Text(
+                text = "本次会议暂无上传附件",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
+            // Hero image — participates in scrolling with parallax + fade
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(heroHeight)
+                    .graphicsLayer {
+                        translationY = scrollState.value * 0.5f
+                        alpha = 1f - collapseProgress
+                    }
+            ) {
+                AsyncImage(
+                    model = bgImage,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.2f),
+                                    Color.Black.copy(alpha = 0.1f),
+                                    Color.Black.copy(alpha = 0.6f)
+                                )
+                            )
+                        )
+                )
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MeetingStatusBadge(status = meeting.getUiStatus())
+                    if (!meeting.meetingTypeName.isNullOrEmpty()) {
+                        androidx.compose.material3.Surface(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = meeting.meetingTypeName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
+                    Text(
+                        text = meeting.title,
+                        style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LocationOn, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(meeting.location ?: "地点待定", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.DateRange, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = try {
+                                    java.time.LocalDateTime.parse(meeting.startTime.substringBefore("."))
+                                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                                } catch (_: Exception) { meeting.startTime.substringBefore("T") },
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
             }
 
-            val scrollState = rememberScrollState()
+            // Content body sections
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp)
-                    .verticalScroll(scrollState)
+                modifier = Modifier.padding(if (isPhone) 16.dp else 24.dp)
             ) {
                 if (isWideScreen) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(), 
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(48.dp)
                     ) {
                         Column(modifier = Modifier.weight(0.3f)) {
@@ -491,8 +503,34 @@ fun MeetingDetailContent(
                     Spacer(modifier = Modifier.height(32.dp))
                     MaterialsSectionContent()
                 }
-                
                 Spacer(modifier = Modifier.height(80.dp))
+            }
+        }
+
+        // Collapsed top bar — appears when hero scrolls out of view
+        AnimatedVisibility(
+            visible = collapseProgress > 0.85f,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    )
+                    .padding(horizontal = if (isPhone) 16.dp else 24.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = meeting.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(end = 48.dp)
+                )
             }
         }
     }
