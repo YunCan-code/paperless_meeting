@@ -6,15 +6,12 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
-import android.view.MotionEvent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -28,15 +25,13 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -48,8 +43,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.example.paperlessmeeting.ui.screens.reader.ReaderUiState
-import com.example.paperlessmeeting.ui.screens.reader.ReaderViewModel
 import com.github.barteksc.pdfviewer.PDFView
 import com.shockwave.pdfium.PdfDocument.Bookmark
 import kotlinx.coroutines.Dispatchers
@@ -112,10 +105,11 @@ fun ReaderScreen(
     var showOverlay by remember { mutableStateOf(true) }
     var isNightMode by remember { mutableStateOf(false) }
     
-    // Mode State: Reading or Editing
-    var isEditing by remember { mutableStateOf(false) }
-    var editPageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var editingPageIndex by remember { mutableIntStateOf(0) }
+    // Inline Annotation Mode
+    var isAnnotating by remember { mutableStateOf(false) }
+    var annotPageWidth by remember { mutableStateOf(0f) }
+    var annotPageHeight by remember { mutableStateOf(0f) }
+    var viewWidthPx by remember { mutableStateOf(0f) }
     
     var isHorizontalScroll by remember { mutableStateOf(false) } // Default Vertical
     
@@ -159,12 +153,12 @@ fun ReaderScreen(
     var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
 
     // --- Window Insets Logic (Immersive Mode) ---
-    LaunchedEffect(showOverlay) {
+    LaunchedEffect(showOverlay, isAnnotating) {
         val window = (context as? Activity)?.window
         if (window != null) {
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            if (showOverlay) {
+            if (showOverlay || isAnnotating) {
                 insetsController.show(WindowInsetsCompat.Type.systemBars())
             } else {
                 insetsController.hide(WindowInsetsCompat.Type.systemBars())
@@ -416,22 +410,16 @@ fun ReaderScreen(
                     }
                 }
                 is ReaderUiState.Ready -> {
+                    // Load saved annotations when document is ready
+                    LaunchedEffect(state.file) {
+                        viewModel.loadAnnotations(state.file)
+                    }
 
-                    if (isEditing && editPageBitmap != null) {
-                        // ====== MODE B: Focus/Edit Mode ======
-                        SinglePageEditor(
-                            bitmap = editPageBitmap!!,
-                            initialStrokes = pageAnnotations[editingPageIndex] ?: emptyList(),
-                            onCancel = { isEditing = false },
-                            onSave = { newStrokes ->
-                                viewModel.updatePageAnnotations(editingPageIndex, newStrokes)
-                                viewModel.saveAnnotations(state.file)
-                                isEditing = false
-                                // Invalidate PDFView to show updates logic handles by PDFView key/update
-                                pdfViewRef?.invalidate() 
-                            }
-                        )
-                    } else {
+                    // Reading mode is always rendered as the base layer
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { viewWidthPx = it.width.toFloat() }
+                    ) {
                         // ====== MODE A: Reading Mode ======
                         // 1. PDF Content
                         PDFViewerContent(
@@ -442,6 +430,12 @@ fun ReaderScreen(
                             currentPage = currentPage,
                             isProgrammaticScroll = isProgrammaticScroll,
                             pageAnnotations = pageAnnotations,
+                            isAnnotating = isAnnotating,
+                            annotatingPage = currentPage,
+                            onPageRenderInfo = { w, h ->
+                                annotPageWidth = w
+                                annotPageHeight = h
+                            },
                             onPdfViewReady = { pdfViewRef = it },
                             onPageChange = { page, count ->
                                 isProgrammaticScroll = false // User scrolled
@@ -454,20 +448,18 @@ fun ReaderScreen(
                                 }
                             },
                             onPdfLoaded = { count ->
-                                // Ensure totalPages is always set when PDF loads,
-                                // regardless of whether onPageChange fires
                                 totalPages = count
                             },
                             onTap = {
-                                showOverlay = !showOverlay
+                                if (!isAnnotating) showOverlay = !showOverlay
                             },
-                            onLoadToc = { list -> tocList = list }, // Load TOC from PDF
+                            onLoadToc = { list -> tocList = list },
                             modifier = Modifier.fillMaxSize()
                         )
 
-                        // 2. Floating Top Bar
+                        // 2. Floating Top Bar (hidden during annotation)
                         AnimatedVisibility(
-                            visible = showOverlay,
+                            visible = showOverlay && !isAnnotating,
                             enter = fadeIn() + slideInVertically { -it },
                             exit = fadeOut() + slideOutVertically { -it },
                             modifier = Modifier.align(Alignment.TopCenter)
@@ -485,9 +477,9 @@ fun ReaderScreen(
                             )
                         }
 
-                        // 3. Floating Bottom Capsule
+                        // 3. Floating Bottom Capsule (hidden during annotation)
                         AnimatedVisibility(
-                            visible = showOverlay,
+                            visible = showOverlay && !isAnnotating,
                             enter = fadeIn() + slideInVertically { it },
                             exit = fadeOut() + slideOutVertically { it },
                             modifier = Modifier
@@ -501,18 +493,12 @@ fun ReaderScreen(
                                 isNightMode = isNightMode,
                                 onTocClick = { scope.launch { drawerState.open() } }, // Open TOC
                                 onGridClick = { showThumbnailSheet = true },
-                                onPenClick = { 
-                                    // Enter Edit Mode Logic
-                                    scope.launch(Dispatchers.IO) {
-                                        val bmp = renderPdfPageToBitmap(state.file, currentPage)
-                                        if (bmp != null) {
-                                             withContext(Dispatchers.Main) {
-                                                 editPageBitmap = bmp
-                                                 editingPageIndex = currentPage
-                                                 isEditing = true
-                                             }
-                                        }
-                                    }
+                                onPenClick = {
+                                    isProgrammaticScroll = true
+                                    currentPage = currentPage // ensure jumpTo fires
+                                    pdfViewRef?.jumpTo(currentPage, false)
+                                    isAnnotating = true
+                                    showOverlay = true
                                 },
                                 onSettingsClick = { isNightMode = !isNightMode }
                             )
@@ -537,6 +523,35 @@ fun ReaderScreen(
                                ) 
                             }
                         }
+
+                        // 6. Inline Annotation Overlay
+                        AnimatedVisibility(
+                            visible = isAnnotating,
+                            enter = fadeIn(animationSpec = tween(200)),
+                            exit = fadeOut(animationSpec = tween(200))
+                        ) {
+                            val pageOffsetX = if (annotPageWidth > 0)
+                                (viewWidthPx - annotPageWidth) / 2f else 0f
+
+                            InlineAnnotationOverlay(
+                                pageIndex = currentPage,
+                                initialStrokes = pageAnnotations[currentPage] ?: emptyList(),
+                                pageRenderWidth = annotPageWidth,
+                                pageRenderHeight = annotPageHeight,
+                                pageOffsetX = pageOffsetX,
+                                pageOffsetY = 0f,
+                                onCancel = {
+                                    isAnnotating = false
+                                    pdfViewRef?.invalidate()
+                                },
+                                onSave = { newStrokes ->
+                                    viewModel.updatePageAnnotations(currentPage, newStrokes)
+                                    viewModel.saveAnnotations(state.file)
+                                    isAnnotating = false
+                                    pdfViewRef?.invalidate()
+                                }
+                            )
+                        }
                     }
                 }
                 else -> {}
@@ -549,7 +564,6 @@ fun ReaderScreen(
 //                              SUBCOMPONENTS
 // =========================================================================================
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PDFViewerContent(
     file: File,
@@ -559,6 +573,9 @@ fun PDFViewerContent(
     currentPage: Int,
     isProgrammaticScroll: Boolean,
     pageAnnotations: Map<Int, List<AnnotationStroke>>,
+    isAnnotating: Boolean = false,
+    annotatingPage: Int = 0,
+    onPageRenderInfo: (Float, Float) -> Unit = { _, _ -> },
     onPdfViewReady: (PDFView) -> Unit,
     onPageChange: (Int, Int) -> Unit,
     onPdfLoaded: (Int) -> Unit,
@@ -566,12 +583,14 @@ fun PDFViewerContent(
     onLoadToc: (List<Pair<Int, Bookmark>>) -> Unit,
     modifier: Modifier
 ) {
-    // Fix Stale Closure: Always access latest values via rememberUpdatedState
     val currentAnnotations by rememberUpdatedState(pageAnnotations)
     val currentPageState by rememberUpdatedState(currentPage)
     val currentOnPageChange by rememberUpdatedState(onPageChange)
     val currentOnPdfLoaded by rememberUpdatedState(onPdfLoaded)
     val currentOnLoadToc by rememberUpdatedState(onLoadToc)
+    val currentIsAnnotating by rememberUpdatedState(isAnnotating)
+    val currentAnnotatingPage by rememberUpdatedState(annotatingPage)
+    val currentOnPageRenderInfo by rememberUpdatedState(onPageRenderInfo)
 
     // Local ref for page jumping
     var localPdfViewRef by remember { mutableStateOf<PDFView?>(null) }
@@ -622,18 +641,32 @@ fun PDFViewerContent(
                              currentOnPdfLoaded(nbPages)
                         }
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
-                             // Render Saved Annotations (PDF Coordinates -> View Coordinates)
-                             // Logic: The points are 0-1 relative to page.
-                             // Canvas here is already transformed to the page's local space.
-                             
+                             // Report page render dimensions for inline annotation overlay
+                             if (pageIdx == currentPageState) {
+                                 currentOnPageRenderInfo(pageWidth, pageHeight)
+                             }
+
+                             // Skip rendering strokes on the annotating page
+                             // (the overlay Canvas handles it to avoid double-drawing)
+                             if (currentIsAnnotating && pageIdx == currentAnnotatingPage) return@onDraw
+
                              currentAnnotations[pageIdx]?.forEach { stroke ->
                                  val paint = Paint().apply {
-                                     color = stroke.color
                                      style = Paint.Style.STROKE
                                      strokeWidth = stroke.strokeWidth
-                                     strokeCap = Paint.Cap.ROUND
                                      strokeJoin = Paint.Join.ROUND
                                      isAntiAlias = true
+                                     if (stroke.isHighlighter) {
+                                         color = stroke.color
+                                         alpha = 90
+                                         strokeCap = Paint.Cap.SQUARE
+                                         xfermode = android.graphics.PorterDuffXfermode(
+                                             android.graphics.PorterDuff.Mode.MULTIPLY
+                                         )
+                                     } else {
+                                         color = stroke.color
+                                         strokeCap = Paint.Cap.ROUND
+                                     }
                                  }
                                  val path = Path()
                                  if (stroke.points.isNotEmpty()) {
@@ -666,34 +699,6 @@ fun PDFViewerContent(
                 localPdfViewRef?.jumpTo(currentPage, false)
             }
         }
-    }
-}
-
-// Helper: Render High-Res Bitmap of a PDF Page
-fun renderPdfPageToBitmap(file: File, pageIndex: Int): Bitmap? {
-    return try {
-        val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-        val renderer = PdfRenderer(fileDescriptor)
-        val page = renderer.openPage(pageIndex)
-        
-        // Render High Res (e.g. 2x screen width or fixed 1080p width)
-        // Let's assume a reasonable width for editing.
-        val width = 1500 
-        val height = (width * page.height / page.width.toFloat()).toInt()
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        
-        val canvas = android.graphics.Canvas(bitmap)
-        canvas.drawColor(android.graphics.Color.WHITE)
-        
-        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-        
-        page.close()
-        renderer.close()
-        fileDescriptor.close()
-        bitmap
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
     }
 }
 
@@ -843,12 +848,10 @@ fun FloatingControlCapsule(
                 }
 
                 // 3. Annotation (Pen)
-                /*
                 IconButton(onClick = onPenClick) {
                     val tint = if(isEditing) MaterialTheme.colorScheme.primary else IconGrey
                     Icon(Icons.Default.Edit, "Annotate", tint = tint)
                 }
-                */
 
                 // 4. Night Mode / Settings
                 IconButton(onClick = onSettingsClick) {
