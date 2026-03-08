@@ -138,11 +138,11 @@ const getTypeColor = (id) => {
 .today-sessions {
   border-radius: 16px;
   border: none;
-  background: var(--card-bg); /* Simplified from gradient to solid card background for consistency */
+  background: var(--card-bg);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 0;
 }
 
 :deep(.el-card__header) {

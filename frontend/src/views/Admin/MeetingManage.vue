@@ -50,24 +50,23 @@
 
     <!-- 主体区域: 日历 (2/3) + 今日会议 (1/3) -->
     <el-row :gutter="24" class="main-content-row">
-      <el-col :xs="24" :sm="24" :md="16" :span="16">
+      <el-col :xs="24" :sm="24" :md="16" :span="16" ref="calendarColRef">
         <SessionCalendar 
            :meetings="meetings" 
            @create="openCreate" 
            @select-date="(val) => currentSelectedDate = val"
         />
       </el-col>
-      <el-col :xs="24" :sm="24" :md="8" :span="8" :class="{ 'today-col': hasMeetingsToday }">
-        <div :class="{ 'today-wrapper': hasMeetingsToday }">
-          <TodayMeetings 
-             class="today-component"
-             :meetings="meetings" 
-             :meeting-types="meetingTypes" 
-             :date="currentSelectedDate"
-             @create="openCreate" 
-             @view="viewDetails" 
-          />
-        </div>
+      <el-col :xs="24" :sm="24" :md="8" :span="8" class="today-col">
+        <TodayMeetings 
+           class="today-component"
+           :meetings="meetings" 
+           :meeting-types="meetingTypes" 
+           :date="currentSelectedDate"
+           :style="calendarHeight ? { maxHeight: calendarHeight + 'px' } : {}"
+           @create="openCreate" 
+           @view="viewDetails" 
+        />
       </el-col>
     </el-row>
 
@@ -409,7 +408,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -471,13 +470,31 @@ const form = ref({
 
 const currentSelectedDate = ref(new Date())
 
-const hasMeetingsToday = computed(() => {
-  if (!meetings.value || meetings.value.length === 0) return false
-  const targetDateStr = currentSelectedDate.value.toDateString()
-  return meetings.value.some(m => {
-    if (!m.start_time) return false
-    return new Date(m.start_time).toDateString() === targetDateStr
+// 监听日历列高度，用于限制今日会议卡片最大高度
+const calendarColRef = ref(null)
+const calendarHeight = ref(0)
+let resizeObserver = null
+
+const updateCalendarHeight = () => {
+  const el = calendarColRef.value?.$el || calendarColRef.value
+  if (el) {
+    calendarHeight.value = el.offsetHeight
+  }
+}
+
+onMounted(() => {
+  nextTick(() => {
+    const el = calendarColRef.value?.$el || calendarColRef.value
+    if (el) {
+      updateCalendarHeight()
+      resizeObserver = new ResizeObserver(() => updateCalendarHeight())
+      resizeObserver.observe(el)
+    }
   })
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
 })
 
 // Stats State
@@ -846,25 +863,15 @@ const downloadFile = (file) => {
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px; }
 .header-left { display: flex; align-items: center; gap: 12px; }
 
-/* 主体区域等高与弹性 */
+/* 主体区域布局 */
 .stats-row { row-gap: 20px; }
-.main-content-row { display: flex; align-items: stretch; margin-bottom: 24px; row-gap: 24px; }
+.main-content-row { display: flex; align-items: flex-start; margin-bottom: 24px; row-gap: 24px; }
 .main-content-row > .el-col { display: flex; flex-direction: column; }
 
-@media screen and (min-width: 992px) {
-  .today-col { position: relative; }
-  .today-wrapper { position: absolute; top: 0; left: 12px; right: 12px; bottom: 0; }
-}
 @media screen and (max-width: 991px) {
-  .today-col { margin-top: 24px; }
-  .today-wrapper { height: 500px; display: flex; flex-direction: column; }
+  .today-component { max-height: 500px !important; }
 }
-@supports (row-gap: 1px) {
-  @media screen and (max-width: 991px) {
-    .today-col { margin-top: 0; }
-  }
-}
-.today-component { height: 100%; }
+.today-component { display: flex; flex-direction: column; overflow: hidden; }
 
 .collapse-btn { padding: 8px; border-radius: 8px; transition: background-color 0.2s; height: auto; }
 .collapse-btn:hover { background-color: var(--bg-main); }
