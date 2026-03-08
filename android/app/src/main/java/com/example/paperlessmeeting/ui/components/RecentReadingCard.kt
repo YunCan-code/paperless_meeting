@@ -45,6 +45,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.data.local.ReadingProgress
 
+private enum class PdfThumbnailState {
+    Loading,
+    Success,
+    Error
+}
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun RecentReadingCard(
@@ -139,8 +145,10 @@ fun RecentReadingCard(
                         .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
-                    val hasLocalFile = !progress.localPath.isNullOrEmpty() &&
-                        java.io.File(progress.localPath).exists()
+                    val localFile = progress.localPath?.let { java.io.File(it) }
+                    val hasLocalFile = localFile?.exists() == true &&
+                        localFile.isFile &&
+                        localFile.length() > 0L
 
                     if (hasLocalFile) {
                         PdfThumbnail(
@@ -236,43 +244,74 @@ fun PdfThumbnail(
     filePath: String,
     modifier: Modifier = Modifier
 ) {
-    var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var bitmap by remember(filePath) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var thumbnailState by remember(filePath) { mutableStateOf(PdfThumbnailState.Loading) }
 
     LaunchedEffect(filePath) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val file = java.io.File(filePath)
-                if (file.exists()) {
-                    val fileDescriptor = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
-                    val renderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
-                    val page = renderer.openPage(0)
-
-                    val width = 150
-                    val height = (width * page.height / page.width.toFloat()).toInt()
-                    val bmp = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(bmp)
-                    canvas.drawColor(android.graphics.Color.WHITE)
-                    page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-                    page.close()
-                    renderer.close()
-                    fileDescriptor.close()
-
-                    bitmap = bmp
+                if (!file.exists() || !file.isFile || file.length() <= 0L) {
+                    thumbnailState = PdfThumbnailState.Error
+                    return@withContext
                 }
+
+                val fileDescriptor = android.os.ParcelFileDescriptor.open(
+                    file,
+                    android.os.ParcelFileDescriptor.MODE_READ_ONLY
+                )
+                val renderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
+                val page = renderer.openPage(0)
+
+                val width = 150
+                val height = (width * page.height / page.width.toFloat()).toInt().coerceAtLeast(1)
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    width,
+                    height,
+                    android.graphics.Bitmap.Config.ARGB_8888
+                )
+                val canvas = android.graphics.Canvas(bmp)
+                canvas.drawColor(android.graphics.Color.WHITE)
+                page.render(
+                    bmp,
+                    null,
+                    null,
+                    android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+                )
+
+                page.close()
+                renderer.close()
+                fileDescriptor.close()
+
+                bitmap = bmp
+                thumbnailState = PdfThumbnailState.Success
             } catch (e: Exception) {
-                e.printStackTrace()
+                bitmap = null
+                thumbnailState = PdfThumbnailState.Error
+                android.util.Log.w(
+                    "RecentReadingCard",
+                    "PdfThumbnail: unable to render thumbnail for $filePath"
+                )
             }
         }
     }
 
-    if (bitmap != null) {
+    if (thumbnailState == PdfThumbnailState.Success && bitmap != null) {
         Image(
             bitmap = bitmap!!.asImageBitmap(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = modifier
         )
+    } else if (thumbnailState == PdfThumbnailState.Error) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
     } else {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             CircularProgressIndicator(modifier = Modifier.size(24.dp))
