@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import List, Optional
@@ -90,3 +90,25 @@ def get_progress(user_id: int, session: Session = Depends(get_session)):
         )
         for r in results
     ]
+
+
+@router.delete("/{user_id}")
+def delete_progress(
+    user_id: int,
+    file_url: str = Query(...),
+    session: Session = Depends(get_session)
+):
+    entry = session.exec(
+        select(ReadingProgress).where(
+            ReadingProgress.user_id == user_id,
+            ReadingProgress.file_url == file_url
+        )
+    ).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Reading progress not found")
+
+    session.delete(entry)
+    session.commit()
+
+    return {"message": "deleted"}

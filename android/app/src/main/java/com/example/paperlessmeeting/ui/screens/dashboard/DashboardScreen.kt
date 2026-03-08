@@ -24,6 +24,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +45,8 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +91,7 @@ fun DashboardScreen(
                 state = state, 
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
+                onDeleteReading = viewModel::deleteReadingProgress,
                 onVoteClick = onVoteClick,
                 onLotteryClick = onLotteryClick,
                 onCheckInClick = onCheckInClick
@@ -99,6 +106,7 @@ fun DashboardContent(
     state: DashboardUiState.Success, 
     onMeetingClick: (Int) -> Unit, 
     onReadingClick: (String, String, Int) -> Unit,
+    onDeleteReading: (String) -> Unit,
     onVoteClick: () -> Unit,
     onLotteryClick: () -> Unit,
     onCheckInClick: () -> Unit
@@ -111,19 +119,23 @@ fun DashboardContent(
 
     val currentHour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = when (currentHour) {
-        in 5..11 -> "上午好"
-        in 12..13 -> "中午好"
-        in 14..18 -> "下午好"
-        else -> "晚上好"
+        in 5..11 -> "\u4e0a\u5348\u597d"
+        in 12..13 -> "\u4e2d\u5348\u597d"
+        in 14..18 -> "\u4e0b\u5348\u597d"
+        else -> "\u665a\u4e0a\u597d"
     }
     
     val currentDate = remember { 
         val now = java.time.LocalDate.now()
-        now.format(DateTimeFormatter.ofPattern("yy年MM月dd日 EEEE", Locale.CHINA))
+        now.format(DateTimeFormatter.ofPattern("yy\u5e74M\u6708d\u65e5 EEEE", Locale.CHINA))
     }
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val isPhone = screenWidthDp < 600
+    var deleteTargetId by rememberSaveable(state.readingProgress) { mutableStateOf<String?>(null) }
+    var confirmDeleteId by remember { mutableStateOf<String?>(null) }
+    var confirmDeleteName by remember { mutableStateOf<String?>(null) }
+
     val contentPadding = if (isPhone) 16.dp else 24.dp
     val heroCardHeight = if (isPhone) 160.dp else 200.dp
 
@@ -141,7 +153,7 @@ fun DashboardContent(
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "今天是 $currentDate",
+            text = "\u4eca\u5929\u662f $currentDate",
             style = if (isPhone) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
@@ -150,7 +162,7 @@ fun DashboardContent(
 
         // 2. Hero Card (Up Next)
         Text(
-            text = "今日会议",
+            text = "\u4eca\u65e5\u4f1a\u8bae\u5b89\u6392",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -180,7 +192,7 @@ fun DashboardContent(
                     pageSpacing = if (isPhone) 12.dp else 16.dp,
                     modifier = Modifier.fillMaxWidth().height(heroCardHeight) 
                 ) { virtualPage ->
-                    // 取模映射到实际索引
+                    // 闁哄啰濞€濡剧儤娼鑺ュ啊闁哄啳鍩栧Σ褏浜搁崟顐㈢厒闁活亞鍠庨悿鍕濮樻剚鍞寸紒渚垮灩缁?
                     val actualPage = virtualPage % actualCount
                     val meeting = state.activeMeetings[actualPage]
                     com.example.paperlessmeeting.ui.components.MeetingCard(
@@ -239,7 +251,7 @@ fun DashboardContent(
                      )
                      Spacer(modifier = Modifier.height(12.dp))
                      Text(
-                         text = "今日暂无会议安排", 
+                         text = "\u4eca\u65e5\u6682\u65e0\u4f1a\u8bae\u5b89\u6392",
                          style = MaterialTheme.typography.titleMedium,
                          color = MaterialTheme.colorScheme.onSurface,
                          fontWeight = FontWeight.Medium
@@ -252,7 +264,7 @@ fun DashboardContent(
 
         // Quick Actions Card
         Text(
-            text = "快捷功能",
+            text = "\u5feb\u6377\u529f\u80fd",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -273,20 +285,20 @@ fun DashboardContent(
             ) {
                 QuickActionButton(
                     icon = Icons.Default.HowToVote,
-                    label = "投票",
+                    label = "\u6295\u7968",
                     onClick = onVoteClick
                 )
 
                 QuickActionButton(
                     icon = Icons.Default.Refresh,
-                    label = "抽签",
+                    label = "\u62bd\u7b7e",
                     onClick = onLotteryClick
                 )
 
-                /* 暂时隐藏打卡按钮
+                /* 闂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾妤犵偞鐗犻、鏇㈠煑閼恒儳鈽夐摶鏍煕濞戝崬骞橀柨娑欑懇濮婃椽鎳￠妶鍛亪闂佺顑呴敃銈夊Υ閹烘挾绡€婵﹩鍘鹃崢閬嶆倵閸忓浜鹃梺閫炲苯澧寸€规洘鍨块幃娆撳传閸曨厼骞堥梻浣告惈濞层垽宕瑰ú顏呭亗婵炲棙鎸婚埛鎴炪亜閹惧崬濡块柣锝変憾閺岋綀绠涙繝鍌氣拤闂侀潧娲ょ€氱増淇婇悜鑺ユ櫇闁逞屽墴閹﹢骞橀鐣屽幐閻庡厜鍋撻柍褜鍓熷畷浼村冀瑜忛弳锔炬喐閻楀牆淇柡浣稿暣閺屻劌鈹戦崱妯烘濡炪倧绲鹃悡锟犲蓟閿濆棙鍎熼柕鍫濆缂嶅牆鈹戦悙璺虹毢闁哥姵鍔楃划瀣吋婢跺﹪鍞堕梺鍝勬川婵绮婇敃鍌涒拺鐟滅増甯掓禍浼存煕濡灝浜规繛鍡愬灲閹瑩鎮滃Ο鐓庡箥闂傚倷绶￠崣蹇曠不閹达妇宓侀柡宥庡幗閻?
                 QuickActionButton(
                     icon = Icons.Default.Edit,
-                    label = "打卡",
+                    label = "闂傚倸鍊搁崐鎼佸磹閻戣姤鍤勯柛顐ｆ礀缁犵娀鏌熼崜褏甯涢柛濠呭煐閹便劌螣閹稿海銆愮紓浣哄У婢瑰棛妲愰幒鏂哄亾閿濆骸骞楃痪顓炵埣閺?,
                     onClick = onCheckInClick
                 )
                 */
@@ -297,7 +309,7 @@ fun DashboardContent(
 
         // 3. Recent Reading (Using reading progress)
         Text(
-            text = "最近阅读",
+            text = "\u6700\u8fd1\u9605\u8bfb",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -307,17 +319,37 @@ fun DashboardContent(
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(state.readingProgress) { progress ->
-                    com.example.paperlessmeeting.ui.components.RecentReadingCard(
-                        progress = progress,
-                        onClick = {
-                            onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
-                        }
-                    )
+                items(
+                    items = state.readingProgress,
+                    key = { it.uniqueId }
+                ) { progress ->
+                    Box(
+                        modifier = Modifier.animateItemPlacement()
+                    ) {
+                        com.example.paperlessmeeting.ui.components.RecentReadingCard(
+                            progress = progress,
+                            showDeleteAction = deleteTargetId == progress.uniqueId,
+                            isDeleting = false,
+                            onClick = {
+                                if (deleteTargetId == progress.uniqueId) {
+                                    deleteTargetId = null
+                                } else {
+                                    onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
+                                }
+                            },
+                            onLongClick = {
+                                deleteTargetId = progress.uniqueId
+                            },
+                            onDeleteClick = {
+                                confirmDeleteId = progress.uniqueId
+                                confirmDeleteName = progress.fileName
+                            }
+                        )
+                    }
                 }
             }
         } else {
-            // 空状态提示
+            // 缂傚倸鍊风粈渚€鎯屾担绯曟瀺闁挎繂妫欓崣蹇涙煙闂傚顦︾紒鐘冲灥闇夐柨婵嗘处閸も偓缂備焦褰冨﹢杈╂閹烘鐒?
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -337,12 +369,54 @@ fun DashboardContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "暂无阅读记录",
+                        text = "\u6682\u65e0\u9605\u8bfb\u8bb0\u5f55",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
+        }
+
+        if (confirmDeleteId != null) {
+            AlertDialog(
+                onDismissRequest = {
+                    confirmDeleteId = null
+                    confirmDeleteName = null
+                },
+                modifier = Modifier.widthIn(max = 280.dp),
+                title = {
+                    Text("\u786e\u8ba4\u5220\u9664", style = MaterialTheme.typography.titleSmall)
+                },
+                text = {
+                    Text(
+                        "\u786e\u5b9a\u8981\u5220\u9664\u300c${confirmDeleteName ?: "\u8be5\u6587\u4ef6"}\u300d\u5417\uff1f",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val pendingId = confirmDeleteId ?: return@TextButton
+                            confirmDeleteId = null
+                            confirmDeleteName = null
+                            deleteTargetId = null
+                            onDeleteReading(pendingId)
+                        }
+                    ) {
+                        Text("\u5220\u9664")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            confirmDeleteId = null
+                            confirmDeleteName = null
+                        }
+                    ) {
+                        Text("\u53d6\u6d88")
+                    }
+                }
+            )
         }
         
         Spacer(modifier = Modifier.height(80.dp))

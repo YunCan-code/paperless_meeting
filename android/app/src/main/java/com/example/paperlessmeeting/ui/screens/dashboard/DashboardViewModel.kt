@@ -57,6 +57,25 @@ class DashboardViewModel @Inject constructor(
         loadData()
     }
 
+    fun deleteReadingProgress(uniqueId: String) {
+        viewModelScope.launch {
+            val previousState = _uiState.value
+            // 先乐观更新 UI
+            if (previousState is DashboardUiState.Success) {
+                _uiState.value = previousState.copy(
+                    readingProgress = previousState.readingProgress.filterNot { it.uniqueId == uniqueId }
+                )
+            }
+            try {
+                readingProgressManager.deleteProgress(uniqueId)
+            } catch (e: Exception) {
+                // 删除失败，恢复 UI
+                _uiState.value = previousState
+                _toastMessage.emit("删除失败，请检查网络后重试")
+            }
+        }
+    }
+
     private fun loadData() {
         viewModelScope.launch {
             try {

@@ -32,9 +32,12 @@ class ReadingProgressManager @Inject constructor(
     private val prefs = context.getSharedPreferences("reading_progress_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
     private val KEY_PROGRESS_LIST = "progress_list"
+    private val KEY_DELETED_PROGRESS_IDS = "deleted_progress_ids"
 
     suspend fun saveProgress(uniqueId: String, fileName: String, page: Int, total: Int, localPath: String? = null) {
         withContext(Dispatchers.IO) {
+            removeDeletedMarker(uniqueId)
+
             // 保存到本地
             val currentList = getAllProgressLocal().toMutableList()
             currentList.removeAll { it.uniqueId == uniqueId }
@@ -50,8 +53,7 @@ class ReadingProgressManager @Inject constructor(
             currentList.add(0, newEntry)
             
             val trimmedList = if (currentList.size > 20) currentList.take(20) else currentList
-            val json = gson.toJson(trimmedList)
-            prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
+            persistProgressList(trimmedList)
 
             // 同步到服务端
             val userId = userPreferences.getUserId()
@@ -80,6 +82,23 @@ class ReadingProgressManager @Inject constructor(
         }
     }
 
+    suspend fun deleteProgress(uniqueId: String) {
+        withContext(Dispatchers.IO) {
+            val updatedList = getAllProgressLocal().filterNot { it.uniqueId == uniqueId }
+            addDeletedMarker(uniqueId)
+            persistProgressList(updatedList)
+
+            val userId = userPreferences.getUserId()
+            if (userId != -1) {
+                try {
+                    apiService.deleteReadingProgress(userId, uniqueId)
+                } catch (e: Exception) {
+                    android.util.Log.w("ReadingProgress", "deleteProgress: server delete failed for $uniqueId", e)
+                }
+            }
+        }
+    }
+
     /**
      * 从服务端拉取当前用户的阅读进度并写入本地
      */
@@ -91,6 +110,7 @@ class ReadingProgressManager @Inject constructor(
 
             try {
                 val serverList = apiService.getReadingProgress(userId)
+                val deletedIds = getDeletedMarkers()
                 android.util.Log.d("ReadingProgress", "loadFromServer: serverList.size=${serverList.size}")
                 for (item in serverList) {
                     android.util.Log.d("ReadingProgress", "  server item: url=${item.fileUrl}, name=${item.fileName}, page=${item.currentPage}")
@@ -98,7 +118,9 @@ class ReadingProgressManager @Inject constructor(
 
                 val currentLocalMap = getAllProgressLocal().associateBy { it.uniqueId }
 
-                val mergedList = serverList.map { item ->
+                val mergedList = serverList
+                    .filterNot { it.fileUrl in deletedIds }
+                    .map { item ->
                     val existingLocal = currentLocalMap[item.fileUrl]
                     val localPath = existingLocal?.localPath
                         ?: findCachedLocalPath(item.fileUrl, item.fileName)
@@ -110,11 +132,10 @@ class ReadingProgressManager @Inject constructor(
                         lastReadTime = System.currentTimeMillis(),
                         localPath = localPath
                     )
-                }
+                    }
                 
                 android.util.Log.d("ReadingProgress", "loadFromServer: mergedList.size=${mergedList.size}")
-                val json = gson.toJson(mergedList)
-                prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
+                persistProgressList(mergedList)
             } catch (e: Exception) {
                 android.util.Log.e("ReadingProgress", "loadFromServer FAILED", e)
                 e.printStackTrace()
@@ -168,7 +189,32 @@ class ReadingProgressManager @Inject constructor(
 
     suspend fun clearAll() {
         withContext(Dispatchers.IO) {
-            prefs.edit().remove(KEY_PROGRESS_LIST).apply()
+            prefs.edit()
+                .remove(KEY_PROGRESS_LIST)
+                .remove(KEY_DELETED_PROGRESS_IDS)
+                .apply()
+        }
+    }
+
+    private fun persistProgressList(progressList: List<ReadingProgress>) {
+        val json = gson.toJson(progressList)
+        prefs.edit().putString(KEY_PROGRESS_LIST, json).apply()
+    }
+
+    private fun getDeletedMarkers(): Set<String> {
+        return prefs.getStringSet(KEY_DELETED_PROGRESS_IDS, emptySet()).orEmpty().toSet()
+    }
+
+    private fun addDeletedMarker(uniqueId: String) {
+        val updated = getDeletedMarkers().toMutableSet()
+        updated.add(uniqueId)
+        prefs.edit().putStringSet(KEY_DELETED_PROGRESS_IDS, updated).apply()
+    }
+
+    private fun removeDeletedMarker(uniqueId: String) {
+        val updated = getDeletedMarkers().toMutableSet()
+        if (updated.remove(uniqueId)) {
+            prefs.edit().putStringSet(KEY_DELETED_PROGRESS_IDS, updated).apply()
         }
     }
 }

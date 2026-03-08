@@ -99,6 +99,12 @@ interface ApiService {
     @GET("reading-progress/{userId}")
     suspend fun getReadingProgress(@retrofit2.http.Path("userId") userId: Int): List<com.example.paperlessmeeting.domain.model.ReadingProgressResponse>
 
+    @retrofit2.http.DELETE("reading-progress/{userId}")
+    suspend fun deleteReadingProgress(
+        @retrofit2.http.Path("userId") userId: Int,
+        @retrofit2.http.Query("file_url") fileUrl: String
+    ): Map<String, String>
+
     // ===== Check-In API =====
     @retrofit2.http.POST("checkin/")
     suspend fun checkIn(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.CheckInRequest): com.example.paperlessmeeting.domain.model.CheckInResponse
