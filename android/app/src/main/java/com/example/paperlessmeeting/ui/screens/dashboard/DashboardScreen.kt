@@ -309,123 +309,147 @@ fun DashboardContent(
 
         Spacer(modifier = Modifier.height(if (isPhone) 16.dp else 24.dp))
 
-        // Quick Actions & Stats Section -> Split Layout
+        // Split Layout: 1:2 Asymmetric Quick Actions & Stats
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "快捷功能",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "参会记录",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1.2f)
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(110.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Left Side: Quick Actions
+            // Left Side: Condensed Quick Actions (weight 1f)
             Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 )
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        QuickActionButton(
-                            icon = Icons.Default.HowToVote,
-                            label = "投票",
-                            onClick = onVoteClick
-                        )
-                        QuickActionButton(
-                            icon = Icons.Default.Refresh,
-                            label = "抽签",
-                            onClick = onLotteryClick
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            onClick = onVoteClick,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(Icons.Default.HowToVote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp))
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text("投票", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
+                    }
+                    
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            onClick = onLotteryClick,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp))
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text("抽签", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
                     }
                 }
             }
 
-            // Right Side: Meeting Stats Pager
+            // Right Side: Gradient Stats Pager (weight 2.2f)
             Card(
-                modifier = Modifier.weight(1.2f),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                )
+                modifier = Modifier.weight(2.2f).fillMaxHeight(),
+                shape = RoundedCornerShape(20.dp)
             ) {
-                val statsPagerState = rememberPagerState(pageCount = { 3 })
-                
-                Column(
-                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Background Gradient
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            )
+                        )
                 ) {
-                    HorizontalPager(
-                        state = statsPagerState,
-                        modifier = Modifier.fillMaxWidth().height(84.dp)
-                    ) { page ->
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Watermark Icon Background
+                    Icon(
+                        imageVector = Icons.Default.EventAvailable,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(90.dp)
+                            .offset(x = 16.dp, y = 16.dp)
+                    )
+                    
+                    val statsPagerState = rememberPagerState(pageCount = { 3 })
+                    
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        HorizontalPager(
+                            state = statsPagerState,
+                            modifier = Modifier.fillMaxWidth().weight(1f)
+                        ) { page ->
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.Start
+                            ) {
                                 when (page) {
                                     0 -> {
-                                        Text("今年在本会议室参会", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text("24 次", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Text("本会议室参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text("24", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                        }
                                     }
                                     1 -> {
-                                        Text("累计下载会议文件", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text("128 份", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Text("累计下载文件", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text("128", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("份", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                        }
                                     }
                                     2 -> {
-                                        Text("本周待办会议", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text("3 场", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Text("本周待办会议", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text("3", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("场", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    // Stats Indicator
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        repeat(3) { iteration ->
-                            val color = if (statsPagerState.currentPage == iteration) 
-                                MaterialTheme.colorScheme.primary 
-                            else MaterialTheme.colorScheme.surfaceVariant
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 2.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .size(6.dp)
-                            )
+                        
+                        // Modern Line Indicator
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            repeat(3) { iteration ->
+                                val isCurrent = statsPagerState.currentPage == iteration
+                                val width = if (isCurrent) 16.dp else 4.dp
+                                val color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 4.dp)
+                                        .height(4.dp)
+                                        .width(width)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                )
+                            }
                         }
                     }
                 }
