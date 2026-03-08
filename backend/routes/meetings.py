@@ -609,6 +609,7 @@ class MeetingUpdate(SQLModel):
     title: Optional[str] = None
     meeting_type_id: Optional[int] = None
     start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
     location: Optional[str] = None
     status: Optional[str] = None
     speaker: Optional[str] = None
@@ -628,7 +629,7 @@ def update_meeting(
         
     meeting_data = meeting_update.model_dump(exclude_unset=True, exclude={"attendees_roles"})
     for key, value in meeting_data.items():
-        if key == 'start_time' and isinstance(value, str):
+        if key in ('start_time', 'end_time') and isinstance(value, str):
              try:
                 # 再次防止 Pydantic 转 datetime 失败的情况
                 value = datetime.fromisoformat(value.replace('Z', '+00:00'))
