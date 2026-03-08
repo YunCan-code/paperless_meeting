@@ -149,12 +149,19 @@ fun DashboardContent(
     val selectedProgress = state.readingProgress.filter { it.uniqueId in selectedReadingIds }
     val visibleReadingProgress = state.readingProgress.filterNot { it.uniqueId in pendingDeleteIds }
     val undoBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + if (isPhone) 92.dp else 108.dp
+    val recentReadingListState = androidx.compose.foundation.lazy.rememberLazyListState()
 
     LaunchedEffect(state.readingProgress, selectedReadingIds) {
         val existingIds = state.readingProgress.map { it.uniqueId }.toSet()
         val filteredIds = selectedReadingIds.filter { it in existingIds }
         if (filteredIds != selectedReadingIds) {
             selectedReadingIds = filteredIds
+        }
+    }
+
+    LaunchedEffect(visibleReadingProgress.map { it.uniqueId to it.currentPage }) {
+        if (visibleReadingProgress.isNotEmpty()) {
+            recentReadingListState.scrollToItem(0)
         }
     }
 
@@ -415,6 +422,7 @@ fun DashboardContent(
         
         if (visibleReadingProgress.isNotEmpty()) {
             LazyRow(
+                state = recentReadingListState,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(
@@ -703,6 +711,9 @@ fun QuickActionButton(
         )
     }
 }
+
+
+
 
 
 

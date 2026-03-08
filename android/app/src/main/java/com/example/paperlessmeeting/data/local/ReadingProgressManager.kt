@@ -34,6 +34,7 @@ class ReadingProgressManager @Inject constructor(
     private val gson = Gson()
     private val KEY_PROGRESS_LIST = "progress_list"
     private val KEY_DELETED_PROGRESS_IDS = "deleted_progress_ids"
+    private val MAX_RECENT_PROGRESS_ITEMS = 20
 
     suspend fun saveProgress(uniqueId: String, fileName: String, page: Int, total: Int, localPath: String? = null) {
         withContext(Dispatchers.IO) {
@@ -53,7 +54,7 @@ class ReadingProgressManager @Inject constructor(
             )
             currentList.add(0, newEntry)
             
-            val trimmedList = if (currentList.size > 20) currentList.take(20) else currentList
+            val trimmedList = currentList.take(MAX_RECENT_PROGRESS_ITEMS)
             persistProgressList(trimmedList)
 
             // 鍚屾鍒版湇鍔＄
@@ -136,26 +137,36 @@ class ReadingProgressManager @Inject constructor(
 
                 val mergedList = serverList
                     .filterNot { it.fileUrl in deletedIds }
+                    .sortedByDescending { parseUpdatedAtMillis(it.updatedAt) }
+                    .take(MAX_RECENT_PROGRESS_ITEMS)
                     .map { item ->
-                    val existingLocal = currentLocalMap[item.fileUrl]
-                    val localPath = existingLocal?.localPath
-                        ?: findCachedLocalPath(item.fileUrl, item.fileName)
-                    ReadingProgress(
-                        uniqueId = item.fileUrl,
-                        fileName = item.fileName,
-                        currentPage = item.currentPage,
-                        totalPages = item.totalPages,
-                        lastReadTime = System.currentTimeMillis(),
-                        localPath = localPath
-                    )
+                        val existingLocal = currentLocalMap[item.fileUrl]
+                        val localPath = existingLocal?.localPath
+                            ?: findCachedLocalPath(item.fileUrl, item.fileName)
+                        ReadingProgress(
+                            uniqueId = item.fileUrl,
+                            fileName = item.fileName,
+                            currentPage = item.currentPage,
+                            totalPages = item.totalPages,
+                            lastReadTime = parseUpdatedAtMillis(item.updatedAt),
+                            localPath = localPath
+                        )
                     }
-                
+
                 android.util.Log.d("ReadingProgress", "loadFromServer: mergedList.size=${mergedList.size}")
                 persistProgressList(mergedList)
             } catch (e: Exception) {
                 android.util.Log.e("ReadingProgress", "loadFromServer FAILED", e)
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun parseUpdatedAtMillis(updatedAt: String): Long {
+        return try {
+            java.time.OffsetDateTime.parse(updatedAt).toInstant().toEpochMilli()
+        } catch (_: Exception) {
+            0L
         }
     }
 
@@ -234,5 +245,9 @@ class ReadingProgressManager @Inject constructor(
         }
     }
 }
+
+
+
+
 
 

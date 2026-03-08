@@ -1,6 +1,10 @@
 ﻿package com.example.paperlessmeeting.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -18,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -33,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -256,9 +262,10 @@ private fun FloatingNavBar(
     onTabClick: (Screen) -> Unit
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val navPillShape = RoundedCornerShape(50)
 
     Surface(
-        shape = RoundedCornerShape(50),
+        shape = navPillShape,
         shadowElevation = 8.dp,
         tonalElevation = 2.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -279,7 +286,8 @@ private fun FloatingNavBar(
                     label = screen.title,
                     selected = selected,
                     onClick = { onTabClick(screen) },
-                    isPhone = isPhone
+                    isPhone = isPhone,
+                    shape = navPillShape
                 )
             }
         }
@@ -292,46 +300,85 @@ private fun FloatingNavItem(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
-    isPhone: Boolean = false
+    isPhone: Boolean = false,
+    shape: RoundedCornerShape = RoundedCornerShape(50)
 ) {
-    val bgColor = if (selected)
-        MaterialTheme.colorScheme.primaryContainer
-    else
-        Color.Transparent
+    val capsuleAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "floating_nav_capsule_alpha"
+    )
 
-    val contentColor = if (selected)
-        MaterialTheme.colorScheme.primary
-    else
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    val capsuleScale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.96f,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "floating_nav_capsule_scale"
+    )
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+        },
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "floating_nav_content"
+    )
+
+    val itemWidth = if (isPhone) 78.dp else 92.dp
+    val itemHeight = if (isPhone) 52.dp else 56.dp
+    val horizontalPadding = if (isPhone) 10.dp else 12.dp
+    val verticalPadding = 7.dp
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(bgColor)
+            .width(itemWidth)
+            .height(itemHeight)
+            .clip(shape)
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
-            ) { onClick() }
-            .padding(
-                horizontal = if (isPhone) 14.dp else 18.dp,
-                vertical = 6.dp
-            )
+            ) { onClick() },
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = contentColor,
-            modifier = Modifier.size(if (isPhone) 20.dp else 22.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = capsuleAlpha
+                    scaleX = capsuleScale
+                    scaleY = capsuleScale
+                }
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
         )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            fontSize = if (isPhone) 11.sp else 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = contentColor,
-            maxLines = 1
-        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(
+                horizontal = horizontalPadding,
+                vertical = verticalPadding
+            )
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(if (isPhone) 20.dp else 22.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                fontSize = if (isPhone) 11.sp else 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = contentColor,
+                maxLines = 1
+            )
+        }
     }
 }
+
+
+
+
+
 
