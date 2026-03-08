@@ -1,4 +1,4 @@
-package com.example.paperlessmeeting.data.remote
+﻿package com.example.paperlessmeeting.data.remote
 
 import com.example.paperlessmeeting.domain.model.Meeting
 import retrofit2.http.GET
@@ -105,6 +105,11 @@ interface ApiService {
         @retrofit2.http.Query("file_url") fileUrl: String
     ): Map<String, String>
 
+    @retrofit2.http.POST("reading-progress/delete")
+    suspend fun deleteReadingProgressCompat(
+        @retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.DeleteReadingProgressRequest
+    ): Map<String, String>
+
     // ===== Check-In API =====
     @retrofit2.http.POST("checkin/")
     suspend fun checkIn(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.CheckInRequest): com.example.paperlessmeeting.domain.model.CheckInResponse
@@ -157,3 +162,4 @@ interface ApiService {
         @retrofit2.http.Query("limit") limit: Int = 20
     ): List<com.example.paperlessmeeting.domain.model.CheckInHistoryItem>
 }
+

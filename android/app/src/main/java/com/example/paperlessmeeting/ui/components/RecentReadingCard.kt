@@ -1,11 +1,8 @@
 ﻿package com.example.paperlessmeeting.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -14,20 +11,21 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,27 +49,16 @@ import com.example.paperlessmeeting.data.local.ReadingProgress
 @Composable
 fun RecentReadingCard(
     progress: ReadingProgress,
-    showDeleteAction: Boolean,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
     isDeleting: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onLongClick: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "recent_reading_wiggle")
-    val wiggleRotation by infiniteTransition.animateFloat(
-        initialValue = -1.8f,
-        targetValue = 1.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 110),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "recent_reading_rotation"
-    )
-
     val cardScale by animateFloatAsState(
         targetValue = when {
-            isDeleting -> 0.82f
-            showDeleteAction -> 0.97f
+            isDeleting -> 0.9f
+            isSelected -> 0.98f
             else -> 1f
         },
         animationSpec = spring(stiffness = 420f, dampingRatio = 0.72f),
@@ -79,9 +66,33 @@ fun RecentReadingCard(
     )
 
     val cardAlpha by animateFloatAsState(
-        targetValue = if (isDeleting) 0f else 1f,
-        animationSpec = tween(durationMillis = 220),
+        targetValue = when {
+            isDeleting -> 0f
+            isSelectionMode && !isSelected -> 0.72f
+            else -> 1f
+        },
+        animationSpec = tween(durationMillis = 180),
         label = "recent_reading_alpha"
+    )
+
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        animationSpec = tween(durationMillis = 180),
+        label = "recent_reading_container_color"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 180),
+        label = "recent_reading_border_color"
     )
 
     Box(
@@ -92,12 +103,16 @@ fun RecentReadingCard(
                 scaleX = cardScale
                 scaleY = cardScale
                 alpha = cardAlpha
-                rotationZ = if (showDeleteAction && !isDeleting) wiggleRotation else 0f
             }
     ) {
         Card(
             modifier = Modifier
                 .fillMaxSize()
+                .border(
+                    width = if (isSelected) 1.5.dp else 0.dp,
+                    color = borderColor,
+                    shape = RoundedCornerShape(16.dp)
+                )
                 .combinedClickable(
                     onClick = {
                         if (!isDeleting) onClick()
@@ -107,8 +122,8 @@ fun RecentReadingCard(
                     }
                 ),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (showDeleteAction) 6.dp else 2.dp)
+            colors = CardDefaults.cardColors(containerColor = containerColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -178,35 +193,39 @@ fun RecentReadingCard(
                     Text(
                         text = "上次阅读至：第 ${progress.currentPage + 1} 页",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
             }
         }
 
         AnimatedVisibility(
-            visible = showDeleteAction && !isDeleting,
+            visible = isSelected && !isDeleting,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(6.dp),
             enter = fadeIn(animationSpec = tween(140)) + scaleIn(animationSpec = tween(180), initialScale = 0.6f),
             exit = fadeOut(animationSpec = tween(120)) + scaleOut(animationSpec = tween(120), targetScale = 0.6f)
         ) {
-            FilledIconButton(
-                onClick = {
-                    if (!isDeleting) onDeleteClick()
-                },
+            Surface(
                 modifier = Modifier.size(24.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError
-                )
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "删除最近阅读",
-                    modifier = Modifier.size(14.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "已选中最近阅读",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
     }
@@ -260,3 +279,4 @@ fun PdfThumbnail(
         }
     }
 }
+

@@ -1,7 +1,8 @@
-package com.example.paperlessmeeting.data.local
+﻿package com.example.paperlessmeeting.data.local
 
 import android.content.Context
 import com.example.paperlessmeeting.data.remote.ApiService
+import com.example.paperlessmeeting.domain.model.DeleteReadingProgressRequest
 import com.example.paperlessmeeting.domain.model.ReadingProgressRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -55,7 +56,7 @@ class ReadingProgressManager @Inject constructor(
             val trimmedList = if (currentList.size > 20) currentList.take(20) else currentList
             persistProgressList(trimmedList)
 
-            // 同步到服务端
+            // 鍚屾鍒版湇鍔＄
             val userId = userPreferences.getUserId()
             if (userId != -1) {
                 try {
@@ -69,7 +70,7 @@ class ReadingProgressManager @Inject constructor(
                         )
                     )
                 } catch (e: Exception) {
-                    // 网络失败时静默忽略，本地已保存
+                    // 缃戠粶澶辫触鏃堕潤榛樺拷鐣ワ紝鏈湴宸蹭繚瀛?
                     e.printStackTrace()
                 }
             }
@@ -92,6 +93,21 @@ class ReadingProgressManager @Inject constructor(
             if (userId != -1) {
                 try {
                     apiService.deleteReadingProgress(userId, uniqueId)
+                } catch (e: retrofit2.HttpException) {
+                    if (e.code() == 405) {
+                        try {
+                            apiService.deleteReadingProgressCompat(
+                                DeleteReadingProgressRequest(
+                                    userId = userId,
+                                    fileUrl = uniqueId
+                                )
+                            )
+                        } catch (fallbackException: Exception) {
+                            android.util.Log.w("ReadingProgress", "deleteProgress: compat delete failed for $uniqueId", fallbackException)
+                        }
+                    } else {
+                        android.util.Log.w("ReadingProgress", "deleteProgress: server delete failed for $uniqueId", e)
+                    }
                 } catch (e: Exception) {
                     android.util.Log.w("ReadingProgress", "deleteProgress: server delete failed for $uniqueId", e)
                 }
@@ -100,7 +116,7 @@ class ReadingProgressManager @Inject constructor(
     }
 
     /**
-     * 从服务端拉取当前用户的阅读进度并写入本地
+     * 浠庢湇鍔＄鎷夊彇褰撳墠鐢ㄦ埛鐨勯槄璇昏繘搴﹀苟鍐欏叆鏈湴
      */
     suspend fun loadFromServer() {
         withContext(Dispatchers.IO) {
@@ -218,3 +234,5 @@ class ReadingProgressManager @Inject constructor(
         }
     }
 }
+
+

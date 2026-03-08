@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+﻿from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 from database import get_session
 from models import ReadingProgress
@@ -25,9 +25,31 @@ class ReadingProgressResponse(BaseModel):
     updated_at: datetime
 
 
+class DeleteReadingProgressRequest(BaseModel):
+    user_id: int
+    file_url: str
+
+
+def _delete_progress_entry(user_id: int, file_url: str, session: Session):
+    entry = session.exec(
+        select(ReadingProgress).where(
+            ReadingProgress.user_id == user_id,
+            ReadingProgress.file_url == file_url
+        )
+    ).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Reading progress not found")
+
+    session.delete(entry)
+    session.commit()
+
+    return {"message": "deleted"}
+
+
 @router.post("/", response_model=ReadingProgressResponse)
 def save_progress(req: ReadingProgressRequest, session: Session = Depends(get_session)):
-    """保存或更新阅读进度 (upsert by user_id + file_url)"""
+    """保存或更新阅读进度（按 user_id + file_url upsert）"""
     existing = session.exec(
         select(ReadingProgress).where(
             ReadingProgress.user_id == req.user_id,
@@ -82,13 +104,13 @@ def get_progress(user_id: int, session: Session = Depends(get_session)):
 
     return [
         ReadingProgressResponse(
-            file_url=r.file_url,
-            file_name=r.file_name,
-            current_page=r.current_page,
-            total_pages=r.total_pages,
-            updated_at=r.updated_at
+            file_url=item.file_url,
+            file_name=item.file_name,
+            current_page=item.current_page,
+            total_pages=item.total_pages,
+            updated_at=item.updated_at
         )
-        for r in results
+        for item in results
     ]
 
 
@@ -98,17 +120,12 @@ def delete_progress(
     file_url: str = Query(...),
     session: Session = Depends(get_session)
 ):
-    entry = session.exec(
-        select(ReadingProgress).where(
-            ReadingProgress.user_id == user_id,
-            ReadingProgress.file_url == file_url
-        )
-    ).first()
+    return _delete_progress_entry(user_id=user_id, file_url=file_url, session=session)
 
-    if not entry:
-        raise HTTPException(status_code=404, detail="Reading progress not found")
 
-    session.delete(entry)
-    session.commit()
-
-    return {"message": "deleted"}
+@router.post("/delete")
+def delete_progress_compat(
+    req: DeleteReadingProgressRequest,
+    session: Session = Depends(get_session)
+):
+    return _delete_progress_entry(user_id=req.user_id, file_url=req.file_url, session=session)

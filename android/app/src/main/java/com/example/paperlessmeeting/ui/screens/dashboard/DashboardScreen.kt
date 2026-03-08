@@ -1,6 +1,7 @@
-package com.example.paperlessmeeting.ui.screens.dashboard
+﻿package com.example.paperlessmeeting.ui.screens.dashboard
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.MenuBook
@@ -18,13 +21,14 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -34,7 +38,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,7 +51,6 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -91,7 +96,7 @@ fun DashboardScreen(
                 state = state, 
                 onMeetingClick = onMeetingClick, 
                 onReadingClick = onReadingClick,
-                onDeleteReading = viewModel::deleteReadingProgress,
+                onDeleteReading = viewModel::deleteReadingProgresses,
                 onVoteClick = onVoteClick,
                 onLotteryClick = onLotteryClick,
                 onCheckInClick = onCheckInClick
@@ -106,7 +111,7 @@ fun DashboardContent(
     state: DashboardUiState.Success, 
     onMeetingClick: (Int) -> Unit, 
     onReadingClick: (String, String, Int) -> Unit,
-    onDeleteReading: (String) -> Unit,
+    onDeleteReading: (List<String>) -> Unit,
     onVoteClick: () -> Unit,
     onLotteryClick: () -> Unit,
     onCheckInClick: () -> Unit
@@ -132,19 +137,54 @@ fun DashboardContent(
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val isPhone = screenWidthDp < 600
-    var deleteTargetId by rememberSaveable(state.readingProgress) { mutableStateOf<String?>(null) }
-    var confirmDeleteId by remember { mutableStateOf<String?>(null) }
-    var confirmDeleteName by remember { mutableStateOf<String?>(null) }
+    val hapticFeedback = LocalHapticFeedback.current
+    val undoProgress = remember { Animatable(0f) }
+    var selectedReadingIds by rememberSaveable(state.readingProgress) { mutableStateOf(listOf<String>()) }
+    var pendingDeleteProgresses by remember { mutableStateOf<List<com.example.paperlessmeeting.data.local.ReadingProgress>>(emptyList()) }
 
     val contentPadding = if (isPhone) 16.dp else 24.dp
     val heroCardHeight = if (isPhone) 160.dp else 200.dp
+    val isSelectionMode = selectedReadingIds.isNotEmpty()
+    val pendingDeleteIds = pendingDeleteProgresses.map { it.uniqueId }.toSet()
+    val selectedProgress = state.readingProgress.filter { it.uniqueId in selectedReadingIds }
+    val visibleReadingProgress = state.readingProgress.filterNot { it.uniqueId in pendingDeleteIds }
+    val undoBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + if (isPhone) 92.dp else 108.dp
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(contentPadding)
-    ) {
+    LaunchedEffect(state.readingProgress, selectedReadingIds) {
+        val existingIds = state.readingProgress.map { it.uniqueId }.toSet()
+        val filteredIds = selectedReadingIds.filter { it in existingIds }
+        if (filteredIds != selectedReadingIds) {
+            selectedReadingIds = filteredIds
+        }
+    }
+
+    LaunchedEffect(pendingDeleteProgresses) {
+        if (pendingDeleteProgresses.isNotEmpty()) {
+            val pendingIds = pendingDeleteProgresses.map { it.uniqueId }
+            undoProgress.snapTo(1f)
+            undoProgress.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 4200)
+            )
+            if (pendingDeleteProgresses.map { it.uniqueId } == pendingIds) {
+                pendingDeleteProgresses = emptyList()
+                onDeleteReading(pendingIds)
+            }
+        } else {
+            undoProgress.snapTo(0f)
+        }
+    }
+    BackHandler(enabled = isSelectionMode) {
+        selectedReadingIds = emptyList()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(contentPadding)
+        ) {
         // 1. Header
         Text(
             text = "$greeting, ${state.userName}",
@@ -192,7 +232,7 @@ fun DashboardContent(
                     pageSpacing = if (isPhone) 12.dp else 16.dp,
                     modifier = Modifier.fillMaxWidth().height(heroCardHeight) 
                 ) { virtualPage ->
-                    // 闁哄啰濞€濡剧儤娼鑺ュ啊闁哄啳鍩栧Σ褏浜搁崟顐㈢厒闁活亞鍠庨悿鍕濮樻剚鍞寸紒渚垮灩缁?
+                    // 闂佸搫鍟版繛鈧俊鍓у劋濞碱亪顢欓懞銉ュ晩闂佸搫鍟抽崺鏍ｈ娴滄悂宕熼銏㈠帓闂佹椿浜為崰搴ㄦ偪閸曨剙顕辨慨妯诲墯閸炲绱掓笟鍨仼缂?
                     val actualPage = virtualPage % actualCount
                     val meeting = state.activeMeetings[actualPage]
                     com.example.paperlessmeeting.ui.components.MeetingCard(
@@ -295,10 +335,10 @@ fun DashboardContent(
                     onClick = onLotteryClick
                 )
 
-                /* 闂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾妤犵偞鐗犻、鏇㈠煑閼恒儳鈽夐摶鏍煕濞戝崬骞橀柨娑欑懇濮婃椽鎳￠妶鍛亪闂佺顑呴敃銈夊Υ閹烘挾绡€婵﹩鍘鹃崢閬嶆倵閸忓浜鹃梺閫炲苯澧寸€规洘鍨块幃娆撳传閸曨厼骞堥梻浣告惈濞层垽宕瑰ú顏呭亗婵炲棙鎸婚埛鎴炪亜閹惧崬濡块柣锝変憾閺岋綀绠涙繝鍌氣拤闂侀潧娲ょ€氱増淇婇悜鑺ユ櫇闁逞屽墴閹﹢骞橀鐣屽幐閻庡厜鍋撻柍褜鍓熷畷浼村冀瑜忛弳锔炬喐閻楀牆淇柡浣稿暣閺屻劌鈹戦崱妯烘濡炪倧绲鹃悡锟犲蓟閿濆棙鍎熼柕鍫濆缂嶅牆鈹戦悙璺虹毢闁哥姵鍔楃划瀣吋婢跺﹪鍞堕梺鍝勬川婵绮婇敃鍌涒拺鐟滅増甯掓禍浼存煕濡灝浜规繛鍡愬灲閹瑩鎮滃Ο鐓庡箥闂傚倷绶￠崣蹇曠不閹达妇宓侀柡宥庡幗閻?
+                /* 闂傚倸鍊搁崐鎼佸磹閹间礁纾瑰瀣捣閻棗銆掑锝呬壕濡ょ姷鍋為悧鐘汇€侀弴銏犵厬闁兼亽鍎抽埥澶愭懚閺嶎厽鐓曟繛鎴濆船楠炴﹢鏌ㄥ☉娆戞噰婵﹥妞介幊锟犲Χ閸涱喚浜梻浣侯焾椤戝懘鏁冮妶澶娢ラ柟鐑樻尵缁♀偓濠殿喗锕╅崢楣冨储闁秵鍊甸柛蹇擃槸娴滈箖姊洪柅鐐茶嫰婢у鈧娲橀崹鍧楀箖濞嗘挸浼犻柛鏇ㄥ幖楠炲牓姊绘担鍛婃儓婵炲眰鍨藉畷鐟懊洪鍛簵濠电偛妫欓幐濠氬煕閹寸偑浜滈柟鎯у船婵″潡鏌ｉ敐澶夋喚闁哄矉缍€缁犳稒绻濋崒姘ｆ嫟闂備線娼уú銈団偓姘卞娣囧﹪鎮滈懞銉︽珖闂侀€炲苯澧撮柟顔斤耿楠炴﹢顢欓悾灞藉箰闁诲骸鍘滈崑鎾绘煃瑜滈崜鐔风暦娴兼潙鍐€鐟滃繘寮抽敂鐐枑闁绘鐗嗘穱顖炴煛娴ｇ鏆ｉ柡灞诲妼閳规垿宕卞Ο鐑橆仱婵＄偑鍊х徊楣冩偂閿熺姴钃熼柨婵嗘閸庣喖鏌曢崼婵嗩劉缂傚秴鐗嗛埞鎴︽倷鐠鸿櫣姣㈤梺鍝ュУ閸旀鍒掔€ｎ亶鍚嬪璺猴躬閸炲爼姊洪崫鍕窛濠殿喖顕划濠囨晝閸屾稈鎷洪悷婊呭鐢帗绂嶆导瀛樼厱婵☆垰鐏濇禍瑙勭箾閸℃劕鐏查柟顔界懇閹粌螣閻撳骸绠ラ梻鍌氬€风欢锟犲矗韫囨洜涓嶉柟杈惧瀹撲線鏌″搴″箺闁?
                 QuickActionButton(
                     icon = Icons.Default.Edit,
-                    label = "闂傚倸鍊搁崐鎼佸磹閻戣姤鍤勯柛顐ｆ礀缁犵娀鏌熼崜褏甯涢柛濠呭煐閹便劌螣閹稿海銆愮紓浣哄У婢瑰棛妲愰幒鏂哄亾閿濆骸骞楃痪顓炵埣閺?,
+                    label = "闂傚倸鍊搁崐鎼佸磹閹间礁纾归柣鎴ｅГ閸ゅ嫰鏌涢锝嗙缂佺姷濞€閺岀喖宕滆鐢盯鏌涙繝鍛厫闁逛究鍔岃灒闁圭娴烽妴鎰磽娴ｅ搫校濠㈢懓妫涘Σ鎰板箳閺傚搫浜鹃柨婵嗛楠炴鐥鐐靛煟闁?,
                     onClick = onCheckInClick
                 )
                 */
@@ -308,19 +348,77 @@ fun DashboardContent(
         Spacer(modifier = Modifier.height(if (isPhone) 20.dp else 32.dp))
 
         // 3. Recent Reading (Using reading progress)
-        Text(
-            text = "\u6700\u8fd1\u9605\u8bfb",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+        if (isSelectionMode) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "已选择 ${selectedReadingIds.size} 项",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (selectedReadingIds.size == 1) {
+                            selectedProgress.firstOrNull()?.fileName ?: "可批量管理最近阅读"
+                        } else {
+                            "可批量移除最近阅读记录，不会删除 PDF 文件"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        val newPendingItems = state.readingProgress
+                            .filter { it.uniqueId in selectedReadingIds }
+                        if (newPendingItems.isNotEmpty()) {
+                            pendingDeleteProgresses = (pendingDeleteProgresses + newPendingItems)
+                                .distinctBy { it.uniqueId }
+                            selectedReadingIds = emptyList()
+                        }
+                    },
+                    enabled = selectedReadingIds.isNotEmpty()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("删除")
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                TextButton(onClick = { selectedReadingIds = emptyList() }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("取消")
+                }
+            }
+        } else {
+            Text(
+                text = "最近阅读",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
         Spacer(modifier = Modifier.height(12.dp))
         
-        if (state.readingProgress.isNotEmpty()) {
+        if (visibleReadingProgress.isNotEmpty()) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(
-                    items = state.readingProgress,
+                    items = visibleReadingProgress,
                     key = { it.uniqueId }
                 ) { progress ->
                     Box(
@@ -328,28 +426,36 @@ fun DashboardContent(
                     ) {
                         com.example.paperlessmeeting.ui.components.RecentReadingCard(
                             progress = progress,
-                            showDeleteAction = deleteTargetId == progress.uniqueId,
+                            isSelectionMode = isSelectionMode,
+                            isSelected = progress.uniqueId in selectedReadingIds,
                             isDeleting = false,
                             onClick = {
-                                if (deleteTargetId == progress.uniqueId) {
-                                    deleteTargetId = null
+                                if (isSelectionMode) {
+                                    selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
+                                        selectedReadingIds.filterNot { it == progress.uniqueId }
+                                    } else {
+                                        selectedReadingIds + progress.uniqueId
+                                    }
                                 } else {
                                     onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
                                 }
                             },
                             onLongClick = {
-                                deleteTargetId = progress.uniqueId
-                            },
-                            onDeleteClick = {
-                                confirmDeleteId = progress.uniqueId
-                                confirmDeleteName = progress.fileName
+                                if (progress.uniqueId !in pendingDeleteIds) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
+                                        selectedReadingIds
+                                    } else {
+                                        selectedReadingIds + progress.uniqueId
+                                    }
+                                }
                             }
                         )
                     }
                 }
             }
         } else {
-            // 缂傚倸鍊风粈渚€鎯屾担绯曟瀺闁挎繂妫欓崣蹇涙煙闂傚顦︾紒鐘冲灥闇夐柨婵嗘处閸も偓缂備焦褰冨﹢杈╂閹烘鐒?
+            // 缂傚倸鍊搁崐椋庣矆娓氣偓閹本鎷呯化鏇熺€洪梺鎸庣箓濡瑩宕ｈ箛娑欑厵闂傚倸顕ˇ锔剧磼閻樺啿鐏ラ棁澶愭煥濠靛棙澶勯柛銈傚亾缂傚倷鐒﹁ぐ鍐耿鏉堚晜顫曢柟鐑橆殔閻?
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -376,50 +482,89 @@ fun DashboardContent(
                 }
             }
         }
-
-        if (confirmDeleteId != null) {
-            AlertDialog(
-                onDismissRequest = {
-                    confirmDeleteId = null
-                    confirmDeleteName = null
-                },
-                modifier = Modifier.widthIn(max = 280.dp),
-                title = {
-                    Text("\u786e\u8ba4\u5220\u9664", style = MaterialTheme.typography.titleSmall)
-                },
-                text = {
-                    Text(
-                        "\u786e\u5b9a\u8981\u5220\u9664\u300c${confirmDeleteName ?: "\u8be5\u6587\u4ef6"}\u300d\u5417\uff1f",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val pendingId = confirmDeleteId ?: return@TextButton
-                            confirmDeleteId = null
-                            confirmDeleteName = null
-                            deleteTargetId = null
-                            onDeleteReading(pendingId)
-                        }
-                    ) {
-                        Text("\u5220\u9664")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            confirmDeleteId = null
-                            confirmDeleteName = null
-                        }
-                    ) {
-                        Text("\u53d6\u6d88")
-                    }
-                }
-            )
+        Spacer(modifier = Modifier.height(if (isPhone) 128.dp else 148.dp))
         }
-        
-        Spacer(modifier = Modifier.height(80.dp))
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = pendingDeleteProgresses.isNotEmpty(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 16.dp, end = 16.dp, bottom = undoBarBottomPadding),
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 }
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                tonalElevation = 8.dp,
+                shadowElevation = 16.dp,
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth(if (isPhone) 0.9f else 0.58f)
+                    .widthIn(max = if (isPhone) 380.dp else 440.dp)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, top = 14.dp, end = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = pendingDeleteProgresses.size.toString(),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (pendingDeleteProgresses.size == 1) {
+                                    "已移除《${pendingDeleteProgresses.first().fileName}》"
+                                } else {
+                                    "已移除 ${pendingDeleteProgresses.size} 项最近阅读"
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "仅删除阅读记录，不影响 PDF 文件 · 4 秒内可撤销",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = { pendingDeleteProgresses = emptyList() },
+                            shape = RoundedCornerShape(18.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Text("撤销")
+                        }
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { undoProgress.value },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -558,3 +703,6 @@ fun QuickActionButton(
         )
     }
 }
+
+
+

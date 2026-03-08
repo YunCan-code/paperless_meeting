@@ -1,4 +1,4 @@
-package com.example.paperlessmeeting.ui.screens.dashboard
+﻿package com.example.paperlessmeeting.ui.screens.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -58,18 +58,24 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun deleteReadingProgress(uniqueId: String) {
+        deleteReadingProgresses(listOf(uniqueId))
+    }
+
+    fun deleteReadingProgresses(uniqueIds: List<String>) {
+        if (uniqueIds.isEmpty()) return
         viewModelScope.launch {
+            val targetIds = uniqueIds.toSet()
             val previousState = _uiState.value
-            // 先乐观更新 UI
             if (previousState is DashboardUiState.Success) {
                 _uiState.value = previousState.copy(
-                    readingProgress = previousState.readingProgress.filterNot { it.uniqueId == uniqueId }
+                    readingProgress = previousState.readingProgress.filterNot { it.uniqueId in targetIds }
                 )
             }
             try {
-                readingProgressManager.deleteProgress(uniqueId)
+                uniqueIds.forEach { uniqueId ->
+                    readingProgressManager.deleteProgress(uniqueId)
+                }
             } catch (e: Exception) {
-                // 删除失败，恢复 UI
                 _uiState.value = previousState
                 _toastMessage.emit("删除失败，请检查网络后重试")
             }
@@ -79,7 +85,7 @@ class DashboardViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             try {
-                val userName = userPreferences.getUserName() ?: "用户"
+                val userName = userPreferences.getUserName() ?: "鐢ㄦ埛"
 
                 val todayStr = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).toString()
                 val todayMeetings = repository.getMeetings(
@@ -164,13 +170,13 @@ class DashboardViewModel @Inject constructor(
 
                 launch {
                     socketManager.voteStartEvent.collect { vote ->
-                        _toastMessage.emit("收到新投票: ${vote.title}")
+                        _toastMessage.emit("鏀跺埌鏂版姇绁? ${vote.title}")
                     }
                 }
 
                 launch {
                     socketManager.voteEndEvent.collect { data ->
-                        _toastMessage.emit("投票已结束: ${data.title}")
+                        _toastMessage.emit("鎶曠エ宸茬粨鏉? ${data.title}")
                     }
                 }
 
@@ -193,3 +199,4 @@ class DashboardViewModel @Inject constructor(
         }
     }
 }
+

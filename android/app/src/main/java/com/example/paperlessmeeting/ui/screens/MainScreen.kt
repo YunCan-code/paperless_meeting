@@ -1,4 +1,4 @@
-package com.example.paperlessmeeting.ui.screens
+﻿package com.example.paperlessmeeting.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -142,7 +142,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     )
                 ) { backStackEntry ->
                     val meetingId = backStackEntry.arguments?.getInt("meetingId") ?: 0
-                    val title = backStackEntry.arguments?.getString("title") ?: "抽签"
+                    val title = backStackEntry.arguments?.getString("title") ?: "鎶界"
                     com.example.paperlessmeeting.ui.screens.lottery.LotteryDetailScreen(
                         meetingId = meetingId,
                         meetingTitle = title,
@@ -222,12 +222,25 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     tabs = tabs,
                     currentRoute = currentDestination?.route?.substringBefore("?"),
                     onTabClick = { screen ->
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
+                        if (screen == Screen.Dashboard) {
+                            val popped = navController.popBackStack(Screen.Dashboard.route, inclusive = false)
+                            if (!popped) {
+                                navController.navigate(Screen.Dashboard.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
-                            launchSingleTop = true
-                            restoreState = true
+                        } else {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     }
                 )
@@ -321,3 +334,4 @@ private fun FloatingNavItem(
         )
     }
 }
+
