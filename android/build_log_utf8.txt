@@ -35,62 +35,71 @@
 > Task :app:writeDebugSigningConfigVersions UP-TO-DATE
 
 > Task :app:compileDebugKotlin FAILED
-.\gradlew.bat : e: file
-:///D:/ProgramData/pape
-rless_meeting/android/a
-pp/src/main/java/com/ex
-ample/paperlessmeeting/
-ui/screens/dashboard/Da
-shboardScreen.kt:22:47 
-Unresolved reference: E
-ditDelete
+.\gradlew.bat : e: fil
+e:///D:/ProgramData/pa
+perless_meeting/androi
+d/app/src/main/java/co
+m/example/paperlessmee
+ting/ui/screens/dashbo
+ard/DashboardScreen.kt
+:409:56 Unresolved ref
+erence: context
 所在位置 行:1 字符: 5
-+ & { .\gradlew.bat ass
-embleDebug > build_log_
-tmp.txt 2>&1 ; Get-Cont
-en ...
-+     ~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~
-    + CategoryInfo     
-         : NotSpeci    
-fied: (e: file://    /D
-:/P...nce: Edit    Dele
-te:String) []    , Remo
-teException
-    + FullyQualifiedE  
-  rrorId : NativeCo    
-mmandError
++ & { .\gradlew.bat as
+sembleDebug > build_lo
+g_tmp.txt 2>&1 ; Get-C
+onten ...
++     ~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (e: file://   
+ /D:/P...erence: c    
+ontext:String) []    ,
+ RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
  
+e: file:///D:/ProgramD
+ata/paperless_meeting/
+android/app/src/main/j
+ava/com/example/paperl
+essmeeting/ui/screens/
+dashboard/DashboardScr
+een.kt:414:56 Unresolv
+ed reference: context
 
-FAILURE: Build failed w
-ith an exception.
+FAILURE: Build failed 
+with an exception.
 
 * What went wrong:
-Execution failed for ta
-sk ':app:compileDebugKo
-tlin'.
-> A failure occurred wh
-ile executing org.jetbr
-ains.kotlin.compilerRun
-ner.GradleCompilerRunne
-rWithWorkers$GradleKotl
-inCompilerWorkAction
-   > Compilation error.
- See log for more detai
-ls
+Execution failed for t
+ask ':app:compileDebug
+Kotlin'.
+> A failure occurred w
+hile executing org.jet
+brains.kotlin.compiler
+Runner.GradleCompilerR
+unnerWithWorkers$Gradl
+eKotlinCompilerWorkAct
+ion
+   > Compilation error
+. See log for more det
+ails
 
 * Try:
-> Run with --stacktrace
- option to get the stac
-k trace.
-> Run with --info or --
-debug option to get mor
-e log output.
-> Run with --scan to ge
-t full insights.
-> Get more help at http
-s://help.gradle.org.
+> Run with --stacktrac
+e option to get the st
+ack trace.
+> Run with --info or -
+-debug option to get m
+ore log output.
+> Run with --scan to g
+et full insights.
+> Get more help at htt
+ps://help.gradle.org.
 
 BUILD FAILED in 6s
 31 actionable tasks: 2 executed, 29 up-to-date

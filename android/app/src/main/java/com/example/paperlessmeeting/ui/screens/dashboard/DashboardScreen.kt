@@ -42,6 +42,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -142,6 +146,7 @@ fun DashboardContent(
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val isPhone = screenWidthDp < 600
+    val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
     val undoProgress = remember { Animatable(0f) }
     var selectedReadingIds by rememberSaveable(state.readingProgress) { mutableStateOf(listOf<String>()) }
@@ -364,7 +369,7 @@ fun DashboardContent(
 
         // Split Layout: 1:1 Symmetric Quick Actions & Stats
         Row(
-            modifier = Modifier.fillMaxWidth().height(160.dp).padding(horizontal = contentPadding), // 高度扩展至容纳2x2网络
+            modifier = Modifier.fillMaxWidth().height(184.dp).padding(horizontal = contentPadding), // 增加高度至184dp，防止文字裁切
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Left Side: 2x2 Quick Actions (weight 1f)
@@ -376,8 +381,9 @@ fun DashboardContent(
                 )
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                    verticalArrangement = Arrangement.SpaceEvenly
+                    modifier = Modifier.fillMaxSize().padding(top = 16.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -394,7 +400,6 @@ fun DashboardContent(
                             onClick = onLotteryClick
                         )
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -402,12 +407,12 @@ fun DashboardContent(
                         QuickActionItem(
                             icon = Icons.Default.Edit,
                             label = "签到",
-                            onClick = { /* mock */ }
+                            onClick = { Toast.makeText(context, "签到功能开发中", Toast.LENGTH_SHORT).show() }
                         )
                         QuickActionItem(
                             icon = Icons.Default.QrCodeScanner,
                             label = "扫一扫",
-                            onClick = { /* mock */ }
+                            onClick = { Toast.makeText(context, "扫一扫功能开发中", Toast.LENGTH_SHORT).show() }
                         )
                     }
                 }
@@ -460,44 +465,81 @@ fun DashboardContent(
                                 when (page) {
                                     0 -> {
                                         Text("本年参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(verticalAlignment = Alignment.Bottom) {
-                                            Text("45", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Row(verticalAlignment = Alignment.Bottom) {
+                                                Text("45", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                            }
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(54.dp)) {
+                                                CircularProgressIndicator(progress = { 0.75f }, modifier = Modifier.fillMaxSize(), strokeWidth = 5.dp, color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primary.copy(alpha=0.15f), strokeCap = StrokeCap.Round)
+                                                Text("75%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            }
                                         }
                                     }
                                     1 -> {
                                         Text("本季参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(verticalAlignment = Alignment.Bottom) {
-                                            Text("12", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Row(verticalAlignment = Alignment.Bottom) {
+                                                Text("12", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                                            }
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                verticalAlignment = Alignment.Bottom,
+                                                modifier = Modifier.height(36.dp).padding(bottom = 4.dp)
+                                            ) {
+                                                val barValues = listOf(0.4f, 0.7f, 1.0f, 0.6f)
+                                                barValues.forEach { h -> 
+                                                    Box(modifier = Modifier.width(8.dp).fillMaxHeight(h).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(if (h == 1.0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha=0.4f)))
+                                                }
+                                            }
                                         }
                                     }
                                     2 -> {
                                         Text("本月参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
                                         Row(verticalAlignment = Alignment.Bottom) {
                                             Text("3", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                                             Spacer(Modifier.width(4.dp))
                                             Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
                                         }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        LinearProgressIndicator(
+                                            progress = { 0.4f },
+                                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha=0.15f),
+                                            strokeCap = StrokeCap.Round
+                                        )
                                     }
                                     3 -> {
                                         Text("参会类型TOP3", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("1. 党组会", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("1.党组会", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                                }
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF009688)))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("2.办公会", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                                }
                                             }
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("2. 办公会", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                            
+                                            val primaryColor = MaterialTheme.colorScheme.primary
+                                            val secondaryColor = Color(0xFF009688)
+                                            val tertiaryColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                            Canvas(modifier = Modifier.size(50.dp)) {
+                                                drawArc(color = primaryColor, startAngle = -90f, sweepAngle = 200f, useCenter = true)
+                                                drawArc(color = secondaryColor, startAngle = 110f, sweepAngle = 100f, useCenter = true)
+                                                drawArc(color = tertiaryColor, startAngle = 210f, sweepAngle = 60f, useCenter = true)
                                             }
                                         }
                                     }
@@ -864,6 +906,8 @@ fun QuickActionButton(
     onClick: () -> Unit
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val context = LocalContext.current
+    val contentPadding = if (isPhone) 16.dp else 24.dp
     val btnSize = if (isPhone) 48.dp else 56.dp
     val iconSize = if (isPhone) 24.dp else 28.dp
     Column(
@@ -913,7 +957,7 @@ fun QuickActionItem(
                 modifier = Modifier.padding(10.dp)
             )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(8.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
