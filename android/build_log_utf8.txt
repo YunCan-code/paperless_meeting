@@ -1,0 +1,96 @@
+﻿> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+.\gradlew.bat : e: file
+:///D:/ProgramData/pape
+rless_meeting/android/a
+pp/src/main/java/com/ex
+ample/paperlessmeeting/
+ui/screens/dashboard/Da
+shboardScreen.kt:22:47 
+Unresolved reference: E
+ditDelete
+所在位置 行:1 字符: 5
++ & { .\gradlew.bat ass
+embleDebug > build_log_
+tmp.txt 2>&1 ; Get-Cont
+en ...
++     ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpeci    
+fied: (e: file://    /D
+:/P...nce: Edit    Dele
+te:String) []    , Remo
+teException
+    + FullyQualifiedE  
+  rrorId : NativeCo    
+mmandError
+ 
+
+FAILURE: Build failed w
+ith an exception.
+
+* What went wrong:
+Execution failed for ta
+sk ':app:compileDebugKo
+tlin'.
+> A failure occurred wh
+ile executing org.jetbr
+ains.kotlin.compilerRun
+ner.GradleCompilerRunne
+rWithWorkers$GradleKotl
+inCompilerWorkAction
+   > Compilation error.
+ See log for more detai
+ls
+
+* Try:
+> Run with --stacktrace
+ option to get the stac
+k trace.
+> Run with --info or --
+debug option to get mor
+e log output.
+> Run with --scan to ge
+t full insights.
+> Get more help at http
+s://help.gradle.org.
+
+BUILD FAILED in 6s
+31 actionable tasks: 2 executed, 29 up-to-date
