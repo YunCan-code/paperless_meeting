@@ -1,0 +1,67 @@
+﻿.\gradlew.bat : e: fil
+e:///D:/ProgramData/pa
+perless_meeting/androi
+d/app/src/main/java/co
+m/example/paperlessmee
+ting/ui/screens/dashbo
+ard/DashboardScreen.kt
+:328:29 Unresolved ref
+erence: TextAlign
+所在位置 行:1 字符: 1
++ .\gradlew.bat assemb
+leDebug 2> error.txt; 
+Get-Content -Path erro
+r.txt ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (e: file://   
+ /D:/P...ence: Tex    
+tAlign:String) []    ,
+ RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+e: file:///D:/ProgramD
+ata/paperless_meeting/
+android/app/src/main/j
+ava/com/example/paperl
+essmeeting/ui/screens/
+dashboard/DashboardScr
+een.kt:336:29 Unresolv
+ed reference: TextAlig
+n
+
+FAILURE: Build failed 
+with an exception.
+
+* What went wrong:
+Execution failed for t
+ask ':app:compileDebug
+Kotlin'.
+> A failure occurred w
+hile executing org.jet
+brains.kotlin.compiler
+Runner.GradleCompilerR
+unnerWithWorkers$Gradl
+eKotlinCompilerWorkAct
+ion
+   > Compilation error
+. See log for more det
+ails
+
+* Try:
+> Run with --stacktrac
+e option to get the st
+ack trace.
+> Run with --info or -
+-debug option to get m
+ore log output.
+> Run with --scan to g
+et full insights.
+> Get more help at htt
+ps://help.gradle.org.
+
+BUILD FAILED in 7s

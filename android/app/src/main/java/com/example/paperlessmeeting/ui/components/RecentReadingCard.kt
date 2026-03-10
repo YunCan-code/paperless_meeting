@@ -1,4 +1,4 @@
-﻿package com.example.paperlessmeeting.ui.components
+package com.example.paperlessmeeting.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -168,8 +168,8 @@ fun RecentReadingCard(
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.Center
+                    modifier = Modifier.weight(1f).fillMaxHeight(), // 增加 fillMaxHeight() 使整列撑满卡片可用高度
+                    verticalArrangement = Arrangement.SpaceBetween    // 改为上下两端对齐
                 ) {
                     Text(
                         text = progress.fileName,
@@ -179,15 +179,16 @@ fun RecentReadingCard(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.weight(1f)) // 将剩余空间推给顶部标题
 
-                    val progressPercent = if (progress.totalPages > 0) {
-                        (progress.currentPage + 1).toFloat() / progress.totalPages.toFloat()
-                    } else {
-                        0f
-                    }
+                    Column { // 进度条和页码作为底部块
+                        val progressPercent = if (progress.totalPages > 0) {
+                            (progress.currentPage + 1).toFloat() / progress.totalPages.toFloat()
+                        } else {
+                            0f
+                        }
 
-                    LinearProgressIndicator(
+                        LinearProgressIndicator(
                         progress = { progressPercent },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -196,17 +197,18 @@ fun RecentReadingCard(
                         trackColor = MaterialTheme.colorScheme.outlineVariant
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    Text(
-                        text = "上次阅读至：第 ${progress.currentPage + 1} 页",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
+                        Text(
+                            text = "上次阅读至：第 ${progress.currentPage + 1} 页",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
                 }
             }
         }

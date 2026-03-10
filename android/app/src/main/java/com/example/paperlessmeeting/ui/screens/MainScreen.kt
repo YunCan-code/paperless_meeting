@@ -1,4 +1,4 @@
-﻿package com.example.paperlessmeeting.ui.screens
+package com.example.paperlessmeeting.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -266,7 +266,7 @@ private fun FloatingNavBar(
 
     Surface(
         shape = navPillShape,
-        shadowElevation = 8.dp,
+        shadowElevation = 4.dp, // 8.dp -> 4.dp
         tonalElevation = 2.dp,
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.padding(bottom = if (isPhone) 8.dp else 16.dp)
@@ -369,7 +369,7 @@ private fun FloatingNavItem(
             Text(
                 text = label,
                 fontSize = if (isPhone) 11.sp else 12.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, // 加粗
                 color = contentColor,
                 maxLines = 1
             )

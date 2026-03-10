@@ -66,7 +66,7 @@ fun MeetingCard(
                     }
                 )
             },
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp), // 改为 20.dp
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -132,7 +132,7 @@ fun MeetingCard(
                     Surface(
                         color = typeColor,
                         shape = RoundedCornerShape(8.dp),
-                        shadowElevation = 4.dp
+                        shadowElevation = 2.dp // 弱化阴影
                     ) {
                         Text(
                             text = typeName,

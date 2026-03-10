@@ -42,6 +42,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -132,7 +133,7 @@ fun DashboardContent(
     
     val currentDate = remember { 
         val now = java.time.LocalDate.now()
-        now.format(DateTimeFormatter.ofPattern("yy\u5e74M\u6708d\u65e5 EEEE", Locale.CHINA))
+        now.format(DateTimeFormatter.ofPattern("yyyy\u5e74M\u6708d\u65e5 EEEE", Locale.CHINA)) // yyyy年
     }
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -190,30 +191,33 @@ fun DashboardContent(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(contentPadding)
+                // 移除外层的横向 padding，我们将它们下放到内部元素
+                .padding(top = contentPadding, bottom = contentPadding)
         ) {
         // 1. Header
-        Text(
-            text = "$greeting, ${state.userName}",
-            style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "\u4eca\u5929\u662f $currentDate",
-            style = if (isPhone) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-        )
+        Column(modifier = Modifier.padding(horizontal = contentPadding)) {
+            Text(
+                text = "$greeting, ${state.userName}",
+                style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "\u4eca\u5929\u662f $currentDate",
+                style = if (isPhone) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
 
-        Spacer(modifier = Modifier.height(if (isPhone) 20.dp else 32.dp))
+            Spacer(modifier = Modifier.height(if (isPhone) 12.dp else 24.dp)) // 从 20.dp/32.dp 收紧间距
 
-        // 2. Hero Card (Up Next)
-        Text(
-            text = "\u4eca\u65e5\u4f1a\u8bae\u5b89\u6392",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+            // 2. Hero Card (Up Next)
+            Text(
+                text = "\u4eca\u65e5\u4f1a\u8bae", // "今日会议"
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
         
         if (state.activeMeetings.isNotEmpty()) {
             val actualCount = state.activeMeetings.size
@@ -236,6 +240,7 @@ fun DashboardContent(
             Column {
                 HorizontalPager(
                     state = pagerState,
+                    contentPadding = PaddingValues(horizontal = contentPadding), // 为卡片滑动加上 Padding
                     pageSpacing = if (isPhone) 12.dp else 16.dp,
                     modifier = Modifier.fillMaxWidth().height(heroCardHeight) 
                 ) { virtualPage ->
@@ -254,7 +259,7 @@ fun DashboardContent(
                 // Indicators
                 if (actualCount > 1) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding),
                         horizontalArrangement = Arrangement.Center
                     ) {
                         repeat(actualCount) { iteration ->
@@ -274,11 +279,12 @@ fun DashboardContent(
                 }
             }
         } else {
-             Box(
+         Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isPhone) 120.dp else 160.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .height(if (isPhone) 100.dp else 120.dp) // 压缩空状态高度 120->100
+                    .padding(horizontal = contentPadding)
+                    .clip(RoundedCornerShape(16.dp)) // 圆角降为 16.dp
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -294,9 +300,9 @@ fun DashboardContent(
                          imageVector = Icons.Default.EventAvailable, // Or similar icon
                          contentDescription = null,
                          tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                         modifier = Modifier.size(48.dp)
+                         modifier = Modifier.size(36.dp) // 图标从 48 -> 36
                      )
-                     Spacer(modifier = Modifier.height(12.dp))
+                     Spacer(modifier = Modifier.height(8.dp)) // 间距 12 -> 8
                      Text(
                          text = "\u4eca\u65e5\u6682\u65e0\u4f1a\u8bae\u5b89\u6392",
                          style = MaterialTheme.typography.titleMedium,
@@ -309,15 +315,35 @@ fun DashboardContent(
 
         Spacer(modifier = Modifier.height(if (isPhone) 16.dp else 24.dp))
 
+        // Titles for Quick Actions & Stats
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "快捷功能",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "数据概览",
+                modifier = Modifier.weight(2.2f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
         // Split Layout: 1:2 Asymmetric Quick Actions & Stats
         Row(
-            modifier = Modifier.fillMaxWidth().height(110.dp),
+            modifier = Modifier.fillMaxWidth().height(110.dp).padding(horizontal = contentPadding),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Left Side: Condensed Quick Actions (weight 1f)
             Card(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp), // 圆角 20 -> 16
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 )
@@ -358,7 +384,7 @@ fun DashboardContent(
             // Right Side: Gradient Stats Pager (weight 2.2f)
             Card(
                 modifier = Modifier.weight(2.2f).fillMaxHeight(),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(16.dp) // 圆角 20 -> 16
             ) {
                 // Background Gradient
                 Box(
@@ -367,8 +393,8 @@ fun DashboardContent(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.surfaceVariant
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), // 弱化背景，而非原先的强原色
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                             )
                         )
@@ -461,7 +487,7 @@ fun DashboardContent(
         // 3. Recent Reading (Using reading progress)
         if (isSelectionMode) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -518,6 +544,7 @@ fun DashboardContent(
         } else {
             Text(
                 text = "最近阅读",
+                modifier = Modifier.padding(horizontal = contentPadding),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -527,6 +554,7 @@ fun DashboardContent(
         if (visibleReadingProgress.isNotEmpty()) {
             LazyRow(
                 state = recentReadingListState,
+                contentPadding = PaddingValues(horizontal = contentPadding),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(
@@ -567,11 +595,12 @@ fun DashboardContent(
                 }
             }
         } else {
-            // 缂傚倸鍊搁崐椋庣矆娓氣偓閹本鎷呯化鏇熺€洪梺鎸庣箓濡瑩宕ｈ箛娑欑厵闂傚倸顕ˇ锔剧磼閻樺啿鐏ラ棁澶愭煥濠靛棙澶勯柛銈傚亾缂傚倷鐒﹁ぐ鍐耿鏉堚晜顫曢柟鐑橆殔閻?
+            // 没有阅读记录时的状态
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)
+                    .padding(horizontal = contentPadding)
                     .background(
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                         RoundedCornerShape(16.dp)
