@@ -351,7 +351,7 @@ fun DashboardContent(
             verticalAlignment = Alignment.Top
         ) {
             // 左侧列：快捷功能标题 + 卡片
-            Column(modifier = Modifier.weight(0.35f)) {
+            Column(modifier = Modifier.weight(0.4f)) {
                 Text(
                     text = "快捷功能",
                     style = MaterialTheme.typography.titleMedium,
@@ -365,20 +365,18 @@ fun DashboardContent(
                     QuickActionPrimaryButton(
                         icon = Icons.Default.HowToVote,
                         title = "投票",
-                        subtitle = "进入投票中心",
                         onClick = onVoteClick
                     )
                     QuickActionPrimaryButton(
                         icon = Icons.Default.Refresh,
                         title = "抽签",
-                        subtitle = "进入抽签中心",
                         onClick = onLotteryClick
                     )
                 }
             }
 
             // 右侧列：最近阅读标题 + 卡片
-            Column(modifier = Modifier.weight(0.65f)) {
+            Column(modifier = Modifier.weight(0.6f)) {
                 Text(
                     text = if (isSelectionMode) "已选择 ${selectedReadingIds.size} 项" else "最近阅读",
                     style = MaterialTheme.typography.titleMedium,
@@ -762,7 +760,6 @@ fun QuickActionItem(
 fun QuickActionPrimaryButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    subtitle: String,
     onClick: () -> Unit
 ) {
     Surface(
@@ -770,38 +767,38 @@ fun QuickActionPrimaryButton(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        modifier = Modifier.fillMaxWidth().height(60.dp)
+        modifier = Modifier.fillMaxWidth().height(56.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier.padding(6.dp)
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
