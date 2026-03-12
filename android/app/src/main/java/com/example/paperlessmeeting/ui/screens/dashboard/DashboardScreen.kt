@@ -351,44 +351,34 @@ fun DashboardContent(
             verticalAlignment = Alignment.Top
         ) {
             // 左侧列：快捷功能标题 + 卡片
-            val quickActionsMaxWidth = if (isPhone) 140.dp else 180.dp
-            Column(modifier = Modifier.width(quickActionsMaxWidth)) {
+            Column(modifier = Modifier.weight(0.35f)) {
                 Text(
                     text = "快捷功能",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                Card(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                    )
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        QuickActionItem(
-                            icon = Icons.Default.HowToVote,
-                            label = "投票",
-                            onClick = onVoteClick
-                        )
-                        QuickActionItem(
-                            icon = Icons.Default.Refresh,
-                            label = "抽签",
-                            onClick = onLotteryClick
-                        )
-                    }
+                    QuickActionPrimaryButton(
+                        icon = Icons.Default.HowToVote,
+                        title = "投票",
+                        subtitle = "进入投票中心",
+                        onClick = onVoteClick
+                    )
+                    QuickActionPrimaryButton(
+                        icon = Icons.Default.Refresh,
+                        title = "抽签",
+                        subtitle = "进入抽签中心",
+                        onClick = onLotteryClick
+                    )
                 }
             }
 
             // 右侧列：最近阅读标题 + 卡片
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(0.65f)) {
                 Text(
                     text = if (isSelectionMode) "已选择 ${selectedReadingIds.size} 项" else "最近阅读",
                     style = MaterialTheme.typography.titleMedium,
@@ -765,5 +755,53 @@ fun QuickActionItem(
         }
         Spacer(Modifier.height(8.dp))
         Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun QuickActionPrimaryButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
+        modifier = Modifier.fillMaxWidth().height(60.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
