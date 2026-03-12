@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -86,7 +88,9 @@ fun MediaScreen(
     viewModel: MediaViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var previewItem by remember { mutableStateOf<MediaItem?>(null) }
+    var previewVideoItem by remember { mutableStateOf<MediaItem?>(null) }
+    var previewImageItems by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
+    var previewImageIndex by remember { mutableStateOf<Int?>(null) }
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val isPhone = screenWidthDp < 600
     val hPadding = if (isPhone) 16.dp else 28.dp
@@ -189,8 +193,15 @@ fun MediaScreen(
                                 onClick = {
                                     when (item.kind) {
                                         "folder" -> viewModel.navigateToFolder(item.id)
-                                        "image" -> previewItem = item
-                                        "video" -> previewItem = item
+                                        "image" -> {
+                                            val images = uiState.items.filter { it.kind == "image" }
+                                            val idx = images.indexOfFirst { it.id == item.id }
+                                            if (idx >= 0) {
+                                                previewImageItems = images
+                                                previewImageIndex = idx
+                                            }
+                                        }
+                                        "video" -> previewVideoItem = item
                                     }
                                 }
                             )
@@ -224,10 +235,21 @@ fun MediaScreen(
     
     }
 
-    if (previewItem != null) {
-        MediaPreviewDialog(
-            item = previewItem!!,
-            onDismiss = { previewItem = null }
+    if (previewImageIndex != null && previewImageItems.isNotEmpty()) {
+        MediaImagePagerDialog(
+            items = previewImageItems,
+            startIndex = previewImageIndex ?: 0,
+            onDismiss = {
+                previewImageIndex = null
+                previewImageItems = emptyList()
+            }
+        )
+    }
+
+    if (previewVideoItem != null) {
+        MediaVideoPreviewDialog(
+            item = previewVideoItem!!,
+            onDismiss = { previewVideoItem = null }
         )
     }
 }
@@ -558,10 +580,110 @@ private fun formatItemDate(dateStr: String?): String? {
     }
 }
 
-// ==================== Preview Dialog ====================
+// ==================== Preview Dialogs ====================
 
 @Composable
-private fun MediaPreviewDialog(
+private fun MediaImagePagerDialog(
+    items: List<MediaItem>,
+    startIndex: Int,
+    onDismiss: () -> Unit
+) {
+    if (items.isEmpty()) return
+    val pagerState = rememberPagerState(
+        initialPage = startIndex.coerceIn(0, items.lastIndex),
+        pageCount = { items.size }
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val item = items[page]
+                val imageUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
+                    BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+                }
+
+                if (imageUrl != null) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = item.title,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 48.dp)
+                            .size(72.dp),
+                        tint = Color.White.copy(alpha = 0.35f)
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .size(40.dp)
+                    .background(Color.White.copy(alpha = 0.15f), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "鍏抽棴",
+                    tint = Color.White
+                )
+            }
+
+            val currentItem = items.getOrNull(pagerState.currentPage)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+                        )
+                    )
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "${pagerState.currentPage + 1} / ${items.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    if (currentItem != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = currentItem.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaVideoPreviewDialog(
     item: MediaItem,
     onDismiss: () -> Unit
 ) {
@@ -578,43 +700,23 @@ private fun MediaPreviewDialog(
                     interactionSource = remember { MutableInteractionSource() }
                 ) { onDismiss() }
         ) {
-            when (item.kind) {
-                "image" -> {
-                    val imageUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
-                        BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
-                    }
-
-                    if (imageUrl != null) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = item.title,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                }
-                "video" -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.PlayCircleFilled,
-                            contentDescription = null,
-                            modifier = Modifier.size(80.dp),
-                            tint = Color.White.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.PlayCircleFilled,
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp),
+                    tint = Color.White.copy(alpha = 0.8f)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
             }
 
             // Close button

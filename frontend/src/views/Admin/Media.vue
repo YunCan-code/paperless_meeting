@@ -357,6 +357,38 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-image-viewer
+      v-if="imagePreviewVisible"
+      :url-list="imagePreviewUrls"
+      :initial-index="imagePreviewIndex"
+      @close="imagePreviewVisible = false"
+    />
+
+    <el-dialog
+      v-model="videoPreviewVisible"
+      width="760px"
+      append-to-body
+      align-center
+      class="video-preview-dialog"
+      @closed="videoPreviewItem = null"
+    >
+      <template #header>
+        <div class="video-preview-header">
+          <span>{{ videoPreviewItem?.title || '瑙嗛棰勮' }}</span>
+        </div>
+      </template>
+      <div class="video-preview-body">
+        <video
+          v-if="videoPreviewUrl"
+          class="video-preview-player"
+          :src="videoPreviewUrl"
+          controls
+          preload="metadata"
+        />
+        <div v-else class="video-preview-empty">瑙嗛鏃犳硶棰勮</div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -378,7 +410,7 @@ import {
   Upload,
   VideoPlay
 } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElImageViewer, ElMessage, ElMessageBox } from 'element-plus'
 import { useSidebar } from '@/composables/useSidebar'
 import request from '@/utils/request'
 
@@ -412,6 +444,14 @@ const filterOptions = [
 const currentFolderId = ref(null)
 const items = ref([])
 const breadcrumbPath = ref([])
+const imagePreviewVisible = ref(false)
+const imagePreviewIndex = ref(0)
+const videoPreviewVisible = ref(false)
+const videoPreviewItem = ref(null)
+
+const imagePreviewItems = computed(() => items.value.filter((item) => item.kind === 'image' && item.previewUrl))
+const imagePreviewUrls = computed(() => imagePreviewItems.value.map((item) => item.previewUrl))
+const videoPreviewUrl = computed(() => videoPreviewItem.value?.previewUrl || '')
 
 function mapItem(raw) {
   return {
@@ -482,11 +522,35 @@ function toggleViewMode() {
   viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
 }
 
+function openImagePreview(item) {
+  const idx = imagePreviewItems.value.findIndex((img) => img.id === item.id)
+  if (idx === -1) return
+  imagePreviewIndex.value = idx
+  imagePreviewVisible.value = true
+}
+
+function openVideoPreview(item) {
+  if (!item.previewUrl) {
+    ElMessage.warning('瑙嗛鏃犳硶棰勮')
+    return
+  }
+  videoPreviewItem.value = item
+  videoPreviewVisible.value = true
+}
+
 function handleItemClick(item) {
   if (item.kind === 'folder') {
     currentFolderId.value = item.id
     fetchItems()
     fetchBreadcrumbs()
+    return
+  }
+  if (item.kind === 'image') {
+    openImagePreview(item)
+    return
+  }
+  if (item.kind === 'video') {
+    openVideoPreview(item)
   }
 }
 
@@ -645,7 +709,7 @@ async function handleFileImport(event) {
   if (currentFolderId.value !== null) formData.append('parent_id', currentFolderId.value)
 
   try {
-    const result = await request.post('/media/upload', formData)
+    const result = await request.post('/media/upload', formData, { timeout: 0 })
     ElMessage.success(`已导入 ${result.length} 个文件`)
     fetchItems()
   } catch {
@@ -1547,5 +1611,33 @@ onMounted(() => {
   background: var(--el-bg-color-overlay, #1e293b) !important;
   border-color: var(--border-color, #334155) !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+.video-preview-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+}
+
+.video-preview-player {
+  width: 100%;
+  max-height: 70vh;
+  border-radius: 16px;
+  background: #000000;
+}
+
+.video-preview-empty {
+  color: var(--text-secondary, #64748b);
+}
+
+.video-preview-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+}
+
+:deep(.video-preview-dialog .el-dialog__body) {
+  padding: 16px 24px 24px;
 }
 </style>

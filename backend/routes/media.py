@@ -80,9 +80,10 @@ def _to_read(
 ) -> MediaItemRead:
     preview = ""
     thumbnail = ""
-    if item.kind == "image" and item.filename:
+    if item.filename and item.kind in {"image", "video"}:
         preview = f"/static/media/{item.filename}"
-        thumbnail = _build_media_thumbnail(MEDIA_UPLOAD_DIR / item.filename)
+        if item.kind == "image":
+            thumbnail = _build_media_thumbnail(MEDIA_UPLOAD_DIR / item.filename)
     children_count = 0
     if item.kind == "folder":
         if children_counts is not None and item.id is not None:
