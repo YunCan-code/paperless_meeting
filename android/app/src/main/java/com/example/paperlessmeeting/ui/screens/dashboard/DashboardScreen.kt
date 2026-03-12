@@ -351,7 +351,7 @@ fun DashboardContent(
             verticalAlignment = Alignment.Top
         ) {
             // 左侧列：快捷功能标题 + 卡片
-            Column(modifier = Modifier.weight(0.4f)) {
+            Column(modifier = Modifier.weight(0.3f)) {
                 Text(
                     text = "快捷功能",
                     style = MaterialTheme.typography.titleMedium,
@@ -360,7 +360,7 @@ fun DashboardContent(
                 )
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     QuickActionPrimaryButton(
                         icon = Icons.Default.HowToVote,
@@ -376,7 +376,7 @@ fun DashboardContent(
             }
 
             // 右侧列：最近阅读标题 + 卡片
-            Column(modifier = Modifier.weight(0.6f)) {
+            Column(modifier = Modifier.weight(0.7f)) {
                 Text(
                     text = if (isSelectionMode) "已选择 ${selectedReadingIds.size} 项" else "最近阅读",
                     style = MaterialTheme.typography.titleMedium,
@@ -767,11 +767,11 @@ fun QuickActionPrimaryButton(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        modifier = Modifier.fillMaxWidth().height(56.dp)
+        modifier = Modifier.fillMaxWidth().height(52.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
         ) {
             Surface(
                 shape = CircleShape,
@@ -785,7 +785,7 @@ fun QuickActionPrimaryButton(
                     modifier = Modifier.padding(6.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
