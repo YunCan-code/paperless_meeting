@@ -377,7 +377,7 @@ fun DashboardContent(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
                 )
             ) {
                 Column(
@@ -946,7 +946,8 @@ fun QuickActionItem(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 2.dp,
             onClick = onClick,
             modifier = Modifier.size(44.dp)
         ) {

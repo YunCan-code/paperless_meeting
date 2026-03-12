@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,6 +62,13 @@ fun RecentReadingCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val cardWidth = if (isPhone) 260.dp else 320.dp
+    val cardHeight = if (isPhone) 112.dp else 124.dp
+    val defaultContainerColor = MaterialTheme.colorScheme.surface
+    val selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    val thumbnailContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+
     val cardScale by animateFloatAsState(
         targetValue = when {
             isDeleting -> 0.9f
@@ -83,9 +91,9 @@ fun RecentReadingCard(
 
     val containerColor by animateColorAsState(
         targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer
+            selectedContainerColor
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            defaultContainerColor
         },
         animationSpec = tween(durationMillis = 180),
         label = "recent_reading_container_color"
@@ -103,8 +111,8 @@ fun RecentReadingCard(
 
     Box(
         modifier = Modifier
-            .width(260.dp)
-            .height(110.dp)
+            .width(cardWidth)
+            .height(cardHeight)
             .graphicsLayer {
                 scaleX = cardScale
                 scaleY = cardScale
@@ -129,20 +137,20 @@ fun RecentReadingCard(
                 ),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = containerColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp),
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .width(70.dp)
+                        .width(62.dp)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White),
+                        .background(thumbnailContainerColor),
                     contentAlignment = Alignment.Center
                 ) {
                     val localFile = progress.localPath?.let { java.io.File(it) }
@@ -165,50 +173,48 @@ fun RecentReadingCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight(), // 增加 fillMaxHeight() 使整列撑满卡片可用高度
-                    verticalArrangement = Arrangement.SpaceBetween    // 改为上下两端对齐
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.Top
                 ) {
+                    // 标题固定占 2 行高度，避免进度条随行数浮动
                     Text(
                         text = progress.fileName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
+                        minLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.weight(1f)) // 将剩余空间推给顶部标题
+                    Spacer(modifier = Modifier.weight(1f))
 
-                    Column { // 进度条和页码作为底部块
-                        val progressPercent = if (progress.totalPages > 0) {
-                            (progress.currentPage + 1).toFloat() / progress.totalPages.toFloat()
-                        } else {
-                            0f
-                        }
+                    val progressPercent = if (progress.totalPages > 0) {
+                        (progress.currentPage + 1).toFloat() / progress.totalPages.toFloat()
+                    } else {
+                        0f
+                    }
 
-                        LinearProgressIndicator(
+                    LinearProgressIndicator(
                         progress = { progressPercent },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(4.dp),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                         trackColor = MaterialTheme.colorScheme.outlineVariant
                     )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                        Text(
-                            text = "上次阅读至：第 ${progress.currentPage + 1} 页",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
+                    Text(
+                        text = "上次阅读至：第 ${progress.currentPage + 1} 页",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
