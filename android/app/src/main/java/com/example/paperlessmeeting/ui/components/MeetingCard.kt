@@ -36,7 +36,8 @@ import com.example.paperlessmeeting.domain.model.MeetingStatus
 fun MeetingCard(
     meeting: Meeting,
     onClick: () -> Unit,
-    statusOverride: MeetingStatus? = null
+    statusOverride: MeetingStatus? = null,
+    placeLocationBottomEnd: Boolean = false
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (isPressed) 0.98f else 1f, label = "cardScale")
@@ -161,64 +162,128 @@ fun MeetingCard(
                     
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Metadata Row
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Speaker (if available) derived from attendees or fallback
-                        val speakersList = meeting.attendees?.filter { it.meetingRole == "主讲人" }?.joinToString(", ") { it.name }
-                        val displaySpeaker = if (!speakersList.isNullOrBlank()) speakersList else meeting.speaker
-                        
-                        if (!displaySpeaker.isNullOrBlank()) {
+                    // Metadata
+                    val speakersList = meeting.attendees?.filter { it.meetingRole == "主讲人" }?.joinToString(", ") { it.name }
+                    val displaySpeaker = if (!speakersList.isNullOrBlank()) speakersList else meeting.speaker
+
+                    if (placeLocationBottomEnd) {
+                        Column {
+                            if (!displaySpeaker.isNullOrBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Person,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = displaySpeaker,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Time (left bottom)
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = formatTimeRange(meeting.startTime, meeting.endTime),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.9f)
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Location (right bottom)
+                                    Icon(
+                                        imageVector = Icons.Filled.LocationOn,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = meeting.location ?: "\u5f85\u5b9a\u5730\u70b9",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (!displaySpeaker.isNullOrBlank()) {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = displaySpeaker,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+
+                            // Location
                             Icon(
-                                imageVector = Icons.Filled.Person,
+                                imageVector = Icons.Filled.LocationOn,
                                 contentDescription = null,
                                 tint = Color.White.copy(alpha = 0.9f),
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = displaySpeaker,
+                                text = meeting.location ?: "\u5f85\u5b9a\u5730\u70b9",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.9f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+
                             Spacer(modifier = Modifier.width(16.dp))
+
+                            // Time
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = formatTimeRange(meeting.startTime, meeting.endTime),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
                         }
-
-                        // Location
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = meeting.location ?: "待定地点",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.9f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        // Time
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = formatTimeDisplay(meeting.startTime), 
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
                     }
+
                 }
             }
         }
@@ -233,6 +298,16 @@ fun formatTimeDisplay(isoString: String): String {
         } else isoString
     } catch (e: Exception) {
         isoString
+    }
+}
+
+fun formatTimeRange(start: String, end: String?): String {
+    val startText = formatTimeDisplay(start)
+    val endText = end?.takeIf { it.isNotBlank() }?.let { formatTimeDisplay(it) }
+    return if (endText.isNullOrBlank() || endText == startText) {
+        startText
+    } else {
+        "$startText - $endText"
     }
 }
 

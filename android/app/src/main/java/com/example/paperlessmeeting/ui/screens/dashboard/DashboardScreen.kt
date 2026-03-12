@@ -277,6 +277,7 @@ fun DashboardContent(
                     com.example.paperlessmeeting.ui.components.MeetingCard(
                         meeting = meeting,
                         statusOverride = resolveTodayMeetingStatus(state.activeMeetings, actualPage),
+                        placeLocationBottomEnd = true,
                         onClick = { onMeetingClick(meeting.id) }
                     )
                 }

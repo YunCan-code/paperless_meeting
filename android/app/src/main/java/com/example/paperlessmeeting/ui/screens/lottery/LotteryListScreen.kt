@@ -31,6 +31,7 @@ import androidx.navigation.NavController
 import com.example.paperlessmeeting.domain.model.LotteryHistoryResponse
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.navigation.Screen
+import com.example.paperlessmeeting.ui.components.formatTimeRange
 
 // Minimalist Color Palette
 private val ActiveGold = Color(0xFFFFD700) // Gold for lottery
@@ -215,7 +216,7 @@ fun ActiveMeetingCard(meeting: Meeting, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = meeting.startTime.toString(),
+                    text = formatTimeRange(meeting.startTime, meeting.endTime),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )

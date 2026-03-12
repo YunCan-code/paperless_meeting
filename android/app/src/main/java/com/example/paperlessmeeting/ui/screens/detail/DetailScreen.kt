@@ -414,35 +414,33 @@ fun MeetingDetailContent(
                         )
                 )
 
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    MeetingStatusBadge(status = meeting.getUiStatus())
-                    if (!meeting.meetingTypeName.isNullOrEmpty()) {
-                        androidx.compose.material3.Surface(
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = meeting.meetingTypeName,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(24.dp)
+                        .align(Alignment.TopStart)
+                        .padding(20.dp)
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MeetingStatusBadge(status = meeting.getUiStatus())
+                        if (!meeting.meetingTypeName.isNullOrEmpty()) {
+                            androidx.compose.material3.Surface(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = meeting.meetingTypeName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Text(
                         text = meeting.title,
                         style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
@@ -451,25 +449,34 @@ fun MeetingDetailContent(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(meeting.location ?: "地点待定", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyMedium)
-                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.DateRange, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = try {
-                                    java.time.LocalDateTime.parse(meeting.startTime.substringBefore("."))
-                                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                                } catch (_: Exception) { meeting.startTime.substringBefore("T") },
+                                text = formatMeetingDateTimeRange(meeting.startTime, meeting.endTime),
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LocationOn, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                meeting.location ?: "\u5730\u70b9\u5f85\u5b9a",
                                 color = Color.White.copy(alpha = 0.9f),
                                 style = MaterialTheme.typography.bodyMedium
                             )
@@ -618,6 +625,45 @@ fun formatFileSize(size: Int): String {
     if (kb < 1024) return "%.1f KB".format(kb)
     val mb = kb / 1024.0
     return "%.1f MB".format(mb)
+}
+
+private fun formatMeetingDateTimeRange(start: String?, end: String?): String {
+    val startParsed = parseMeetingDateTime(start)
+    val endParsed = parseMeetingDateTime(end)
+
+    if (startParsed == null) {
+        return start?.ifBlank { "" } ?: ""
+    }
+
+    val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    if (endParsed == null) {
+        return startParsed.format(dateFormatter)
+    }
+
+    val sameDay = startParsed.toLocalDate() == endParsed.toLocalDate()
+    return if (sameDay) {
+        val startText = startParsed.format(dateFormatter)
+        val endText = endParsed.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+        "$startText - $endText"
+    } else {
+        val startText = startParsed.format(dateFormatter)
+        val endText = endParsed.format(dateFormatter)
+        "$startText - $endText"
+    }
+}
+
+private fun parseMeetingDateTime(raw: String?): java.time.LocalDateTime? {
+    if (raw.isNullOrBlank()) return null
+    val normalized = raw.substringBefore(".").replace(" ", "T")
+    return try {
+        java.time.LocalDateTime.parse(normalized)
+    } catch (_: Exception) {
+        try {
+            java.time.OffsetDateTime.parse(normalized).toLocalDateTime()
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 // Agenda Item data class
