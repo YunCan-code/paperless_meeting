@@ -7,6 +7,8 @@ from pathlib import Path
 from datetime import datetime
 import uuid
 import os
+import shutil
+import subprocess
 
 from database import get_session
 from models import MediaItem, MediaItemRead, MediaItemPage, MediaItemUpdate, MediaItemMove
@@ -21,6 +23,7 @@ MEDIA_THUMB_DIR.mkdir(parents=True, exist_ok=True)
 
 MEDIA_THUMB_SIZE = (480, 480)
 MEDIA_THUMB_QUALITY = 72
+MEDIA_VIDEO_THUMB_SIZE = (640, 360)
 
 try:
     from PIL import Image as PILImage, ImageOps  # type: ignore
@@ -73,6 +76,50 @@ def _build_media_thumbnail(source_path: Path) -> str:
         return ""
 
 
+def _build_video_thumbnail(source_path: Path) -> str:
+    """Build (or reuse) JPEG thumbnail for a media video using ffmpeg if available."""
+    try:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            return ""
+        source = Path(source_path)
+        if not source.is_file():
+            return ""
+        stem = source.stem
+        w, h = MEDIA_VIDEO_THUMB_SIZE
+        thumb_name = f"{stem}_video_{w}x{h}.jpg"
+        thumb_path = MEDIA_THUMB_DIR / thumb_name
+
+        source_mtime = source.stat().st_mtime
+        if thumb_path.exists() and thumb_path.stat().st_mtime >= source_mtime:
+            return f"/static/thumbnails/media/{thumb_name}"
+
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-ss",
+            "0.5",
+            "-i",
+            str(source),
+            "-vframes",
+            "1",
+            "-vf",
+            f"scale={w}:{h}:force_original_aspect_ratio=decrease",
+            "-q:v",
+            "4",
+            str(thumb_path),
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=20)
+        if result.returncode != 0:
+            return ""
+        if thumb_path.exists():
+            return f"/static/thumbnails/media/{thumb_name}"
+        return ""
+    except Exception as e:
+        print(f"[media-thumb] failed to build video thumbnail for {source_path}: {e}")
+        return ""
+
+
 def _to_read(
     item: MediaItem,
     session: Session,
@@ -84,6 +131,8 @@ def _to_read(
         preview = f"/static/media/{item.filename}"
         if item.kind == "image":
             thumbnail = _build_media_thumbnail(MEDIA_UPLOAD_DIR / item.filename)
+        elif item.kind == "video":
+            thumbnail = _build_video_thumbnail(MEDIA_UPLOAD_DIR / item.filename)
     children_count = 0
     if item.kind == "folder":
         if children_counts is not None and item.id is not None:
@@ -295,6 +344,8 @@ def upload_files(
         # Pre-generate thumbnail for images at upload time
         if kind == "image":
             _build_media_thumbnail(save_path)
+        if kind == "video":
+            _build_video_thumbnail(save_path)
 
         created.append(_to_read(item, session))
 

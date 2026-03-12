@@ -59,6 +59,15 @@
       </div>
     </div>
 
+    <div v-if="uploading" class="upload-progress">
+      <div class="upload-progress-header">
+        <span>上传中 {{ uploadFilesCount }} 个文件</span>
+        <span class="upload-progress-text">{{ uploadPercentText }}</span>
+      </div>
+      <el-progress :percentage="uploadProgress" :stroke-width="6" />
+      <div v-if="uploadSizeText" class="upload-progress-meta">{{ uploadSizeText }}</div>
+    </div>
+
     <div v-if="viewMode === 'grid'" class="library-grid">
       <el-popover
         trigger="click"
@@ -122,9 +131,18 @@
             :alt="item.title"
             class="thumb-image"
           />
+          <img
+            v-else-if="item.kind === 'video' && item.thumbnailUrl"
+            :src="item.thumbnailUrl"
+            :alt="item.title"
+            class="thumb-image"
+          />
           <div v-else class="thumb-overlay">
             <el-icon v-if="item.kind === 'image'" class="thumb-icon"><PictureFilled /></el-icon>
             <el-icon v-else class="thumb-icon"><VideoPlay /></el-icon>
+          </div>
+          <div v-if="item.kind === 'video'" class="thumb-overlay play-overlay">
+            <el-icon class="thumb-icon"><VideoPlay /></el-icon>
           </div>
           <div class="thumb-badge">{{ kindLabel(item.kind) }}</div>
           <div class="thumb-footer">{{ item.kind === 'video' ? item.size : item.extension }}</div>
@@ -211,6 +229,12 @@
             <img
               v-else-if="item.kind === 'image' && item.previewUrl"
               :src="item.previewUrl"
+              :alt="item.title"
+              class="mini-image"
+            />
+            <img
+              v-else-if="item.kind === 'video' && item.thumbnailUrl"
+              :src="item.thumbnailUrl"
               :alt="item.title"
               class="mini-image"
             />
@@ -383,6 +407,7 @@
           v-if="videoPreviewUrl"
           class="video-preview-player"
           :src="videoPreviewUrl"
+          :poster="videoPreviewPosterUrl"
           controls
           preload="metadata"
         />
@@ -421,6 +446,11 @@ const activeFilter = ref('all')
 const viewMode = ref('grid')
 const loading = ref(false)
 const createMenuVisible = ref(false)
+const uploading = ref(false)
+const uploadProgress = ref(0)
+const uploadLoaded = ref(0)
+const uploadTotal = ref(0)
+const uploadFilesCount = ref(0)
 
 const drawerVisible = ref(false)
 const selectedItem = ref(null)
@@ -452,6 +482,12 @@ const videoPreviewItem = ref(null)
 const imagePreviewItems = computed(() => items.value.filter((item) => item.kind === 'image' && item.previewUrl))
 const imagePreviewUrls = computed(() => imagePreviewItems.value.map((item) => item.previewUrl))
 const videoPreviewUrl = computed(() => videoPreviewItem.value?.previewUrl || '')
+const videoPreviewPosterUrl = computed(() => videoPreviewItem.value?.thumbnailUrl || '')
+const uploadPercentText = computed(() => `${uploadProgress.value}%`)
+const uploadSizeText = computed(() => {
+  if (!uploadTotal.value) return ''
+  return `${formatBytes(uploadLoaded.value)} / ${formatBytes(uploadTotal.value)}`
+})
 
 function mapItem(raw) {
   return {
@@ -466,6 +502,7 @@ function mapItem(raw) {
     createdAt: raw.created_at,
     size: raw.size || '',
     previewUrl: raw.previewUrl || '',
+    thumbnailUrl: raw.thumbnailUrl || '',
     childrenCount: raw.children_count ?? 0
   }
 }
@@ -479,6 +516,7 @@ async function fetchItems() {
     const data = await request.get('/media/items', { params })
     items.value = data.map(mapItem)
   } catch {
+    uploading.value = false
     items.value = []
   } finally {
     loading.value = false
@@ -542,6 +580,7 @@ function handleItemClick(item) {
   if (item.kind === 'folder') {
     currentFolderId.value = item.id
     fetchItems()
+    uploading.value = false
     fetchBreadcrumbs()
     return
   }
@@ -708,8 +747,25 @@ async function handleFileImport(event) {
   supportedFiles.forEach((file) => formData.append('files', file))
   if (currentFolderId.value !== null) formData.append('parent_id', currentFolderId.value)
 
+  uploading.value = true
+  uploadProgress.value = 0
+  uploadLoaded.value = 0
+  uploadFilesCount.value = supportedFiles.length
+  uploadTotal.value = supportedFiles.reduce((sum, file) => sum + (file.size || 0), 0)
+
   try {
-    const result = await request.post('/media/upload', formData, { timeout: 0 })
+    const result = await request.post('/media/upload', formData, {
+      timeout: 0,
+      onUploadProgress: (progressEvent) => {
+        if (!uploading.value) return
+        const total = progressEvent.total || uploadTotal.value
+        const loaded = progressEvent.loaded || 0
+        uploadLoaded.value = loaded
+        if (total > 0) {
+          uploadProgress.value = Math.min(100, Math.round((loaded / total) * 100))
+        }
+      }
+    })
     ElMessage.success(`已导入 ${result.length} 个文件`)
     fetchItems()
   } catch {
@@ -725,6 +781,18 @@ function formatDate(value) {
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
   const day = `${date.getDate()}`.padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let idx = 0
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024
+    idx += 1
+  }
+  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`
 }
 
 function getFolderCount(item) {
@@ -884,6 +952,35 @@ onMounted(() => {
   padding: 10px 18px;
 }
 
+.upload-progress {
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--card-bg, #ffffff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upload-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+}
+
+.upload-progress-text {
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+}
+
+.upload-progress-meta {
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+}
+
 .library-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -1000,6 +1097,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.thumb-overlay.play-overlay {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.05), rgba(15, 23, 42, 0.45));
 }
 
 .thumb-icon {

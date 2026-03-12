@@ -40,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +75,10 @@ import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.domain.model.MediaItem
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem as ExoMediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -82,7 +87,7 @@ private val FolderBlue = Color(0xFF5AC8FA)
 private val FolderBlueDark = Color(0xFF4AB8EA)
 private val FolderBlueLight = Color(0xFFB8E8FF)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MediaScreen(
     viewModel: MediaViewModel = hiltViewModel()
@@ -536,6 +541,12 @@ private fun ImageThumbnail(item: MediaItem) {
 @Composable
 @Suppress("UNUSED_PARAMETER")
 private fun VideoThumbnail(item: MediaItem) {
+    val rawThumb = item.thumbnailUrl?.takeIf { it.isNotEmpty() }
+    val thumbUrl = rawThumb?.let {
+        BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+    }
+    val context = LocalContext.current
+
     Card(
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -547,13 +558,33 @@ private fun VideoThumbnail(item: MediaItem) {
                 .aspectRatio(1f),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Default.VideoFile,
-                contentDescription = null,
-                modifier = Modifier.size(44.dp),
-                tint = Color(0xFF4285F4).copy(alpha = 0.6f)
-            )
-            // Play badge
+            if (thumbUrl != null) {
+                val imageRequest = remember(context, thumbUrl) {
+                    ImageRequest.Builder(context)
+                        .data(thumbUrl)
+                        .crossfade(false)
+                        .allowHardware(true)
+                        .precision(Precision.INEXACT)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .networkCachePolicy(CachePolicy.ENABLED)
+                        .build()
+                }
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    Icons.Default.VideoFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = Color(0xFF4285F4).copy(alpha = 0.6f)
+                )
+            }
+
             Icon(
                 Icons.Default.PlayCircleFilled,
                 contentDescription = null,
@@ -582,6 +613,7 @@ private fun formatItemDate(dateStr: String?): String? {
 
 // ==================== Preview Dialogs ====================
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun MediaImagePagerDialog(
     items: List<MediaItem>,
@@ -622,15 +654,17 @@ private fun MediaImagePagerDialog(
                         contentScale = ContentScale.Fit
                     )
                 } else {
-                    Icon(
-                        Icons.Default.Image,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(top = 48.dp)
-                            .size(72.dp),
-                        tint = Color.White.copy(alpha = 0.35f)
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Image,
+                            contentDescription = null,
+                            modifier = Modifier.size(72.dp),
+                            tint = Color.White.copy(alpha = 0.35f)
+                        )
+                    }
                 }
             }
 
@@ -691,19 +725,45 @@ private fun MediaVideoPreviewDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val context = LocalContext.current
+        val videoUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
+            BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+        }
+        val player = remember(videoUrl) {
+            ExoPlayer.Builder(context).build().apply {
+                if (videoUrl != null) {
+                    setMediaItem(ExoMediaItem.fromUri(videoUrl))
+                    prepare()
+                }
+            }
+        }
+        DisposableEffect(player) {
+            onDispose { player.release() }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.92f))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { onDismiss() }
         ) {
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            if (videoUrl != null) {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            this.player = player
+                            useController = true
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                )
+            } else {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 Icon(
                     Icons.Default.PlayCircleFilled,
                     contentDescription = null,
@@ -717,6 +777,7 @@ private fun MediaVideoPreviewDialog(
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
+                }
             }
 
             // Close button

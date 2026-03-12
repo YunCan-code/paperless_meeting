@@ -93,6 +93,10 @@ dependencies {
     // PDF Viewer
     implementation("com.github.asadwaheed1:AndroidPdfViewer:v3.2.0-beta06")
 
+    // Video playback (Media3 / ExoPlayer)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
