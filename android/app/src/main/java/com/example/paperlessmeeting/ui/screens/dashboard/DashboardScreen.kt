@@ -18,15 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.HowToVote
-import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -42,7 +38,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.StrokeCap
@@ -347,10 +342,11 @@ fun DashboardContent(
 
         Spacer(modifier = Modifier.height(if (isPhone) 16.dp else 24.dp))
 
-        // Titles for Quick Actions & Stats
+        // ── 标题行：快捷功能 + 最近阅读 ──
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "快捷功能",
@@ -359,211 +355,167 @@ fun DashboardContent(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "数据概览",
-                modifier = Modifier.weight(1f), // 修改为 1:1对半平分
+                text = if (isSelectionMode) "已选择 ${selectedReadingIds.size} 项" else "最近阅读",
+                modifier = Modifier.weight(2f),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Split Layout: 1:1 Symmetric Quick Actions & Stats
+        // ── 内容行：左侧快捷功能 + 右侧最近阅读 ──
         Row(
-            modifier = Modifier.fillMaxWidth().height(184.dp).padding(horizontal = contentPadding), // 增加高度至184dp，防止文字裁切
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = contentPadding),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            // Left Side: 2x2 Quick Actions (weight 1f)
+            // 左侧：快捷功能（仅投票+抽签，紧凑布局）
+            val quickActionsMaxWidth = if (isPhone) 160.dp else 200.dp
             Card(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier
+                    .width(quickActionsMaxWidth),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
                 )
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(top = 16.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp, horizontal = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        QuickActionItem(
-                            icon = Icons.Default.HowToVote,
-                            label = "投票",
-                            onClick = onVoteClick
-                        )
-                        QuickActionItem(
-                            icon = Icons.Default.Refresh,
-                            label = "抽签",
-                            onClick = onLotteryClick
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        QuickActionItem(
-                            icon = Icons.Default.Edit,
-                            label = "签到",
-                            onClick = { Toast.makeText(context, "签到功能开发中", Toast.LENGTH_SHORT).show() }
-                        )
-                        QuickActionItem(
-                            icon = Icons.Default.QrCodeScanner,
-                            label = "扫一扫",
-                            onClick = { Toast.makeText(context, "扫一扫功能开发中", Toast.LENGTH_SHORT).show() }
-                        )
-                    }
+                    QuickActionItem(
+                        icon = Icons.Default.HowToVote,
+                        label = "投票",
+                        onClick = onVoteClick
+                    )
+                    QuickActionItem(
+                        icon = Icons.Default.Refresh,
+                        label = "抽签",
+                        onClick = onLotteryClick
+                    )
                 }
             }
 
-            // Right Side: Gradient Stats Pager (weight 1f)
+            // 右侧：最近阅读
             Card(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = RoundedCornerShape(16.dp) // 圆角 20 -> 16
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)
+                )
             ) {
-                // Background Gradient
-                Box(
+                Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f), // 弱化背景，而非原先的强原色
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
-                            )
-                        )
+                        .fillMaxWidth()
+                        .padding(12.dp)
                 ) {
-                    // Watermark Icon Background
-                    Icon(
-                        imageVector = Icons.Default.EventAvailable,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(90.dp)
-                            .offset(x = 16.dp, y = 16.dp)
-                    )
-                    
-                    val statsPagerState = rememberPagerState(pageCount = { 4 })
-                    
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        HorizontalPager(
-                            state = statsPagerState,
-                            modifier = Modifier.fillMaxWidth().weight(1f)
-                        ) { page ->
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                when (page) {
-                                    0 -> {
-                                        Text("本年参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Row(verticalAlignment = Alignment.Bottom) {
-                                                Text("45", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
-                                            }
-                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(54.dp)) {
-                                                CircularProgressIndicator(progress = { 0.75f }, modifier = Modifier.fillMaxSize(), strokeWidth = 5.dp, color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primary.copy(alpha=0.15f), strokeCap = StrokeCap.Round)
-                                                Text("75%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                            }
-                                        }
-                                    }
-                                    1 -> {
-                                        Text("本季参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Row(verticalAlignment = Alignment.Bottom) {
-                                                Text("12", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
-                                            }
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                verticalAlignment = Alignment.Bottom,
-                                                modifier = Modifier.height(36.dp).padding(bottom = 4.dp)
-                                            ) {
-                                                val barValues = listOf(0.4f, 0.7f, 1.0f, 0.6f)
-                                                barValues.forEach { h -> 
-                                                    Box(modifier = Modifier.width(8.dp).fillMaxHeight(h).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(if (h == 1.0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha=0.4f)))
-                                                }
-                                            }
-                                        }
-                                    }
-                                    2 -> {
-                                        Text("本月参会", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Row(verticalAlignment = Alignment.Bottom) {
-                                            Text("3", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("次", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
-                                        }
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        LinearProgressIndicator(
-                                            progress = { 0.4f },
-                                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha=0.15f),
-                                            strokeCap = StrokeCap.Round
-                                        )
-                                    }
-                                    3 -> {
-                                        Text("参会类型TOP3", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text("1.党组会", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                                                }
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF009688)))
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text("2.办公会", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-                                                }
-                                            }
-                                            
-                                            val primaryColor = MaterialTheme.colorScheme.primary
-                                            val secondaryColor = Color(0xFF009688)
-                                            val tertiaryColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                            Canvas(modifier = Modifier.size(50.dp)) {
-                                                drawArc(color = primaryColor, startAngle = -90f, sweepAngle = 200f, useCenter = true)
-                                                drawArc(color = secondaryColor, startAngle = 110f, sweepAngle = 100f, useCenter = true)
-                                                drawArc(color = tertiaryColor, startAngle = 210f, sweepAngle = 60f, useCenter = true)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Modern Line Indicator
+                    // 选择模式下的操作栏
+                    if (isSelectionMode) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            repeat(4) { iteration ->
-                                val isCurrent = statsPagerState.currentPage == iteration
-                                val width = if (isCurrent) 16.dp else 4.dp
-                                val color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            Text(
+                                text = if (selectedReadingIds.size == 1) {
+                                    selectedProgress.firstOrNull()?.fileName ?: "可批量管理最近阅读"
+                                } else {
+                                    "可批量移除，不会删除 PDF"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1
+                            )
+                            FilledTonalButton(
+                                onClick = {
+                                    val newPendingItems = state.readingProgress
+                                        .filter { it.uniqueId in selectedReadingIds }
+                                    if (newPendingItems.isNotEmpty()) {
+                                        pendingDeleteProgresses = (pendingDeleteProgresses + newPendingItems)
+                                            .distinctBy { it.uniqueId }
+                                        selectedReadingIds = emptyList()
+                                    }
+                                },
+                                enabled = selectedReadingIds.isNotEmpty(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("删除")
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            TextButton(onClick = { selectedReadingIds = emptyList() }) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
-                                Box(
-                                    modifier = Modifier
-                                        .padding(end = 4.dp)
-                                        .height(4.dp)
-                                        .width(width)
-                                        .clip(CircleShape)
-                                        .background(color)
+                    if (visibleReadingProgress.isNotEmpty()) {
+                        LazyRow(
+                            state = recentReadingListState,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(
+                                items = visibleReadingProgress,
+                                key = { it.uniqueId }
+                            ) { progress ->
+                                Box(modifier = Modifier.animateItemPlacement()) {
+                                    com.example.paperlessmeeting.ui.components.RecentReadingCard(
+                                        progress = progress,
+                                        isSelectionMode = isSelectionMode,
+                                        isSelected = progress.uniqueId in selectedReadingIds,
+                                        isDeleting = false,
+                                        onClick = {
+                                            if (isSelectionMode) {
+                                                selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
+                                                    selectedReadingIds.filterNot { it == progress.uniqueId }
+                                                } else {
+                                                    selectedReadingIds + progress.uniqueId
+                                                }
+                                            } else {
+                                                onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            if (progress.uniqueId !in pendingDeleteIds) {
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
+                                                    selectedReadingIds
+                                                } else {
+                                                    selectedReadingIds + progress.uniqueId
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.MenuBook,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "暂无阅读记录",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
                                 )
                             }
                         }
@@ -572,147 +524,6 @@ fun DashboardContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(if (isPhone) 20.dp else 32.dp))
-
-        // 3. Recent Reading (Using reading progress)
-        if (isSelectionMode) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "已选择 ${selectedReadingIds.size} 项",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (selectedReadingIds.size == 1) {
-                            selectedProgress.firstOrNull()?.fileName ?: "可批量管理最近阅读"
-                        } else {
-                            "可批量移除最近阅读记录，不会删除 PDF 文件"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-
-                FilledTonalButton(
-                    onClick = {
-                        val newPendingItems = state.readingProgress
-                            .filter { it.uniqueId in selectedReadingIds }
-                        if (newPendingItems.isNotEmpty()) {
-                            pendingDeleteProgresses = (pendingDeleteProgresses + newPendingItems)
-                                .distinctBy { it.uniqueId }
-                            selectedReadingIds = emptyList()
-                        }
-                    },
-                    enabled = selectedReadingIds.isNotEmpty()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("删除")
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                TextButton(onClick = { selectedReadingIds = emptyList() }) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("取消")
-                }
-            }
-        } else {
-            Text(
-                text = "最近阅读",
-                modifier = Modifier.padding(horizontal = contentPadding),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        if (visibleReadingProgress.isNotEmpty()) {
-            LazyRow(
-                state = recentReadingListState,
-                contentPadding = PaddingValues(horizontal = contentPadding),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(
-                    items = visibleReadingProgress,
-                    key = { it.uniqueId }
-                ) { progress ->
-                    Box(
-                        modifier = Modifier.animateItemPlacement()
-                    ) {
-                        com.example.paperlessmeeting.ui.components.RecentReadingCard(
-                            progress = progress,
-                            isSelectionMode = isSelectionMode,
-                            isSelected = progress.uniqueId in selectedReadingIds,
-                            isDeleting = false,
-                            onClick = {
-                                if (isSelectionMode) {
-                                    selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
-                                        selectedReadingIds.filterNot { it == progress.uniqueId }
-                                    } else {
-                                        selectedReadingIds + progress.uniqueId
-                                    }
-                                } else {
-                                    onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
-                                }
-                            },
-                            onLongClick = {
-                                if (progress.uniqueId !in pendingDeleteIds) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
-                                        selectedReadingIds
-                                    } else {
-                                        selectedReadingIds + progress.uniqueId
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        } else {
-            // 没有阅读记录时的状态
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .padding(horizontal = contentPadding)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.MenuBook,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "\u6682\u65e0\u9605\u8bfb\u8bb0\u5f55",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
-        }
         Spacer(modifier = Modifier.height(if (isPhone) 128.dp else 148.dp))
         }
 
