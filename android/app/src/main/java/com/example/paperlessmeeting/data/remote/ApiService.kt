@@ -128,8 +128,10 @@ interface ApiService {
     suspend fun getMediaItems(
         @retrofit2.http.Query("parent_id") parentId: Int? = null,
         @retrofit2.http.Query("kind") kind: String? = null,
-        @retrofit2.http.Query("visible_on_android") visibleOnAndroid: Boolean? = null
-    ): List<com.example.paperlessmeeting.domain.model.MediaItem>
+        @retrofit2.http.Query("visible_on_android") visibleOnAndroid: Boolean? = null,
+        @retrofit2.http.Query("skip") skip: Int = 0,
+        @retrofit2.http.Query("limit") limit: Int = 0
+    ): com.example.paperlessmeeting.domain.model.MediaItemPage
 
     @GET("media/ancestors/{item_id}")
     suspend fun getMediaAncestors(

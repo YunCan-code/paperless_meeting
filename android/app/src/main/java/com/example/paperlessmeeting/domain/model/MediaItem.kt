@@ -19,6 +19,7 @@ data class MediaItem(
     val updatedAt: String? = null,
     val size: String? = null,
     val previewUrl: String? = null,
+    val thumbnailUrl: String? = null,
     @SerializedName("children_count")
     val childrenCount: Int = 0
 )

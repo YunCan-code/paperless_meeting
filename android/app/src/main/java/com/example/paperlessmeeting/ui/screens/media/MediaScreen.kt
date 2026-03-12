@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,9 +65,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import coil.size.Precision
 import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.domain.model.MediaItem
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -188,6 +194,27 @@ fun MediaScreen(
                                     }
                                 }
                             )
+                        }
+
+                        // Load more trigger
+                        if (uiState.hasMore || uiState.isLoadingMore) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                                // Trigger load more when this item becomes visible
+                                LaunchedEffect(uiState.currentPage) {
+                                    viewModel.loadMore()
+                                }
+                            }
                         }
                     }
                 }
@@ -433,9 +460,13 @@ private fun FolderThumbnail() {
 
 @Composable
 private fun ImageThumbnail(item: MediaItem) {
-    val imageUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
+    // Prefer thumbnailUrl for grid view, fall back to previewUrl (original image)
+    val rawUrl = (item.thumbnailUrl?.takeIf { it.isNotEmpty() } ?: item.previewUrl)
+        ?.takeIf { it.isNotEmpty() }
+    val imageUrl = rawUrl?.let {
         BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
     }
+    val context = LocalContext.current
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -449,8 +480,19 @@ private fun ImageThumbnail(item: MediaItem) {
             contentAlignment = Alignment.Center
         ) {
             if (imageUrl != null) {
+                val imageRequest = remember(context, imageUrl) {
+                    ImageRequest.Builder(context)
+                        .data(imageUrl)
+                        .crossfade(false)
+                        .allowHardware(true)
+                        .precision(Precision.INEXACT)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .networkCachePolicy(CachePolicy.ENABLED)
+                        .build()
+                }
                 AsyncImage(
-                    model = imageUrl,
+                    model = imageRequest,
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

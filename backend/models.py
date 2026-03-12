@@ -383,7 +383,15 @@ class MediaItemRead(SQLModel):
     updated_at: datetime
     size: str = ""
     previewUrl: str = ""
+    thumbnailUrl: str = ""
     children_count: int = 0
+
+
+class MediaItemPage(SQLModel):
+    items: List[MediaItemRead]
+    total: int
+    skip: int
+    limit: int
 
 
 class MediaItemUpdate(SQLModel):

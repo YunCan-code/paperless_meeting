@@ -1,19 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 from sqlalchemy import func
-from typing import List, Optional
+from typing import List, Optional, Dict, Union
 from pathlib import Path
 from datetime import datetime
 import uuid
 import os
 
 from database import get_session
-from models import MediaItem, MediaItemRead, MediaItemUpdate, MediaItemMove
+from models import MediaItem, MediaItemRead, MediaItemPage, MediaItemUpdate, MediaItemMove
 
 router = APIRouter(prefix="/media", tags=["media"])
 
 MEDIA_UPLOAD_DIR = Path("uploads/media")
 MEDIA_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+MEDIA_THUMB_DIR = Path("uploads/thumbnails/media")
+MEDIA_THUMB_DIR.mkdir(parents=True, exist_ok=True)
+
+MEDIA_THUMB_SIZE = (480, 480)
+MEDIA_THUMB_QUALITY = 72
+
+try:
+    from PIL import Image as PILImage, ImageOps  # type: ignore
+    PIL_AVAILABLE = True
+except Exception:
+    PIL_AVAILABLE = False
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
@@ -30,15 +43,54 @@ def _format_size(size: int) -> str:
     return f"{size} B"
 
 
-def _to_read(item: MediaItem, session: Session) -> MediaItemRead:
+def _build_media_thumbnail(source_path: Path) -> str:
+    """Build (or reuse) WebP thumbnail for a media image. Returns URL path or empty string."""
+    if not PIL_AVAILABLE:
+        return ""
+    try:
+        source = Path(source_path)
+        if not source.is_file():
+            return ""
+        stem = source.stem
+        ext = source.suffix.lower().lstrip(".") or "img"
+        w, h = MEDIA_THUMB_SIZE
+        thumb_name = f"{stem}_{ext}_{w}x{h}.webp"
+        thumb_path = MEDIA_THUMB_DIR / thumb_name
+
+        source_mtime = source.stat().st_mtime
+        if thumb_path.exists() and thumb_path.stat().st_mtime >= source_mtime:
+            return f"/static/thumbnails/media/{thumb_name}"
+
+        resample = PILImage.Resampling.LANCZOS if hasattr(PILImage, "Resampling") else PILImage.LANCZOS
+        with PILImage.open(source) as img:
+            img = ImageOps.exif_transpose(img).convert("RGB")
+            fitted = ImageOps.fit(img, MEDIA_THUMB_SIZE, method=resample)
+            fitted.save(thumb_path, format="WEBP", quality=MEDIA_THUMB_QUALITY, method=6)
+
+        return f"/static/thumbnails/media/{thumb_name}"
+    except Exception as e:
+        print(f"[media-thumb] failed to build thumbnail for {source_path}: {e}")
+        return ""
+
+
+def _to_read(
+    item: MediaItem,
+    session: Session,
+    children_counts: Optional[Dict[int, int]] = None,
+) -> MediaItemRead:
     preview = ""
+    thumbnail = ""
     if item.kind == "image" and item.filename:
         preview = f"/static/media/{item.filename}"
+        thumbnail = _build_media_thumbnail(MEDIA_UPLOAD_DIR / item.filename)
     children_count = 0
     if item.kind == "folder":
-        children_count = session.exec(
-            select(func.count()).where(MediaItem.parent_id == item.id)
-        ).one()
+        if children_counts is not None and item.id is not None:
+            children_count = children_counts.get(item.id, 0)
+        else:
+            children_count = session.exec(
+                select(func.count()).where(MediaItem.parent_id == item.id)
+            ).one()
     return MediaItemRead(
         id=item.id,
         kind=item.kind,
@@ -51,27 +103,55 @@ def _to_read(item: MediaItem, session: Session) -> MediaItemRead:
         updated_at=item.updated_at,
         size=_format_size(item.file_size) if item.kind != "folder" else "",
         previewUrl=preview,
+        thumbnailUrl=thumbnail,
         children_count=children_count,
     )
 
 
 # ---------- 列表 ----------
 
-@router.get("/items", response_model=List[MediaItemRead])
+@router.get("/items")
 def list_items(
     parent_id: Optional[int] = None,
     kind: Optional[str] = None,
     visible_on_android: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 0,
     session: Session = Depends(get_session),
-):
+) -> Union[List[MediaItemRead], MediaItemPage]:
     stmt = select(MediaItem).where(MediaItem.parent_id == parent_id)
     if kind and kind != "all":
         stmt = stmt.where(MediaItem.kind == kind)
     if visible_on_android is not None:
         stmt = stmt.where(MediaItem.visible_on_android == visible_on_android)
     stmt = stmt.order_by(MediaItem.kind, MediaItem.updated_at.desc())
+
+    # Total count (needed for pagination)
+    if limit > 0:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = session.exec(count_stmt).one()
+        stmt = stmt.offset(skip).limit(limit)
+    else:
+        total = 0
+
     items = session.exec(stmt).all()
-    return [_to_read(i, session) for i in items]
+
+    # Batch children count for folders (fix N+1)
+    folder_ids = [i.id for i in items if i.kind == "folder" and i.id is not None]
+    children_counts: Dict[int, int] = {}
+    if folder_ids:
+        rows = session.exec(
+            select(MediaItem.parent_id, func.count())
+            .where(MediaItem.parent_id.in_(folder_ids))
+            .group_by(MediaItem.parent_id)
+        ).all()
+        children_counts = {pid: cnt for pid, cnt in rows}
+
+    result = [_to_read(i, session, children_counts) for i in items]
+
+    if limit > 0:
+        return MediaItemPage(items=result, total=total, skip=skip, limit=limit)
+    return result
 
 
 # ---------- 单项详情 ----------
@@ -210,6 +290,11 @@ def upload_files(
         session.add(item)
         session.commit()
         session.refresh(item)
+
+        # Pre-generate thumbnail for images at upload time
+        if kind == "image":
+            _build_media_thumbnail(save_path)
+
         created.append(_to_read(item, session))
 
     if not created:
