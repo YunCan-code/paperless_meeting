@@ -6,6 +6,11 @@ WORKDIR /app
 # 设置时区为上海
 ENV TZ=Asia/Shanghai
 
+# Install ffmpeg for video thumbnails
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # 安装依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
