@@ -33,6 +33,11 @@ class UserPreferences @Inject constructor(
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_ROLE = "user_role"
         private const val KEY_TOKEN = "jwt_token"
+
+        // Device-level settings (preserved on logout)
+        private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_FONT_SCALE_LEVEL = "font_scale_level"
+        private const val KEY_SERVER_HOST = "server_host"
     }
 
     fun saveUserId(id: Int) {
@@ -99,7 +104,45 @@ class UserPreferences @Inject constructor(
         return prefs.getString(KEY_TOKEN, null)
     }
 
+    // --- Device-level settings (theme, font, server) ---
+
+    fun saveThemeMode(mode: String) {
+        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
+    }
+
+    fun getThemeMode(): String {
+        return prefs.getString(KEY_THEME_MODE, "system") ?: "system"
+    }
+
+    fun saveFontScaleLevel(level: Int) {
+        prefs.edit().putInt(KEY_FONT_SCALE_LEVEL, level).apply()
+    }
+
+    fun getFontScaleLevel(): Int {
+        return prefs.getInt(KEY_FONT_SCALE_LEVEL, 1) // default: 标准
+    }
+
+    fun saveServerHost(host: String) {
+        prefs.edit().putString(KEY_SERVER_HOST, host).apply()
+    }
+
+    fun getServerHost(): String {
+        val apiUrl = com.example.paperlessmeeting.BuildConfig.API_BASE_URL
+        val defaultHost = apiUrl.removeSuffix("/api/").removeSuffix("/api").removeSuffix("/")
+        return prefs.getString(KEY_SERVER_HOST, defaultHost) ?: defaultHost
+    }
+
     fun clear() {
+        // Backup device-level settings before clearing
+        val themeMode = getThemeMode()
+        val fontScaleLevel = getFontScaleLevel()
+        val serverHost = getServerHost()
+
         prefs.edit().clear().apply()
+
+        // Restore device-level settings
+        saveThemeMode(themeMode)
+        saveFontScaleLevel(fontScaleLevel)
+        saveServerHost(serverHost)
     }
 }

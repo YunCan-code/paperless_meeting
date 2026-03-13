@@ -1,10 +1,6 @@
 package com.example.paperlessmeeting.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -26,6 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,22 +33,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.paperlessmeeting.ui.navigation.Screen
+import kotlin.math.abs
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(onLogout: () -> Unit = {}) {
     val navController = rememberNavController()
@@ -63,6 +65,9 @@ fun MainScreen(onLogout: () -> Unit = {}) {
         Screen.Settings
     )
 
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val coroutineScope = rememberCoroutineScope()
+
     val isReaderScreen = currentDestination?.route?.startsWith("reader") == true
 
     Surface(
@@ -73,31 +78,49 @@ fun MainScreen(onLogout: () -> Unit = {}) {
             // Content
             NavHost(
                 navController = navController,
-                startDestination = Screen.Dashboard.route,
+                startDestination = "main_tabs",
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars)
             ) {
-                composable(Screen.Dashboard.route) {
-                    com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen(
-                        onMeetingClick = { meetingId ->
-                            navController.navigate("meetings?meetingId=$meetingId")
-                        },
-                        onReadingClick = { url, name, page ->
-                            val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
-                            val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-                            navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$page")
-                        },
-                        onVoteClick = {
-                            navController.navigate(Screen.VoteList.route)
-                        },
-                        onLotteryClick = {
-                            navController.navigate(Screen.LotteryList.route)
-                        },
-                        onCheckInClick = {
-                            navController.navigate(Screen.CheckInDashboard.route)
+                // 主标签页：HorizontalPager 包裹 4 个页面
+                composable("main_tabs") {
+                    HorizontalPager(
+                        state = pagerState,
+                        beyondBoundsPageCount = 1,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        when (page) {
+                            0 -> com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen(
+                                onMeetingClick = { meetingId ->
+                                    navController.navigate("meetings?meetingId=$meetingId")
+                                },
+                                onReadingClick = { url, name, pageNum ->
+                                    val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+                                    val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
+                                    navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$pageNum")
+                                },
+                                onVoteClick = {
+                                    navController.navigate(Screen.VoteList.route)
+                                },
+                                onLotteryClick = {
+                                    navController.navigate(Screen.LotteryList.route)
+                                },
+                                onCheckInClick = {
+                                    navController.navigate(Screen.CheckInDashboard.route)
+                                }
+                            )
+                            1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                                meetingTypeName = "ALL",
+                                navController = navController
+                            )
+                            2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
+                            3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
+                                navController = navController,
+                                onLogout = onLogout
+                            )
                         }
-                    )
+                    }
                 }
 
                 composable(Screen.CheckInDashboard.route) {
@@ -133,12 +156,6 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         navController = navController
                     )
                 }
-                composable(Screen.Media.route) {
-                    com.example.paperlessmeeting.ui.screens.media.MediaScreen()
-                }
-                composable(Screen.Settings.route) {
-                    com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(navController = navController, onLogout = onLogout)
-                }
 
                 composable(
                     route = Screen.LotteryDetail.route,
@@ -148,7 +165,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     )
                 ) { backStackEntry ->
                     val meetingId = backStackEntry.arguments?.getInt("meetingId") ?: 0
-                    val title = backStackEntry.arguments?.getString("title") ?: "鎶界"
+                    val title = backStackEntry.arguments?.getString("title") ?: "抽签"
                     com.example.paperlessmeeting.ui.screens.lottery.LotteryDetailScreen(
                         meetingId = meetingId,
                         meetingTitle = title,
@@ -226,27 +243,13 @@ fun MainScreen(onLogout: () -> Unit = {}) {
             ) {
                 FloatingNavBar(
                     tabs = tabs,
-                    currentRoute = currentDestination?.route?.substringBefore("?"),
+                    scrollPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction,
                     onTabClick = { screen ->
-                        if (screen == Screen.Dashboard) {
-                            val popped = navController.popBackStack(Screen.Dashboard.route, inclusive = false)
-                            if (!popped) {
-                                navController.navigate(Screen.Dashboard.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        } else {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                        val index = tabs.indexOf(screen)
+                        // 如果在子路由上，先返回 main_tabs
+                        navController.popBackStack("main_tabs", inclusive = false)
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
                         }
                     }
                 )
@@ -258,7 +261,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
 @Composable
 private fun FloatingNavBar(
     tabs: List<Screen>,
-    currentRoute: String?,
+    scrollPosition: Float,
     onTabClick: (Screen) -> Unit
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
@@ -266,7 +269,7 @@ private fun FloatingNavBar(
 
     Surface(
         shape = navPillShape,
-        shadowElevation = 4.dp, // 8.dp -> 4.dp
+        shadowElevation = 4.dp,
         tonalElevation = 2.dp,
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.padding(bottom = if (isPhone) 8.dp else 16.dp)
@@ -279,12 +282,13 @@ private fun FloatingNavBar(
             horizontalArrangement = Arrangement.spacedBy(if (isPhone) 4.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            tabs.forEach { screen ->
-                val selected = currentRoute == screen.route
+            tabs.forEachIndexed { index, screen ->
+                // 根据 pager 滑动位置计算每个 tab 的选中分数 (0f ~ 1f)
+                val selectionFraction = (1f - abs(scrollPosition - index)).coerceIn(0f, 1f)
                 FloatingNavItem(
                     icon = screen.icon,
                     label = screen.title,
-                    selected = selected,
+                    selectionFraction = selectionFraction,
                     onClick = { onTabClick(screen) },
                     isPhone = isPhone,
                     shape = navPillShape
@@ -298,32 +302,18 @@ private fun FloatingNavBar(
 private fun FloatingNavItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    selected: Boolean,
+    selectionFraction: Float,
     onClick: () -> Unit,
     isPhone: Boolean = false,
     shape: RoundedCornerShape = RoundedCornerShape(50)
 ) {
-    val capsuleAlpha by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "floating_nav_capsule_alpha"
-    )
+    // 直接使用 selectionFraction 驱动所有视觉属性，跟随手指平滑过渡
+    val capsuleAlpha = selectionFraction
+    val capsuleScale = 0.96f + 0.04f * selectionFraction
 
-    val capsuleScale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.96f,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "floating_nav_capsule_scale"
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-        },
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-        label = "floating_nav_content"
-    )
+    val selectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+    val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+    val contentColor = lerpColor(unselectedColor, selectedColor, selectionFraction)
 
     val itemWidth = if (isPhone) 78.dp else 92.dp
     val itemHeight = if (isPhone) 52.dp else 56.dp
@@ -369,16 +359,10 @@ private fun FloatingNavItem(
             Text(
                 text = label,
                 fontSize = if (isPhone) 11.sp else 12.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, // 加粗
+                fontWeight = if (selectionFraction > 0.5f) FontWeight.Bold else FontWeight.Medium,
                 color = contentColor,
                 maxLines = 1
             )
         }
     }
 }
-
-
-
-
-
-

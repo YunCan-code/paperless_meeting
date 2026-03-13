@@ -1,6 +1,9 @@
 package com.example.paperlessmeeting.ui.screens.settings
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,9 +31,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.paperlessmeeting.data.local.AppSettingsState
+import com.example.paperlessmeeting.data.local.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,12 +48,13 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    
+
     // BottomSheet States
     var showPasswordSheet by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
-    
+    var showServerDialog by remember { mutableStateOf(false) }
+
     val passwordSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val profileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -55,12 +63,38 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
-                        "设置", 
+                        "设置",
                         style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
-                    ) 
+                    )
+                },
+                actions = {
+                    Button(
+                        onClick = { showLogoutDialog = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .height(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Logout,
+                            contentDescription = "退出登录",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "退出登录",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -83,7 +117,7 @@ fun SettingsScreen(
                 ProfileCard(state, onClick = { showProfileSheet = true })
             }
 
-            // 2. Account Settings
+            // 2. 账户安全
             item {
                 SettingsGroup("账户安全") {
                     SettingsItem(
@@ -91,57 +125,73 @@ fun SettingsScreen(
                         title = "修改密码",
                         onClick = { showPasswordSheet = true }
                     )
+                }
+            }
+
+            // 3. 外观设置（新增）
+            item {
+                AppearanceSection(
+                    themeMode = state.themeMode,
+                    fontScaleLevel = state.fontScaleLevel,
+                    onThemeModeChange = { viewModel.setThemeMode(it) },
+                    onFontScaleLevelChange = { viewModel.setFontScaleLevel(it) }
+                )
+            }
+
+            // 4. 连接设置（新增）
+            item {
+                SettingsGroup("连接设置") {
                     SettingsItem(
-                        icon = Icons.Outlined.Badge,
-                        title = "个人信息",
-                        subtitle = "完善您的个人资料",
-                        onClick = { showProfileSheet = true }
+                        icon = Icons.Outlined.Dns,
+                        title = "服务器地址",
+                        subtitle = state.serverHost,
+                        onClick = { showServerDialog = true }
                     )
                 }
             }
 
-            // 3. System Settings
+            // 5. 系统
             item {
-                SettingsGroup("系统设置") {
+                SettingsGroup("系统") {
                     SettingsItem(
                         icon = Icons.Outlined.CleaningServices,
                         title = "清理缓存",
                         subtitle = state.cacheSize,
-                        onClick = { 
-                            viewModel.clearCache()
-                            // Toast.makeText(context, "缓存已清理", Toast.LENGTH_SHORT).show()
-                        }
+                        onClick = { viewModel.clearCache() }
                     )
                     SettingsItem(
                         icon = Icons.Outlined.SystemUpdate,
                         title = "检查更新",
                         subtitle = "当前版本 ${state.versionName}",
-                        onClick = { 
+                        onClick = {
                             viewModel.checkForUpdate(
-                                onNoUpdate = {
-                                    // Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
-                                },
+                                onNoUpdate = { },
                                 onUpdateAvailable = { version, notes ->
                                     android.app.AlertDialog.Builder(context)
                                         .setTitle("发现新版本 $version")
                                         .setMessage(notes.ifBlank { "有新版本可用，是否立即下载？" })
                                         .setPositiveButton("立即更新") { _, _ ->
                                             viewModel.triggerAppUpdate()
-                                            // Toast.makeText(context, "正在下载更新...", Toast.LENGTH_SHORT).show()
                                         }
                                         .setNegativeButton("稍后再说", null)
                                         .show()
                                 },
-                                onError = { msg ->
-                                    // Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
+                                onError = { }
                             )
                         }
                     )
                 }
             }
-            
-            // 4. About
+
+            // 6. 设备信息（新增）
+            item {
+                DeviceInfoSection(
+                    deviceInfo = state.deviceInfo,
+                    onCopy = { viewModel.copyDeviceInfoToClipboard() }
+                )
+            }
+
+            // 7. 关于
             item {
                 SettingsGroup("关于") {
                     SettingsItem(
@@ -151,31 +201,10 @@ fun SettingsScreen(
                     )
                 }
             }
-
-            // 5. Logout Button
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = { showLogoutDialog = true },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(0.dp)
-                ) {
-                    Icon(Icons.Default.Logout, null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("退出登录", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                }
-            }
         }
-        
+
         // --- Bottom Sheets ---
-        
+
         if (showPasswordSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showPasswordSheet = false },
@@ -189,7 +218,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         if (showProfileSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showProfileSheet = false },
@@ -203,13 +232,28 @@ fun SettingsScreen(
                     onSave = { dept, district, phone, email ->
                         viewModel.updateProfile(dept, district, phone, email) {
                              showProfileSheet = false
-                             // Toast.makeText(context, "个人信息已更新", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
             }
         }
-        
+
+        // --- Server Address Dialog ---
+        if (showServerDialog) {
+            ServerAddressDialog(
+                currentHost = state.serverHost,
+                onDismiss = { showServerDialog = false },
+                onSave = { host ->
+                    viewModel.updateServerHost(host)
+                    showServerDialog = false
+                },
+                onReset = {
+                    viewModel.resetServerHost()
+                    showServerDialog = false
+                }
+            )
+        }
+
         // --- Logout Dialog ---
         if (showLogoutDialog) {
              AlertDialog(
@@ -218,8 +262,8 @@ fun SettingsScreen(
                 text = { Text("确定要退出登录吗？") },
                 confirmButton = {
                     TextButton(
-                        onClick = { 
-                            showLogoutDialog = false 
+                        onClick = {
+                            showLogoutDialog = false
                             viewModel.logout()
                             onLogout()
                         }
@@ -233,7 +277,296 @@ fun SettingsScreen(
     }
 }
 
-// ---------------------- Sub-Composables ----------------------
+// ====================== 外观设置分组 ======================
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppearanceSection(
+    themeMode: ThemeMode,
+    fontScaleLevel: Int,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onFontScaleLevelChange: (Int) -> Unit
+) {
+    Column {
+        Text(
+            text = "外观设置",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 12.dp, start = 8.dp)
+        )
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // --- 深色模式 ---
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.DarkMode,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "深色模式",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options = listOf(
+                        ThemeMode.SYSTEM to "自动",
+                        ThemeMode.LIGHT to "亮色",
+                        ThemeMode.DARK to "暗色"
+                    )
+                    options.forEachIndexed { index, (mode, label) ->
+                        SegmentedButton(
+                            selected = themeMode == mode,
+                            onClick = { onThemeModeChange(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                        ) {
+                            Text(label)
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+            // --- 字体大小 ---
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.FormatSize,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "字体大小",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val labels = listOf("小", "标准", "大", "特大")
+                Slider(
+                    value = fontScaleLevel.toFloat(),
+                    onValueChange = { onFontScaleLevelChange(it.toInt()) },
+                    valueRange = 0f..3f,
+                    steps = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    labels.forEach { label ->
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                val previewScale = AppSettingsState.fontScaleFactor(fontScaleLevel)
+                Text(
+                    text = "这是预览文本 Aa",
+                    fontSize = (16 * previewScale).sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+// ====================== 设备信息分组 ======================
+
+@Composable
+fun DeviceInfoSection(
+    deviceInfo: DeviceInfo,
+    onCopy: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    Column {
+        Text(
+            text = "设备信息",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 12.dp, start = 8.dp)
+        )
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            ),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Outlined.Smartphone,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            deviceInfo.model,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            deviceInfo.ipAddress.ifBlank { "未知IP" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.padding(top = 16.dp)) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        DeviceInfoRow("设备ID", deviceInfo.deviceId)
+                        DeviceInfoRow("型号", deviceInfo.model)
+                        DeviceInfoRow("系统版本", deviceInfo.osVersion)
+                        DeviceInfoRow("应用版本", deviceInfo.appVersion)
+                        DeviceInfoRow("IP 地址", deviceInfo.ipAddress)
+                        DeviceInfoRow("MAC 地址", deviceInfo.macAddress)
+                        DeviceInfoRow("电池", "${deviceInfo.batteryLevel}%${if (deviceInfo.isCharging) " (充电中)" else ""}")
+                        DeviceInfoRow("存储", "${deviceInfo.storageAvailableMB}MB / ${deviceInfo.storageTotalMB}MB")
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                onCopy()
+                                Toast.makeText(context, "已复制设备信息", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("复制设备信息")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value.ifBlank { "-" },
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+// ====================== 服务器地址对话框 ======================
+
+@Composable
+fun ServerAddressDialog(
+    currentHost: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+    onReset: () -> Unit
+) {
+    var host by remember { mutableStateOf(currentHost) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("服务器地址") },
+        text = {
+            Column {
+                Text(
+                    "设置服务器连接地址（含协议，如 https://example.com）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    label = { Text("服务器地址") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = {
+                    host = AppSettingsState.getDefaultHost()
+                }) {
+                    Text("恢复默认", color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val trimmed = host.trim().trimEnd('/')
+                if (trimmed.isNotBlank()) {
+                    onSave(trimmed)
+                }
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+// ====================== 原有子组件 ======================
 
 @Composable
 fun ProfileCard(state: SettingsUiState, onClick: () -> Unit) {
@@ -265,9 +598,9 @@ fun ProfileCard(state: SettingsUiState, onClick: () -> Unit) {
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.width(20.dp))
-            
+
             Column {
                 Text(
                     text = state.userName,
@@ -278,8 +611,8 @@ fun ProfileCard(state: SettingsUiState, onClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        Icons.Outlined.Business, 
-                        null, 
+                        Icons.Outlined.Business,
+                        null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
@@ -291,9 +624,9 @@ fun ProfileCard(state: SettingsUiState, onClick: () -> Unit) {
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.weight(1f))
-            
+
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
                 null,
@@ -331,16 +664,16 @@ fun SettingsItem(
     onClick: () -> Unit
 ) {
     ListItem(
-        headlineContent = { 
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium) 
+        headlineContent = {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         },
         supportingContent = if (subtitle != null) {
             { Text(subtitle, style = MaterialTheme.typography.bodyMedium) }
         } else null,
         leadingContent = {
             Icon(
-                imageVector = icon, 
-                contentDescription = null, 
+                imageVector = icon,
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
@@ -358,7 +691,7 @@ fun SettingsItem(
     )
 }
 
-// ---------------------- Bottom Sheets ----------------------
+// ====================== Bottom Sheets ======================
 
 @Composable
 fun EditProfileSheet(
@@ -375,7 +708,7 @@ fun EditProfileSheet(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 48.dp) // Add padding for bottom navigation bar
+            .padding(bottom = 48.dp)
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -383,27 +716,27 @@ fun EditProfileSheet(
         // Header
         Box(modifier = Modifier.fillMaxWidth()) {
             TextButton(
-                onClick = onDismiss, 
+                onClick = onDismiss,
                 modifier = Modifier.align(Alignment.CenterStart)
             ) {
                 Text("取消", color = MaterialTheme.colorScheme.outline)
             }
             Text(
-                "个人主页", 
-                style = MaterialTheme.typography.titleLarge, 
+                "个人主页",
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Center)
             )
             TextButton(
-                onClick = { onSave(dept, district, phone, email) }, 
+                onClick = { onSave(dept, district, phone, email) },
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 Text("保存", fontWeight = FontWeight.Bold)
             }
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         // Avatar
         Surface(
             modifier = Modifier.size(100.dp),
@@ -420,7 +753,7 @@ fun EditProfileSheet(
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         // Form Fields
         OutlinedTextField(
             value = state.userName,
@@ -431,7 +764,7 @@ fun EditProfileSheet(
             shape = RoundedCornerShape(12.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         OutlinedTextField(
             value = dept,
             onValueChange = { dept = it },
@@ -441,7 +774,7 @@ fun EditProfileSheet(
             shape = RoundedCornerShape(12.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         OutlinedTextField(
             value = district,
             onValueChange = { district = it },
@@ -451,7 +784,7 @@ fun EditProfileSheet(
             shape = RoundedCornerShape(12.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         OutlinedTextField(
             value = phone,
             onValueChange = { phone = it },
@@ -462,7 +795,7 @@ fun EditProfileSheet(
             shape = RoundedCornerShape(12.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -472,7 +805,7 @@ fun EditProfileSheet(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
@@ -488,7 +821,7 @@ fun ChangePasswordSheet(
     var oldPwdVisible by remember { mutableStateOf(false) }
     var newPwdVisible by remember { mutableStateOf(false) }
     var confirmPwdVisible by remember { mutableStateOf(false) }
-    
+
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
@@ -500,18 +833,16 @@ fun ChangePasswordSheet(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Drag Handle removed (using default ModalBottomSheet handle)
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             "修改密码",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
-        // Fields
+
         PasswordTextField(
             value = oldPwd,
             onValueChange = { oldPwd = it },
@@ -520,7 +851,7 @@ fun ChangePasswordSheet(
             onToggleVisibility = { oldPwdVisible = !oldPwdVisible }
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         PasswordTextField(
             value = newPwd,
             onValueChange = { newPwd = it },
@@ -529,7 +860,7 @@ fun ChangePasswordSheet(
             onToggleVisibility = { newPwdVisible = !newPwdVisible }
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         PasswordTextField(
             value = confirmPwd,
             onValueChange = { confirmPwd = it },
@@ -537,7 +868,7 @@ fun ChangePasswordSheet(
             isVisible = confirmPwdVisible,
             onToggleVisibility = { confirmPwdVisible = !confirmPwdVisible }
         )
-        
+
         if (errorMsg != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -546,15 +877,15 @@ fun ChangePasswordSheet(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Button(
             onClick = {
                 if (newPwd.isBlank()) { errorMsg = "密码不能为空"; return@Button }
                 if (newPwd != confirmPwd) { errorMsg = "两次输入的密码不一致"; return@Button }
                 if (newPwd.length < 6) { errorMsg = "密码长度至少6位"; return@Button }
-                
+
                 loading = true
                 viewModel.changePassword(
                     oldPwd = oldPwd,

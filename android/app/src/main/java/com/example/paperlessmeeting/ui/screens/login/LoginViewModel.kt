@@ -33,6 +33,10 @@ class LoginViewModel @Inject constructor(
                 userPreferences.saveUserId(response.user_id)
                 userPreferences.saveToken(response.token)
                 response.role?.let { userPreferences.saveUserRole(it) }
+                response.department?.let { userPreferences.saveUserDept(it) }
+                response.district?.let { userPreferences.saveUserDistrict(it) }
+                response.phone?.let { userPreferences.saveUserPhone(it) }
+                response.email?.let { userPreferences.saveUserEmail(it) }
                 _uiState.value = LoginUiState.Success(response.name)
             } catch (e: Exception) {
                 // Parse error message if possible

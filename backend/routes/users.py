@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
+from pydantic import BaseModel
 from typing import List, Optional
 import io
 import openpyxl
@@ -314,6 +315,30 @@ def update_user(user_id: int, user_data: User, session: Session = Depends(get_se
     for key, value in user_data_dict.items():
         if key != 'id':  # Prevent ID change
             setattr(user, key, value)
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+class UserProfileUpdate(BaseModel):
+    department: Optional[str] = None
+    district: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+@router.patch("/{user_id}/profile", response_model=UserRead)
+def update_user_profile(user_id: int, data: UserProfileUpdate, session: Session = Depends(get_session)):
+    """移动端个人信息更新（仅更新提供的字段）"""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = data.dict(exclude_none=True)
+    for key, value in update_data.items():
+        setattr(user, key, value)
 
     session.add(user)
     session.commit()

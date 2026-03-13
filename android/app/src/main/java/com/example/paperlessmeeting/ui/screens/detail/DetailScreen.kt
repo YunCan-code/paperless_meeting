@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Inbox
-import com.example.paperlessmeeting.BuildConfig
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -97,6 +96,7 @@ fun DetailScreen(
                 is DetailUiState.Success -> {
                     MeetingDetailContent(
                         meeting = state.meeting,
+                        staticBaseUrl = viewModel.staticBaseUrl,
                         onAttachmentClick = { url, name ->
                              val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                              val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
@@ -184,6 +184,7 @@ fun DetailScreen(
 @Composable
 fun MeetingDetailContent(
     meeting: Meeting,
+    staticBaseUrl: String,
     onAttachmentClick: (String, String) -> Unit
 ) {
     val context = LocalContext.current
@@ -357,7 +358,7 @@ fun MeetingDetailContent(
         if (!meeting.attachments.isNullOrEmpty()) {
             meeting.attachments.forEach { file ->
                 val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
-                val fullUrl = "${BuildConfig.STATIC_BASE_URL}$encodedName"
+                val fullUrl = "${staticBaseUrl}$encodedName"
                 val extension = file.filename.substringAfterLast(".", "pdf")
                 val uniqueName = "${fullUrl.hashCode()}.$extension"
                 val localFile = File(context.cacheDir, uniqueName)

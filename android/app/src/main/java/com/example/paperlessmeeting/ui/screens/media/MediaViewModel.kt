@@ -28,8 +28,11 @@ data class MediaUiState(
 
 @HiltViewModel
 class MediaViewModel @Inject constructor(
-    private val api: ApiService
+    private val api: ApiService,
+    private val appSettingsState: com.example.paperlessmeeting.data.local.AppSettingsState
 ) : ViewModel() {
+
+    val staticBaseUrl: String get() = appSettingsState.getStaticBaseUrl()
 
     private val _uiState = MutableStateFlow(MediaUiState())
     val uiState = _uiState.asStateFlow()

@@ -19,6 +19,10 @@ class LoginResponse(BaseModel):
     user_id: int
     name: str
     department: Optional[str] = None
+    district: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
     token: str = "mock-token" # 简单模拟 token
 
 @router.post("/login", response_model=LoginResponse)
@@ -65,5 +69,9 @@ def login(request: LoginRequest, session: Session = Depends(get_session)):
         user_id=user.id,
         name=user.name,
         department=user.department,
+        district=user.district,
+        phone=user.phone,
+        email=user.email,
+        role=user.position,
         token="demo-token-12345"
     )

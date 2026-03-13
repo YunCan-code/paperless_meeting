@@ -71,7 +71,6 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
-import com.example.paperlessmeeting.BuildConfig
 import com.example.paperlessmeeting.domain.model.MediaItem
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -93,6 +92,7 @@ fun MediaScreen(
     viewModel: MediaViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val staticBaseUrl = viewModel.staticBaseUrl
     var previewVideoItem by remember { mutableStateOf<MediaItem?>(null) }
     var previewImageItems by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
     var previewImageIndex by remember { mutableStateOf<Int?>(null) }
@@ -195,6 +195,7 @@ fun MediaScreen(
                         items(uiState.items, key = { it.id }) { item ->
                             MediaGridItem(
                                 item = item,
+                                staticBaseUrl = staticBaseUrl,
                                 onClick = {
                                     when (item.kind) {
                                         "folder" -> viewModel.navigateToFolder(item.id)
@@ -244,6 +245,7 @@ fun MediaScreen(
         MediaImagePagerDialog(
             items = previewImageItems,
             startIndex = previewImageIndex ?: 0,
+            staticBaseUrl = staticBaseUrl,
             onDismiss = {
                 previewImageIndex = null
                 previewImageItems = emptyList()
@@ -254,6 +256,7 @@ fun MediaScreen(
     if (previewVideoItem != null) {
         MediaVideoPreviewDialog(
             item = previewVideoItem!!,
+            staticBaseUrl = staticBaseUrl,
             onDismiss = { previewVideoItem = null }
         )
     }
@@ -358,6 +361,7 @@ private fun FilterCapsuleBar(
 @Composable
 private fun MediaGridItem(
     item: MediaItem,
+    staticBaseUrl: String,
     onClick: () -> Unit
 ) {
     Column(
@@ -371,8 +375,8 @@ private fun MediaGridItem(
         // Thumbnail
         when (item.kind) {
             "folder" -> FolderThumbnail()
-            "image" -> ImageThumbnail(item)
-            "video" -> VideoThumbnail(item)
+            "image" -> ImageThumbnail(item, staticBaseUrl)
+            "video" -> VideoThumbnail(item, staticBaseUrl)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -486,12 +490,12 @@ private fun FolderThumbnail() {
 // ==================== Image Thumbnail ====================
 
 @Composable
-private fun ImageThumbnail(item: MediaItem) {
+private fun ImageThumbnail(item: MediaItem, staticBaseUrl: String) {
     // Prefer thumbnailUrl for grid view, fall back to previewUrl (original image)
     val rawUrl = (item.thumbnailUrl?.takeIf { it.isNotEmpty() } ?: item.previewUrl)
         ?.takeIf { it.isNotEmpty() }
     val imageUrl = rawUrl?.let {
-        BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+        staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
     }
     val context = LocalContext.current
 
@@ -540,10 +544,10 @@ private fun ImageThumbnail(item: MediaItem) {
 
 @Composable
 @Suppress("UNUSED_PARAMETER")
-private fun VideoThumbnail(item: MediaItem) {
+private fun VideoThumbnail(item: MediaItem, staticBaseUrl: String) {
     val rawThumb = item.thumbnailUrl?.takeIf { it.isNotEmpty() }
     val thumbUrl = rawThumb?.let {
-        BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+        staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
     }
     val context = LocalContext.current
 
@@ -618,6 +622,7 @@ private fun formatItemDate(dateStr: String?): String? {
 private fun MediaImagePagerDialog(
     items: List<MediaItem>,
     startIndex: Int,
+    staticBaseUrl: String,
     onDismiss: () -> Unit
 ) {
     if (items.isEmpty()) return
@@ -641,7 +646,7 @@ private fun MediaImagePagerDialog(
             ) { page ->
                 val item = items[page]
                 val imageUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
-                    BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+                    staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
                 }
 
                 if (imageUrl != null) {
@@ -719,6 +724,7 @@ private fun MediaImagePagerDialog(
 @Composable
 private fun MediaVideoPreviewDialog(
     item: MediaItem,
+    staticBaseUrl: String,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -727,7 +733,7 @@ private fun MediaVideoPreviewDialog(
     ) {
         val context = LocalContext.current
         val videoUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
-            BuildConfig.STATIC_BASE_URL.trimEnd('/') + it.removePrefix("/static")
+            staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
         }
         val player = remember(videoUrl) {
             ExoPlayer.Builder(context).build().apply {

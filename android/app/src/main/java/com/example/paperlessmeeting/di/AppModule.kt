@@ -1,11 +1,13 @@
 package com.example.paperlessmeeting.di
 
 import com.example.paperlessmeeting.BuildConfig
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -17,7 +19,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
+        userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+        appSettingsState: AppSettingsState
     ): OkHttpClient {
         try {
             val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
@@ -48,6 +51,22 @@ object AppModule {
                         requestBuilder.header("Authorization", "Bearer $token")
                     }
                     chain.proceed(requestBuilder.build())
+                }
+                // Dynamic host interceptor: replace host based on AppSettingsState
+                .addInterceptor { chain ->
+                    val original = chain.request()
+                    val currentApiBase = appSettingsState.getApiBaseUrl()
+                    val targetUrl = currentApiBase.toHttpUrlOrNull()
+                    if (targetUrl != null) {
+                        val newUrl = original.url.newBuilder()
+                            .scheme(targetUrl.scheme)
+                            .host(targetUrl.host)
+                            .port(targetUrl.port)
+                            .build()
+                        chain.proceed(original.newBuilder().url(newUrl).build())
+                    } else {
+                        chain.proceed(original)
+                    }
                 }
                 .sslSocketFactory(sslSocketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
                 .hostnameVerifier { _, _ -> true }

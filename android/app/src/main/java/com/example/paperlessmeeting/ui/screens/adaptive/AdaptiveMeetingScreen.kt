@@ -190,6 +190,7 @@ fun AdaptiveMeetingScreen(
                         androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
                             MeetingDetailContent(
                                 meeting = displayMeeting,
+                                staticBaseUrl = viewModel.staticBaseUrl,
                                 onAttachmentClick = { url, name ->
                                      val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                                      val encodedName = java.net.URLEncoder.encode(name, "UTF-8")

@@ -2,7 +2,7 @@ package com.example.paperlessmeeting.ui.screens.lottery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paperlessmeeting.BuildConfig
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LotteryState
@@ -29,7 +29,8 @@ data class WinnerAnnouncementData(
 class LotteryViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val userPreferences: UserPreferences,
-    private val socketManager: SocketManager
+    private val socketManager: SocketManager,
+    private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LotteryState?>(null)
@@ -58,7 +59,7 @@ class LotteryViewModel @Inject constructor(
         initSocketListener()
         
         // Ensure connection
-        socketManager.connect(BuildConfig.SOCKET_BASE_URL)
+        socketManager.connect(appSettingsState.getSocketBaseUrl())
         socketManager.joinMeeting(meetingId)
         socketManager.getLotteryState(meetingId, userId)
     }

@@ -1,12 +1,18 @@
 package com.example.paperlessmeeting.ui.screens.settings
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.ReadingProgressManager
+import com.example.paperlessmeeting.data.local.ThemeMode
 import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.remote.ApiService
 import com.example.paperlessmeeting.domain.model.ChangePasswordRequest
+import com.example.paperlessmeeting.worker.HeartbeatPayloadFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,16 +23,36 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
+data class DeviceInfo(
+    val deviceId: String = "",
+    val model: String = "",
+    val osVersion: String = "",
+    val appVersion: String = "",
+    val ipAddress: String = "",
+    val macAddress: String = "",
+    val batteryLevel: Int = -1,
+    val isCharging: Boolean = false,
+    val storageTotalMB: Long = 0,
+    val storageAvailableMB: Long = 0
+)
+
 data class SettingsUiState(
     val userName: String = "Guest",
     val userRole: String = "参会人员",
     val userDept: String = "技术部",
-    val userDistrict: String = "", // 区县
-    val userPhone: String = "", // 联系方式
-    val userEmail: String = "", // 邮箱
+    val userDistrict: String = "",
+    val userPhone: String = "",
+    val userEmail: String = "",
     val cacheSize: String = "计算中...",
     val versionName: String = "v1.0.0",
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    // Phase 2: Appearance
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val fontScaleLevel: Int = 1,
+    // Phase 3: Device info
+    val deviceInfo: DeviceInfo = DeviceInfo(),
+    // Phase 4: Server address
+    val serverHost: String = ""
 )
 
 @HiltViewModel
@@ -35,6 +61,7 @@ class SettingsViewModel @Inject constructor(
     private val apiService: ApiService,
     private val readingProgressManager: ReadingProgressManager,
     private val deviceRepository: com.example.paperlessmeeting.data.repository.DeviceRepository,
+    private val appSettingsState: AppSettingsState,
     application: Application
 ) : AndroidViewModel(application) {
 
@@ -45,6 +72,8 @@ class SettingsViewModel @Inject constructor(
         loadUserProfile()
         calculateCacheSize()
         loadVersionName()
+        loadAppSettings()
+        loadDeviceInfo()
     }
 
     private fun loadVersionName() {
@@ -62,7 +91,7 @@ class SettingsViewModel @Inject constructor(
         val district = userPreferences.getUserDistrict() ?: ""
         val phone = userPreferences.getUserPhone() ?: ""
         val email = userPreferences.getUserEmail() ?: ""
-        
+
         _uiState.value = _uiState.value.copy(
             userName = name,
             userDept = dept,
@@ -71,6 +100,82 @@ class SettingsViewModel @Inject constructor(
             userEmail = email
         )
     }
+
+    private fun loadAppSettings() {
+        _uiState.value = _uiState.value.copy(
+            themeMode = appSettingsState.themeMode.value,
+            fontScaleLevel = appSettingsState.fontScaleLevel.value,
+            serverHost = appSettingsState.serverHost.value
+        )
+    }
+
+    // --- Phase 2: Appearance ---
+
+    fun setThemeMode(mode: ThemeMode) {
+        appSettingsState.setThemeMode(mode)
+        _uiState.value = _uiState.value.copy(themeMode = mode)
+    }
+
+    fun setFontScaleLevel(level: Int) {
+        appSettingsState.setFontScaleLevel(level)
+        _uiState.value = _uiState.value.copy(fontScaleLevel = level)
+    }
+
+    // --- Phase 3: Device info ---
+
+    fun loadDeviceInfo() {
+        viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) {
+                val heartbeat = HeartbeatPayloadFactory.build(
+                    getApplication<Application>(),
+                    userPreferences
+                )
+                DeviceInfo(
+                    deviceId = heartbeat.device_id,
+                    model = heartbeat.model,
+                    osVersion = heartbeat.os_version,
+                    appVersion = heartbeat.app_version,
+                    ipAddress = heartbeat.ip_address ?: "",
+                    macAddress = heartbeat.mac_address,
+                    batteryLevel = heartbeat.battery_level,
+                    isCharging = heartbeat.is_charging,
+                    storageTotalMB = heartbeat.storage_total,
+                    storageAvailableMB = heartbeat.storage_available
+                )
+            }
+            _uiState.value = _uiState.value.copy(deviceInfo = info)
+        }
+    }
+
+    fun copyDeviceInfoToClipboard() {
+        val info = _uiState.value.deviceInfo
+        val text = buildString {
+            appendLine("设备ID: ${info.deviceId}")
+            appendLine("型号: ${info.model}")
+            appendLine("系统: ${info.osVersion}")
+            appendLine("应用版本: ${info.appVersion}")
+            appendLine("IP: ${info.ipAddress}")
+            appendLine("MAC: ${info.macAddress}")
+            appendLine("电池: ${info.batteryLevel}%${if (info.isCharging) " (充电中)" else ""}")
+            appendLine("存储: ${info.storageAvailableMB}MB / ${info.storageTotalMB}MB")
+        }
+        val clipboard = getApplication<Application>().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("设备信息", text))
+    }
+
+    // --- Phase 4: Server address ---
+
+    fun updateServerHost(host: String) {
+        appSettingsState.setServerHost(host)
+        _uiState.value = _uiState.value.copy(serverHost = host)
+    }
+
+    fun resetServerHost() {
+        appSettingsState.resetServerHost()
+        _uiState.value = _uiState.value.copy(serverHost = appSettingsState.serverHost.value)
+    }
+
+    // --- Existing functionality ---
 
     private fun calculateCacheSize() {
         viewModelScope.launch {
@@ -106,16 +211,14 @@ class SettingsViewModel @Inject constructor(
     fun clearCache() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
+
             withContext(Dispatchers.IO) {
-                // 清除缓存文件
                 val cacheDir = getApplication<Application>().cacheDir
                 deleteFolder(cacheDir)
             }
-            
-            // 清空最近阅读记录
+
             readingProgressManager.clearAll()
-            
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 cacheSize = "0 B"
@@ -144,13 +247,13 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val userId = userPreferences.getUserId()
-                if (userId == -1) { // Assuming -1 or similar is invalid
+                if (userId == -1) {
                      throw Exception("无法获取用户信息")
                 }
-                
+
                 apiService.changePassword(
                     ChangePasswordRequest(
-                        user_id = userId, // Need to implement getUserId in UserPreferences
+                        user_id = userId,
                         old_password = oldPwd,
                         new_password = newPwd
                     )
@@ -173,17 +276,31 @@ class SettingsViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            // 模拟API调用延迟
-            kotlinx.coroutines.delay(1000)
-            
-            // 保存到本地 Preferences
+
+            try {
+                val userId = userPreferences.getUserId()
+                if (userId != -1) {
+                    apiService.updateUserProfile(
+                        userId,
+                        com.example.paperlessmeeting.domain.model.UserProfileUpdate(
+                            department = dept.ifBlank { null },
+                            district = district.ifBlank { null },
+                            phone = phone.ifBlank { null },
+                            email = email.ifBlank { null }
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
             withContext(Dispatchers.IO) {
                 userPreferences.saveUserDept(dept)
                 userPreferences.saveUserDistrict(district)
                 userPreferences.saveUserPhone(phone)
                 userPreferences.saveUserEmail(email)
             }
-            
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 userDept = dept,
@@ -217,7 +334,6 @@ class SettingsViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Compare version codes
                 val pInfo = getApplication<Application>().packageManager.getPackageInfo(
                     getApplication<Application>().packageName, 0
                 )

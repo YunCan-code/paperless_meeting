@@ -2,7 +2,7 @@
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paperlessmeeting.BuildConfig
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,7 +35,8 @@ class DashboardViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
     private val readingProgressManager: com.example.paperlessmeeting.data.local.ReadingProgressManager,
-    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager
+    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager,
+    private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
@@ -154,7 +155,7 @@ class DashboardViewModel @Inject constructor(
     private fun setupSocket() {
         viewModelScope.launch {
             try {
-                socketManager.connect(BuildConfig.SOCKET_BASE_URL)
+                socketManager.connect(appSettingsState.getSocketBaseUrl())
 
                 launch {
                     socketManager.connectionState.collect { connected ->
@@ -195,7 +196,7 @@ class DashboardViewModel @Inject constructor(
         if (reconnectJob?.isActive == true) return
         reconnectJob = viewModelScope.launch {
             delay(1500)
-            socketManager.connect(BuildConfig.SOCKET_BASE_URL)
+            socketManager.connect(appSettingsState.getSocketBaseUrl())
         }
     }
 }

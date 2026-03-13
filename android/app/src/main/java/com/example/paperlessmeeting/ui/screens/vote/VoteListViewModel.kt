@@ -2,7 +2,7 @@ package com.example.paperlessmeeting.ui.screens.vote
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paperlessmeeting.BuildConfig
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Vote
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +16,8 @@ import javax.inject.Inject
 class VoteListViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
-    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager
+    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager,
+    private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     data class VoteListUiState(
@@ -130,7 +131,7 @@ class VoteListViewModel @Inject constructor(
         try {
             // Establish connection (idempotent if already connected)
             // Note: Ideally this URL should come from a centralized config
-            socketManager.connect(BuildConfig.SOCKET_BASE_URL)
+            socketManager.connect(appSettingsState.getSocketBaseUrl())
             
             meetings.forEach { meeting ->
                 socketManager.joinMeeting(meeting.id)
