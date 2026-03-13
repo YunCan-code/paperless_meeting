@@ -26,6 +26,9 @@ interface ApiService {
     @retrofit2.http.POST("users/change_password")
     suspend fun changePassword(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.ChangePasswordRequest): Map<String, String>
 
+    @GET("users/{userId}")
+    suspend fun getUser(@retrofit2.http.Path("userId") userId: Int): Map<String, Any?>
+
     @retrofit2.http.PATCH("users/{userId}/profile")
     suspend fun updateUserProfile(
         @retrofit2.http.Path("userId") userId: Int,

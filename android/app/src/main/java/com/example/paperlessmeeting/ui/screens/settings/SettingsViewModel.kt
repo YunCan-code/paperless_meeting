@@ -86,8 +86,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadUserProfile() {
+        // 先用本地缓存快速展示
         val name = userPreferences.getUserName() ?: "未知用户"
-        val dept = userPreferences.getUserDept() ?: "技术部"
+        val dept = userPreferences.getUserDept() ?: ""
         val district = userPreferences.getUserDistrict() ?: ""
         val phone = userPreferences.getUserPhone() ?: ""
         val email = userPreferences.getUserEmail() ?: ""
@@ -99,6 +100,41 @@ class SettingsViewModel @Inject constructor(
             userPhone = phone,
             userEmail = email
         )
+
+        // 从服务器拉取最新数据
+        val userId = userPreferences.getUserId()
+        if (userId != -1) {
+            viewModelScope.launch {
+                try {
+                    val user = apiService.getUser(userId)
+                    val serverName = user["name"]?.toString() ?: name
+                    val serverDept = user["department"]?.toString() ?: ""
+                    val serverDistrict = user["district"]?.toString() ?: ""
+                    val serverPhone = user["phone"]?.toString() ?: ""
+                    val serverEmail = user["email"]?.toString() ?: ""
+                    val serverRole = user["position"]?.toString() ?: ""
+
+                    // 更新本地缓存
+                    userPreferences.saveUserName(serverName)
+                    if (serverDept.isNotEmpty()) userPreferences.saveUserDept(serverDept)
+                    if (serverDistrict.isNotEmpty()) userPreferences.saveUserDistrict(serverDistrict)
+                    if (serverPhone.isNotEmpty()) userPreferences.saveUserPhone(serverPhone)
+                    if (serverEmail.isNotEmpty()) userPreferences.saveUserEmail(serverEmail)
+                    if (serverRole.isNotEmpty()) userPreferences.saveUserRole(serverRole)
+
+                    // 更新 UI
+                    _uiState.value = _uiState.value.copy(
+                        userName = serverName,
+                        userDept = serverDept,
+                        userDistrict = serverDistrict,
+                        userPhone = serverPhone,
+                        userEmail = serverEmail
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     private fun loadAppSettings() {
