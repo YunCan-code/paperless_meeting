@@ -58,7 +58,12 @@
     <el-empty v-else description="暂无笔记" />
 
     <!-- Dialog -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑笔记' : '新建笔记'" width="500px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑笔记' : '新建笔记'"
+      width="720px"
+      class="note-dialog"
+    >
       <el-form label-position="top">
         <el-form-item label="标题">
           <el-input v-model="form.title" placeholder="输入笔记标题..." />
@@ -67,7 +72,7 @@
           <el-input 
             v-model="form.content" 
             type="textarea" 
-            :rows="6" 
+            :rows="10" 
             placeholder="记录详细内容..." 
             resize="none"
           />
@@ -210,4 +215,8 @@ onMounted(fetchNotes)
 
 .note-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color-light); padding-top: 12px; margin-top: auto; }
 .note-date { font-size: 12px; color: var(--text-placeholder); }
+
+:deep(.note-dialog .el-dialog__body) {
+    min-height: 360px;
+}
 </style>

@@ -8,6 +8,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.paperlessmeeting.worker.HeartbeatWorker
+import com.example.paperlessmeeting.worker.ForegroundHeartbeatManager
 import dagger.hilt.android.HiltAndroidApp
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -24,6 +25,8 @@ class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     
     @Inject lateinit var okHttpClient: OkHttpClient
+
+    @Inject lateinit var foregroundHeartbeatManager: ForegroundHeartbeatManager
 
     override fun newImageLoader(): ImageLoader {
         val memoryCachePercent = if (isLowRamDevice()) 0.15 else 0.25
@@ -56,6 +59,8 @@ class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+
+        foregroundHeartbeatManager.register()
         
         // Schedule Heartbeat (Every 15 minutes is minimum by default, but for demo we set 15)
         // If we need faster, we might need a foreground service or just accept 15 min for background.
