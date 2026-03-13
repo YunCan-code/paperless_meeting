@@ -138,7 +138,9 @@ fun MeetingListContent(
             itemsIndexed(list, key = { index, meeting -> "${meeting.id}_${header}_$index" }) { _, meeting ->
                 MeetingCard(
                     meeting = meeting,
-                    onClick = { onMeetingClick(meeting.id) }
+                    onClick = { onMeetingClick(meeting.id) },
+                    placeLocationBottomEnd = true,
+                    showLocation = false
                 )
             }
         }

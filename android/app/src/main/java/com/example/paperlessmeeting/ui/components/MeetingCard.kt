@@ -31,13 +31,16 @@ import coil.request.ImageRequest
 import coil.size.Precision
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.MeetingStatus
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun MeetingCard(
     meeting: Meeting,
     onClick: () -> Unit,
     statusOverride: MeetingStatus? = null,
-    placeLocationBottomEnd: Boolean = false
+    placeLocationBottomEnd: Boolean = false,
+    showLocation: Boolean = true
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (isPressed) 0.98f else 1f, label = "cardScale")
@@ -120,8 +123,7 @@ fun MeetingCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .padding(20.dp)
             ) {
                 // Top Row: Type Tag & Status
                 Row(
@@ -148,91 +150,28 @@ fun MeetingCard(
                     MeetingStatusBadge(status = statusOverride ?: meeting.getUiStatus())
                 }
 
-                // Bottom Content: Title & Metada
-                Column {
-                    // Title
-                    Text(
-                        text = meeting.title,
-                        style = MaterialTheme.typography.headlineSmall, // Larger
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
+                // Title (中间偏上)
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = meeting.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-                    // Metadata
-                    val speakersList = meeting.attendees?.filter { it.meetingRole == "主讲人" }?.joinToString(", ") { it.name }
-                    val displaySpeaker = if (!speakersList.isNullOrBlank()) speakersList else meeting.speaker
+                // Spacer 撑开，将 Metadata 推到底部
+                Spacer(modifier = Modifier.weight(1f))
 
-                    if (placeLocationBottomEnd) {
-                        Column {
-                            if (!displaySpeaker.isNullOrBlank()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Person,
-                                        contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.9f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = displaySpeaker,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
+                // Metadata
+                val speakersList = meeting.attendees?.filter { it.meetingRole == "主讲人" }?.joinToString(", ") { it.name }
+                val displaySpeaker = if (!speakersList.isNullOrBlank()) speakersList else meeting.speaker
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    // Time (left bottom)
-                                    Icon(
-                                        imageVector = Icons.Default.DateRange,
-                                        contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.9f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = formatTimeRange(meeting.startTime, meeting.endTime),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White.copy(alpha = 0.9f)
-                                    )
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    // Location (right bottom)
-                                    Icon(
-                                        imageVector = Icons.Filled.LocationOn,
-                                        contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.9f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = meeting.location ?: "\u5f85\u5b9a\u5730\u70b9",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (!displaySpeaker.isNullOrBlank()) {
+                if (placeLocationBottomEnd) {
+                    Column {
+                        if (!displaySpeaker.isNullOrBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Filled.Person,
                                     contentDescription = null,
@@ -247,9 +186,75 @@ fun MeetingCard(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Time (left bottom)
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = formatTimeRange(meeting.startTime, meeting.endTime),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
                             }
 
+                            if (showLocation) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Location (right bottom)
+                                    Icon(
+                                        imageVector = Icons.Filled.LocationOn,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = meeting.location ?: "待定地点",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (!displaySpeaker.isNullOrBlank()) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = displaySpeaker,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+
+                        if (showLocation) {
                             // Location
                             Icon(
                                 imageVector = Icons.Filled.LocationOn,
@@ -259,55 +264,63 @@ fun MeetingCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = meeting.location ?: "\u5f85\u5b9a\u5730\u70b9",
+                                text = meeting.location ?: "待定地点",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.9f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-
                             Spacer(modifier = Modifier.width(16.dp))
-
-                            // Time
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.9f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = formatTimeRange(meeting.startTime, meeting.endTime),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
                         }
-                    }
 
+                        // Time
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = formatTimeRange(meeting.startTime, meeting.endTime),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-// Helper: Format Time
-fun formatTimeDisplay(isoString: String): String {
+// Helper: Parse ISO datetime string to LocalDateTime
+private fun parseDateTime(isoString: String): LocalDateTime? {
     return try {
-        if (isoString.length >= 16) {
-             isoString.substring(5, 16).replace("T", " ")
-        } else isoString
-    } catch (e: Exception) {
-        isoString
+        val normalized = isoString.substringBefore(".").replace(" ", "T")
+        LocalDateTime.parse(normalized)
+    } catch (_: Exception) {
+        null
     }
 }
 
+// Helper: Format Time Range
+// 同一天: MM-dd HH:mm-HH:mm
+// 不同天: MM-dd HH:mm - MM-dd HH:mm
 fun formatTimeRange(start: String, end: String?): String {
-    val startText = formatTimeDisplay(start)
-    val endText = end?.takeIf { it.isNotBlank() }?.let { formatTimeDisplay(it) }
-    return if (endText.isNullOrBlank() || endText == startText) {
-        startText
+    val startDt = parseDateTime(start)
+    val endDt = end?.takeIf { it.isNotBlank() }?.let { parseDateTime(it) }
+
+    if (startDt == null) return start
+
+    val dateFmt = DateTimeFormatter.ofPattern("MM-dd HH:mm")
+    val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+
+    if (endDt == null) return startDt.format(dateFmt)
+
+    return if (startDt.toLocalDate() == endDt.toLocalDate()) {
+        "${startDt.format(dateFmt)}-${endDt.format(timeFmt)}"
     } else {
-        "$startText - $endText"
+        "${startDt.format(dateFmt)} - ${endDt.format(dateFmt)}"
     }
 }
 

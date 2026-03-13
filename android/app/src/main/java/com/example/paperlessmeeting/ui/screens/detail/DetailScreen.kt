@@ -439,7 +439,7 @@ fun MeetingDetailContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
                         text = meeting.title,
@@ -635,20 +635,18 @@ private fun formatMeetingDateTimeRange(start: String?, end: String?): String {
         return start?.ifBlank { "" } ?: ""
     }
 
-    val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    val dateFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
+    val timeFmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+
     if (endParsed == null) {
-        return startParsed.format(dateFormatter)
+        return startParsed.format(dateFmt)
     }
 
     val sameDay = startParsed.toLocalDate() == endParsed.toLocalDate()
     return if (sameDay) {
-        val startText = startParsed.format(dateFormatter)
-        val endText = endParsed.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-        "$startText - $endText"
+        "${startParsed.format(dateFmt)}-${endParsed.format(timeFmt)}"
     } else {
-        val startText = startParsed.format(dateFormatter)
-        val endText = endParsed.format(dateFormatter)
-        "$startText - $endText"
+        "${startParsed.format(dateFmt)} - ${endParsed.format(dateFmt)}"
     }
 }
 
