@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,7 +54,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MainScreen(onLogout: () -> Unit = {}) {
+fun MainScreen(
+    onLogout: () -> Unit = {},
+    onPortraitExemptionChanged: (Boolean) -> Unit = {}
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -69,6 +73,10 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     val coroutineScope = rememberCoroutineScope()
 
     val isReaderScreen = currentDestination?.route?.startsWith("reader") == true
+
+    SideEffect {
+        onPortraitExemptionChanged(isReaderScreen)
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),

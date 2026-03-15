@@ -1,20 +1,43 @@
 package com.example.paperlessmeeting
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ScreenRotationAlt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.ThemeMode
-import com.example.paperlessmeeting.ui.screens.home.HomeScreen
 import com.example.paperlessmeeting.ui.theme.PaperlessMeetingTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.runtime.Composable
@@ -100,23 +123,105 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppRoot(userPreferences: com.example.paperlessmeeting.data.local.UserPreferences) {
-    // 每次启动都要求登录（公共会议室平板场景）
     var isLoggedIn by remember { mutableStateOf(false) }
+    var allowPortraitContent by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    val shouldShowPortraitOverlay = isPortrait && !(isLoggedIn && allowPortraitContent)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        if (isLoggedIn) {
-            com.example.paperlessmeeting.ui.screens.MainScreen(
-                onLogout = { isLoggedIn = false }
-            )
-        } else {
-            com.example.paperlessmeeting.ui.screens.login.LoginScreen(
-                onLoginSuccess = {
-                    isLoggedIn = true
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isLoggedIn) {
+                com.example.paperlessmeeting.ui.screens.MainScreen(
+                    onLogout = {
+                        allowPortraitContent = false
+                        isLoggedIn = false
+                    },
+                    onPortraitExemptionChanged = { allowPortraitContent = it }
+                )
+            } else {
+                SideEffect {
+                    allowPortraitContent = false
                 }
-            )
+                com.example.paperlessmeeting.ui.screens.login.LoginScreen(
+                    onLoginSuccess = {
+                        isLoggedIn = true
+                    }
+                )
+            }
+
+            if (shouldShowPortraitOverlay) {
+                PortraitOrientationOverlay()
+            }
+        }
+    }
+}
+
+@Composable
+private fun PortraitOrientationOverlay() {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {}
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xF20B1120)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ScreenRotationAlt,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "请横屏使用",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "当前页面为横屏布局设计，请将设备旋转至横向后继续操作。阅读 PDF 时可保持竖屏。",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.86f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
     }
 }
