@@ -1,4 +1,5 @@
 import os
+from sqlalchemy import inspect, text
 from sqlmodel import SQLModel, create_engine, Session
 
 # ============================================================
@@ -46,10 +47,31 @@ def create_db_and_tables():
     """
     try:
         SQLModel.metadata.create_all(engine)
+        _ensure_compatible_device_schema()
     except Exception as e:
         # 在多 worker 启动时，可能会遇到并发创建表的竞争条件
         # 如果甚至 "UniqueViolation" 等错误，通常意味着另一个 worker 已经创建了表
         print(f"[WARN] Database creation warning (likely race condition): {e}")
+
+def _ensure_compatible_device_schema():
+    """
+    兼容旧库，补齐新增的设备版本号字段。
+    """
+    try:
+        inspector = inspect(engine)
+        if "device" not in inspector.get_table_names():
+            return
+
+        existing_columns = {column["name"] for column in inspector.get_columns("device")}
+        if "app_version_code" in existing_columns:
+            return
+
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE device ADD COLUMN app_version_code INTEGER"))
+
+        print("[INFO] Added device.app_version_code column")
+    except Exception as e:
+        print(f"[WARN] Device schema compatibility check failed: {e}")
 
 def get_session():
     """

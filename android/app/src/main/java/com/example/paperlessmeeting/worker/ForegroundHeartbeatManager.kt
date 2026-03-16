@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 class ForegroundHeartbeatManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val deviceRepository: DeviceRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val deviceCommandSyncManager: DeviceCommandSyncManager
 ) : DefaultLifecycleObserver {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -61,6 +62,7 @@ class ForegroundHeartbeatManager @Inject constructor(
         try {
             val heartbeat = HeartbeatPayloadFactory.build(context, userPreferences)
             deviceRepository.sendHeartbeat(heartbeat)
+            deviceCommandSyncManager.syncPendingCommands(heartbeat.device_id)
         } catch (e: Exception) {
             Log.e("ForegroundHeartbeat", "Error sending heartbeat", e)
         }

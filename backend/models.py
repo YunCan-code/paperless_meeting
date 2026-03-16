@@ -164,6 +164,7 @@ class DeviceBase(SQLModel):
     mac_address: Optional[str] = None
     os_version: Optional[str] = None
     app_version: Optional[str] = None
+    app_version_code: Optional[int] = None
     ip_address: Optional[str] = None
     battery_level: Optional[int] = None # 0-100
     is_charging: bool = Field(default=False)

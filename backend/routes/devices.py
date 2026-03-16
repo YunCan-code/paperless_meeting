@@ -71,6 +71,8 @@ async def device_heartbeat(
         # 更新其他可能变化的信息
         if device_data.app_version:
             existing_device.app_version = device_data.app_version
+        if device_data.app_version_code is not None:
+            existing_device.app_version_code = device_data.app_version_code
         if device_data.os_version:
             existing_device.os_version = device_data.os_version
         if device_data.model:

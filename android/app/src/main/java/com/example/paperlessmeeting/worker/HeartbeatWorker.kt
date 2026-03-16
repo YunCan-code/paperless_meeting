@@ -15,7 +15,8 @@ class HeartbeatWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val deviceRepository: DeviceRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val deviceCommandSyncManager: DeviceCommandSyncManager
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -26,33 +27,7 @@ class HeartbeatWorker @AssistedInject constructor(
 
             Log.d("HeartbeatWorker", "Sending heartbeat: $heartbeat")
             deviceRepository.sendHeartbeat(heartbeat)
-            
-            // Poll for pending commands
-            val commandsResult = deviceRepository.getCommands(heartbeat.device_id)
-            if (commandsResult.isSuccess) {
-                val commands = commandsResult.getOrNull() ?: emptyList()
-                for (cmd in commands) {
-                    Log.d("HeartbeatWorker", "Received command: ${cmd.command_type}")
-                    
-                    if (cmd.command_type == "update_app") {
-                        // Get latest update info and trigger UpdateWorker
-                        val updateResult = deviceRepository.checkAppUpdate()
-                        if (updateResult.isSuccess && updateResult.getOrNull() != null) {
-                            val update = updateResult.getOrNull()!!
-                            val updateRequest = androidx.work.OneTimeWorkRequestBuilder<UpdateWorker>()
-                                .setInputData(
-                                    androidx.work.Data.Builder()
-                                        .putString(UpdateWorker.KEY_DOWNLOAD_URL, update.download_url)
-                                        .putInt(UpdateWorker.KEY_COMMAND_ID, cmd.id)
-                                        .build()
-                                )
-                                .build()
-                            androidx.work.WorkManager.getInstance(applicationContext).enqueue(updateRequest)
-                        }
-                    }
-                    // Other command types (restart, etc.) can be handled here
-                }
-            }
+            deviceCommandSyncManager.syncPendingCommands(heartbeat.device_id)
             
             Result.success()
         } catch (e: Exception) {

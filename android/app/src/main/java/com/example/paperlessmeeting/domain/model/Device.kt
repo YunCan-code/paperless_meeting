@@ -7,6 +7,7 @@ data class DeviceHeartbeat(
     val model: String,
     val os_version: String,
     val app_version: String,
+    val app_version_code: Int?,
     val battery_level: Int,
     val is_charging: Boolean,
     val storage_total: Long,

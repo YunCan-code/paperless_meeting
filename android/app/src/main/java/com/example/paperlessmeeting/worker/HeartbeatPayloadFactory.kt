@@ -35,6 +35,7 @@ object HeartbeatPayloadFactory {
             model = Build.MODEL,
             os_version = "Android ${Build.VERSION.RELEASE}",
             app_version = BuildConfig.VERSION_NAME,
+            app_version_code = getAppVersionCode(context),
             battery_level = batteryPct,
             is_charging = isCharging,
             storage_total = storageTotal / (1024 * 1024), // MB
@@ -60,6 +61,20 @@ object HeartbeatPayloadFactory {
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
             status == BatteryManager.BATTERY_STATUS_FULL
         return batteryPct to isCharging
+    }
+
+    private fun getAppVersionCode(context: Context): Int? {
+        return try {
+            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun getStorageStatus(): Pair<Long, Long> {

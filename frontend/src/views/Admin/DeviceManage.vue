@@ -217,7 +217,7 @@
                      <div class="row-item ver-row">
                          <div class="mini-badge" :class="getVersionStatus(row)">
                              <span class="dot"></span>
-                             <span>{{ row.app_version || 'Initial' }}</span>
+                             <span>{{ formatDeviceVersion(row) }}</span>
                          </div>
                          <el-tooltip v-if="getVersionStatus(row) === 'outdated'" content="点击批量更新" placement="right">
                              <el-icon class="update-icon text-red-500"><Upload /></el-icon>
@@ -656,8 +656,22 @@ const getRelativeTime = (isoStr) => {
 }
 
 const getVersionStatus = (row) => {
-    if (!latestVersion.value || !row.app_version) return 'unknown'
-    return row.app_version === latestVersion.value.version_name ? 'latest' : 'outdated'
+    if (!latestVersion.value || !Number.isInteger(row.app_version_code)) return 'unknown'
+    if (row.app_version_code === latestVersion.value.version_code) return 'latest'
+    return row.app_version_code < latestVersion.value.version_code ? 'outdated' : 'unknown'
+}
+
+const formatDeviceVersion = (row) => {
+    if (row.app_version && Number.isInteger(row.app_version_code)) {
+        return `${row.app_version} (Build ${row.app_version_code})`
+    }
+    if (row.app_version) {
+        return `${row.app_version} (Build unknown)`
+    }
+    if (Number.isInteger(row.app_version_code)) {
+        return `Build ${row.app_version_code}`
+    }
+    return 'Not reported'
 }
 
 onMounted(() => {

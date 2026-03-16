@@ -11,6 +11,7 @@ import com.example.paperlessmeeting.data.local.ReadingProgressManager
 import com.example.paperlessmeeting.data.local.ThemeMode
 import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.remote.ApiService
+import com.example.paperlessmeeting.domain.model.AppUpdateCheck
 import com.example.paperlessmeeting.domain.model.ChangePasswordRequest
 import com.example.paperlessmeeting.worker.HeartbeatPayloadFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,21 +38,18 @@ data class DeviceInfo(
 )
 
 data class SettingsUiState(
-    val userName: String = "Guest",
-    val userRole: String = "参会人员",
-    val userDept: String = "技术部",
+    val userName: String = "\u8bbf\u5ba2",
+    val userRole: String = "\u53c2\u4f1a\u4eba\u5458",
+    val userDept: String = "\u6280\u672f\u90e8",
     val userDistrict: String = "",
     val userPhone: String = "",
     val userEmail: String = "",
-    val cacheSize: String = "计算中...",
+    val cacheSize: String = "\u8ba1\u7b97\u4e2d...",
     val versionName: String = "v1.0.0",
     val isLoading: Boolean = false,
-    // Phase 2: Appearance
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val fontScaleLevel: Int = 1,
-    // Phase 3: Device info
     val deviceInfo: DeviceInfo = DeviceInfo(),
-    // Phase 4: Server address
     val serverHost: String = ""
 )
 
@@ -78,16 +76,17 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadVersionName() {
         try {
-            val pInfo = getApplication<Application>().packageManager.getPackageInfo(
-                getApplication<Application>().packageName, 0
+            val packageInfo = getApplication<Application>().packageManager.getPackageInfo(
+                getApplication<Application>().packageName,
+                0
             )
-            _uiState.value = _uiState.value.copy(versionName = "v${pInfo.versionName}")
-        } catch (e: Exception) { }
+            _uiState.value = _uiState.value.copy(versionName = "v${packageInfo.versionName}")
+        } catch (_: Exception) {
+        }
     }
 
     private fun loadUserProfile() {
-        // 先用本地缓存快速展示
-        val name = userPreferences.getUserName() ?: "未知用户"
+        val name = userPreferences.getUserName() ?: "\u672a\u77e5\u7528\u6237"
         val dept = userPreferences.getUserDept() ?: ""
         val district = userPreferences.getUserDistrict() ?: ""
         val phone = userPreferences.getUserPhone() ?: ""
@@ -101,7 +100,6 @@ class SettingsViewModel @Inject constructor(
             userEmail = email
         )
 
-        // 从服务器拉取最新数据
         val userId = userPreferences.getUserId()
         if (userId != -1) {
             viewModelScope.launch {
@@ -114,7 +112,6 @@ class SettingsViewModel @Inject constructor(
                     val serverEmail = user["email"]?.toString() ?: ""
                     val serverRole = user["position"]?.toString() ?: ""
 
-                    // 更新本地缓存
                     userPreferences.saveUserName(serverName)
                     if (serverDept.isNotEmpty()) userPreferences.saveUserDept(serverDept)
                     if (serverDistrict.isNotEmpty()) userPreferences.saveUserDistrict(serverDistrict)
@@ -122,7 +119,6 @@ class SettingsViewModel @Inject constructor(
                     if (serverEmail.isNotEmpty()) userPreferences.saveUserEmail(serverEmail)
                     if (serverRole.isNotEmpty()) userPreferences.saveUserRole(serverRole)
 
-                    // 更新 UI
                     _uiState.value = _uiState.value.copy(
                         userName = serverName,
                         userDept = serverDept,
@@ -145,8 +141,6 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    // --- Phase 2: Appearance ---
-
     fun setThemeMode(mode: ThemeMode) {
         appSettingsState.setThemeMode(mode)
         _uiState.value = _uiState.value.copy(themeMode = mode)
@@ -156,8 +150,6 @@ class SettingsViewModel @Inject constructor(
         appSettingsState.setFontScaleLevel(level)
         _uiState.value = _uiState.value.copy(fontScaleLevel = level)
     }
-
-    // --- Phase 3: Device info ---
 
     fun loadDeviceInfo() {
         viewModelScope.launch {
@@ -170,7 +162,9 @@ class SettingsViewModel @Inject constructor(
                     deviceId = heartbeat.device_id,
                     model = heartbeat.model,
                     osVersion = heartbeat.os_version,
-                    appVersion = heartbeat.app_version,
+                    appVersion = heartbeat.app_version_code?.let {
+                        "${heartbeat.app_version} (Build $it)"
+                    } ?: heartbeat.app_version,
                     ipAddress = heartbeat.ip_address ?: "",
                     macAddress = heartbeat.mac_address,
                     batteryLevel = heartbeat.battery_level,
@@ -186,20 +180,18 @@ class SettingsViewModel @Inject constructor(
     fun copyDeviceInfoToClipboard() {
         val info = _uiState.value.deviceInfo
         val text = buildString {
-            appendLine("设备ID: ${info.deviceId}")
-            appendLine("型号: ${info.model}")
-            appendLine("系统: ${info.osVersion}")
-            appendLine("应用版本: ${info.appVersion}")
+            appendLine("\u8bbe\u5907ID: ${info.deviceId}")
+            appendLine("\u578b\u53f7: ${info.model}")
+            appendLine("\u7cfb\u7edf: ${info.osVersion}")
+            appendLine("\u5e94\u7528\u7248\u672c: ${info.appVersion}")
             appendLine("IP: ${info.ipAddress}")
             appendLine("MAC: ${info.macAddress}")
-            appendLine("电池: ${info.batteryLevel}%${if (info.isCharging) " (充电中)" else ""}")
-            appendLine("存储: ${info.storageAvailableMB}MB / ${info.storageTotalMB}MB")
+            appendLine("\u7535\u6c60: ${info.batteryLevel}%${if (info.isCharging) " (\u5145\u7535\u4e2d)" else ""}")
+            appendLine("\u5b58\u50a8: ${info.storageAvailableMB}MB / ${info.storageTotalMB}MB")
         }
         val clipboard = getApplication<Application>().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("设备信息", text))
+        clipboard.setPrimaryClip(ClipData.newPlainText("\u8bbe\u5907\u4fe1\u606f", text))
     }
-
-    // --- Phase 4: Server address ---
 
     fun updateServerHost(host: String) {
         appSettingsState.setServerHost(host)
@@ -210,8 +202,6 @@ class SettingsViewModel @Inject constructor(
         appSettingsState.resetServerHost()
         _uiState.value = _uiState.value.copy(serverHost = appSettingsState.serverHost.value)
     }
-
-    // --- Existing functionality ---
 
     private fun calculateCacheSize() {
         viewModelScope.launch {
@@ -278,13 +268,18 @@ class SettingsViewModel @Inject constructor(
         userPreferences.clear()
     }
 
-    fun changePassword(oldPwd: String, newPwd: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun changePassword(
+        oldPwd: String,
+        newPwd: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val userId = userPreferences.getUserId()
                 if (userId == -1) {
-                     throw Exception("无法获取用户信息")
+                    throw Exception("\u65e0\u6cd5\u83b7\u53d6\u7528\u6237\u4fe1\u606f")
                 }
 
                 apiService.changePassword(
@@ -298,7 +293,7 @@ class SettingsViewModel @Inject constructor(
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false)
-                onError(e.message ?: "修改失败")
+                onError(e.message ?: "\u4fee\u6539\u5931\u8d25")
             }
         }
     }
@@ -350,7 +345,7 @@ class SettingsViewModel @Inject constructor(
 
     fun checkForUpdate(
         onNoUpdate: () -> Unit,
-        onUpdateAvailable: (versionName: String, releaseNotes: String) -> Unit,
+        onUpdateAvailable: (AppUpdateCheck) -> Unit,
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
@@ -360,7 +355,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = false)
 
                 if (result.isFailure) {
-                    onError("检查更新失败: ${result.exceptionOrNull()?.message}")
+                    onError("\u68c0\u67e5\u66f4\u65b0\u5931\u8d25: ${result.exceptionOrNull()?.message}")
                     return@launch
                 }
 
@@ -370,45 +365,58 @@ class SettingsViewModel @Inject constructor(
                     return@launch
                 }
 
-                val pInfo = getApplication<Application>().packageManager.getPackageInfo(
-                    getApplication<Application>().packageName, 0
-                )
-                val currentVersionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                    pInfo.longVersionCode.toInt()
-                } else {
-                    @Suppress("DEPRECATION")
-                    pInfo.versionCode
-                }
-
-                if (remoteUpdate.version_code > currentVersionCode) {
-                    onUpdateAvailable(remoteUpdate.version_name, remoteUpdate.release_notes)
+                val currentVersionCode = getCurrentVersionCode()
+                if (currentVersionCode != null && remoteUpdate.version_code > currentVersionCode) {
+                    onUpdateAvailable(remoteUpdate)
                 } else {
                     onNoUpdate()
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false)
-                onError("检查更新失败: ${e.message}")
+                onError("\u68c0\u67e5\u66f4\u65b0\u5931\u8d25: ${e.message}")
             }
         }
     }
 
-    fun triggerAppUpdate() {
+    fun triggerAppUpdate(update: AppUpdateCheck) {
         viewModelScope.launch {
             try {
-                val result = deviceRepository.checkAppUpdate()
-                if (result.isSuccess && result.getOrNull() != null) {
-                    val update = result.getOrNull()!!
-                    val updateRequest = androidx.work.OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.UpdateWorker>()
+                val updateRequest =
+                    androidx.work.OneTimeWorkRequestBuilder<com.example.paperlessmeeting.worker.UpdateWorker>()
                         .setInputData(
                             androidx.work.Data.Builder()
-                                .putString(com.example.paperlessmeeting.worker.UpdateWorker.KEY_DOWNLOAD_URL, update.download_url)
+                                .putString(
+                                    com.example.paperlessmeeting.worker.UpdateWorker.KEY_DOWNLOAD_URL,
+                                    update.download_url
+                                )
                                 .putInt(com.example.paperlessmeeting.worker.UpdateWorker.KEY_COMMAND_ID, -1)
                                 .build()
                         )
                         .build()
-                    androidx.work.WorkManager.getInstance(getApplication()).enqueue(updateRequest)
-                }
-            } catch (e: Exception) { }
+                androidx.work.WorkManager.getInstance(getApplication()).enqueueUniqueWork(
+                    "manual-app-update",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    updateRequest
+                )
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun getCurrentVersionCode(): Int? {
+        return try {
+            val packageInfo = getApplication<Application>().packageManager.getPackageInfo(
+                getApplication<Application>().packageName,
+                0
+            )
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 }
