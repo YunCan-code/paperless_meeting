@@ -161,7 +161,7 @@ fun DashboardContent(
     )
 
     val contentPadding = if (isPhone) 16.dp else 24.dp
-    val heroCardHeight = if (isPhone) 160.dp else 180.dp
+    val heroCardHeight = if (isPhone) 208.dp else 216.dp
     val quickSectionCardHeight = if (isPhone) 124.dp else 132.dp
     val isSelectionMode = selectedReadingIds.isNotEmpty()
     val pendingDeleteIds = pendingDeleteProgresses.map { it.uniqueId }.toSet()

@@ -73,6 +73,10 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val isReaderScreen = currentDestination?.route?.startsWith("reader") == true
+    val navScrollPosition = resolveNavBarScrollPosition(
+        currentRoute = currentDestination?.route,
+        pagerScrollPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
+    )
 
     SideEffect {
         onPortraitExemptionChanged(isReaderScreen)
@@ -251,7 +255,7 @@ fun MainScreen(
             ) {
                 FloatingNavBar(
                     tabs = tabs,
-                    scrollPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction,
+                    scrollPosition = navScrollPosition,
                     onTabClick = { screen ->
                         val index = tabs.indexOf(screen)
                         // 如果在子路由上，先返回 main_tabs
@@ -263,6 +267,22 @@ fun MainScreen(
                 )
             }
         }
+    }
+}
+
+private fun resolveNavBarScrollPosition(
+    currentRoute: String?,
+    pagerScrollPosition: Float
+): Float {
+    val route = currentRoute?.substringBefore("?") ?: return pagerScrollPosition
+    return when {
+        route == "main_tabs" -> pagerScrollPosition
+        route.startsWith(Screen.Meetings.route) -> 1f
+        route.startsWith("meeting_split") -> 1f
+        route.startsWith("detail") -> 1f
+        route.startsWith(Screen.Media.route) -> 2f
+        route.startsWith(Screen.Settings.route) -> 3f
+        else -> pagerScrollPosition
     }
 }
 
