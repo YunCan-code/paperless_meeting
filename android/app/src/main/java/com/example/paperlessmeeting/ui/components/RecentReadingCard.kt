@@ -67,8 +67,8 @@ fun RecentReadingCard(
     onLongClick: () -> Unit
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
-    val cardWidth = if (isPhone) 248.dp else 272.dp
-    val cardHeight = fixedHeight ?: if (isPhone) 108.dp else 110.dp
+    val cardWidth = if (isPhone) 244.dp else 260.dp
+    val cardHeight = fixedHeight ?: if (isPhone) 104.dp else 106.dp
     val defaultContainerColor = MaterialTheme.colorScheme.surface
     val selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     val thumbnailContainerColor = MaterialTheme.colorScheme.surface
@@ -107,7 +107,7 @@ fun RecentReadingCard(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primary
         } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f)
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
         },
         animationSpec = tween(durationMillis = 180),
         label = "recent_reading_border_color"
@@ -146,22 +146,22 @@ fun RecentReadingCard(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(10.dp),
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
                     modifier = Modifier
-                        .width(62.dp)
+                        .width(58.dp)
                         .fillMaxHeight()
                         .border(
                             width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
                             shape = RoundedCornerShape(10.dp)
                         ),
                     shape = RoundedCornerShape(10.dp),
                     color = thumbnailContainerColor,
                     tonalElevation = 0.dp,
-                    shadowElevation = 1.dp
+                    shadowElevation = 0.dp
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -177,7 +177,7 @@ fun RecentReadingCard(
                                 filePath = progress.localPath!!,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(4.dp)
+                                    .padding(1.dp)
                             )
                         } else {
                             Icon(
@@ -198,7 +198,7 @@ fun RecentReadingCard(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.Top
                 ) {
-                    // 标题固定占 2 行高度，避免进度条随行数浮动
+                    // 闁哄秴娲。浠嬪炊閸濆嫮鏆伴柛?2 閻炴稑鐭傞悵顔芥償閿旇偐绀夐梺顒€鐏濋崢銈嗘交濞戞ê顔婇柡澶涚節濞堛垻鎮扮仦鐐婵炴惌鍠栨慨?
                     Text(
                         text = progress.fileName,
                         style = MaterialTheme.typography.titleSmall,
@@ -220,7 +220,7 @@ fun RecentReadingCard(
                         progress = { progressPercent },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(4.dp),
+                            .height(3.dp),
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                         trackColor = MaterialTheme.colorScheme.outlineVariant
                     )
@@ -230,7 +230,7 @@ fun RecentReadingCard(
                     Text(
                         text = "上次阅读至：第 ${progress.currentPage + 1} 页",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
                     )
                 }
             }

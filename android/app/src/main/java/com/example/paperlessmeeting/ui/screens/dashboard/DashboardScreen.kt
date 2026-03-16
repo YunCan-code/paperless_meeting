@@ -161,8 +161,8 @@ fun DashboardContent(
     )
 
     val contentPadding = if (isPhone) 16.dp else 24.dp
-    val heroCardHeight = if (isPhone) 160.dp else 184.dp
-    val quickSectionCardHeight = if (isPhone) 128.dp else 138.dp
+    val heroCardHeight = if (isPhone) 160.dp else 180.dp
+    val quickSectionCardHeight = if (isPhone) 124.dp else 132.dp
     val isSelectionMode = selectedReadingIds.isNotEmpty()
     val pendingDeleteIds = pendingDeleteProgresses.map { it.uniqueId }.toSet()
     val selectedProgress = state.readingProgress.filter { it.uniqueId in selectedReadingIds }
@@ -388,7 +388,7 @@ fun DashboardContent(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Column(modifier = Modifier.weight(0.32f)) {
+            Column(modifier = Modifier.weight(0.31f)) {
                 Text(
                     text = "快捷功能",
                     style = MaterialTheme.typography.titleMedium,
@@ -401,11 +401,11 @@ fun DashboardContent(
                         .height(quickSectionCardHeight),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.10f)
                     ),
                     border = BorderStroke(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.26f)
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
@@ -432,7 +432,7 @@ fun DashboardContent(
                 }
             }
 
-            Column(modifier = Modifier.weight(0.68f)) {
+            Column(modifier = Modifier.weight(0.69f)) {
                 Text(
                     text = if (isSelectionMode) "已选择 ${selectedReadingIds.size} 项" else "最近阅读",
                     style = MaterialTheme.typography.titleMedium,
@@ -447,7 +447,7 @@ fun DashboardContent(
                     ),
                     border = BorderStroke(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
@@ -811,22 +811,22 @@ fun QuickActionPrimaryButton(
     ) {
         FilledTonalIconButton(
             onClick = onClick,
-            modifier = Modifier.size(52.dp),
+            modifier = Modifier.size(50.dp),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             )
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
