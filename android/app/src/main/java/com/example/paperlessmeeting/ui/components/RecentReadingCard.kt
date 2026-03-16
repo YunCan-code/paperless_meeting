@@ -43,6 +43,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.data.local.ReadingProgress
 
@@ -59,15 +60,18 @@ fun RecentReadingCard(
     isSelectionMode: Boolean,
     isSelected: Boolean,
     isDeleting: Boolean,
+    modifier: Modifier = Modifier,
+    fillWidth: Boolean = false,
+    fixedHeight: Dp? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
-    val cardWidth = if (isPhone) 260.dp else 320.dp
-    val cardHeight = if (isPhone) 112.dp else 124.dp
+    val cardWidth = if (isPhone) 248.dp else 272.dp
+    val cardHeight = fixedHeight ?: if (isPhone) 108.dp else 110.dp
     val defaultContainerColor = MaterialTheme.colorScheme.surface
     val selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    val thumbnailContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    val thumbnailContainerColor = MaterialTheme.colorScheme.surface
 
     val cardScale by animateFloatAsState(
         targetValue = when {
@@ -103,15 +107,15 @@ fun RecentReadingCard(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primary
         } else {
-            Color.Transparent
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f)
         },
         animationSpec = tween(durationMillis = 180),
         label = "recent_reading_border_color"
     )
 
     Box(
-        modifier = Modifier
-            .width(cardWidth)
+        modifier = modifier
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(cardWidth))
             .height(cardHeight)
             .graphicsLayer {
                 scaleX = cardScale
@@ -145,31 +149,44 @@ fun RecentReadingCard(
                     .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
+                Surface(
                     modifier = Modifier
                         .width(62.dp)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(thumbnailContainerColor),
-                    contentAlignment = Alignment.Center
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f),
+                            shape = RoundedCornerShape(10.dp)
+                        ),
+                    shape = RoundedCornerShape(10.dp),
+                    color = thumbnailContainerColor,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 1.dp
                 ) {
-                    val localFile = progress.localPath?.let { java.io.File(it) }
-                    val hasLocalFile = localFile?.exists() == true &&
-                        localFile.isFile &&
-                        localFile.length() > 0L
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val localFile = progress.localPath?.let { java.io.File(it) }
+                        val hasLocalFile = localFile?.exists() == true &&
+                            localFile.isFile &&
+                            localFile.length() > 0L
 
-                    if (hasLocalFile) {
-                        PdfThumbnail(
-                            filePath = progress.localPath!!,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        if (hasLocalFile) {
+                            PdfThumbnail(
+                                filePath = progress.localPath!!,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(4.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
                     }
                 }
 
@@ -208,7 +225,7 @@ fun RecentReadingCard(
                         trackColor = MaterialTheme.colorScheme.outlineVariant
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
 
                     Text(
                         text = "上次阅读至：第 ${progress.currentPage + 1} 页",

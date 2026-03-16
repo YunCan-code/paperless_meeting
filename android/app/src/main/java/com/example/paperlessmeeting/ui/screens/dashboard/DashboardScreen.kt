@@ -1,7 +1,8 @@
-package com.example.paperlessmeeting.ui.screens.dashboard
+﻿package com.example.paperlessmeeting.ui.screens.dashboard
 
 import androidx.compose.foundation.background
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 
 import androidx.compose.foundation.lazy.LazyRow
@@ -146,15 +147,49 @@ fun DashboardContent(
     val undoProgress = remember { Animatable(0f) }
     var selectedReadingIds by rememberSaveable(state.readingProgress) { mutableStateOf(listOf<String>()) }
     var pendingDeleteProgresses by remember { mutableStateOf<List<com.example.paperlessmeeting.data.local.ReadingProgress>>(emptyList()) }
+    val quickActions = listOf(
+        DashboardQuickAction(
+            icon = Icons.Default.HowToVote,
+            title = "投票",
+            onClick = onVoteClick
+        ),
+        DashboardQuickAction(
+            icon = Icons.Default.Refresh,
+            title = "抽签",
+            onClick = onLotteryClick
+        )
+    )
 
     val contentPadding = if (isPhone) 16.dp else 24.dp
-    val heroCardHeight = if (isPhone) 160.dp else 200.dp
+    val heroCardHeight = if (isPhone) 160.dp else 184.dp
+    val quickSectionCardHeight = if (isPhone) 128.dp else 138.dp
     val isSelectionMode = selectedReadingIds.isNotEmpty()
     val pendingDeleteIds = pendingDeleteProgresses.map { it.uniqueId }.toSet()
     val selectedProgress = state.readingProgress.filter { it.uniqueId in selectedReadingIds }
     val visibleReadingProgress = state.readingProgress.filterNot { it.uniqueId in pendingDeleteIds }
     val undoBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + if (isPhone) 92.dp else 108.dp
     val recentReadingListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val onRecentReadingClick: (com.example.paperlessmeeting.data.local.ReadingProgress) -> Unit = { progress ->
+        if (isSelectionMode) {
+            selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
+                selectedReadingIds.filterNot { it == progress.uniqueId }
+            } else {
+                selectedReadingIds + progress.uniqueId
+            }
+        } else {
+            onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
+        }
+    }
+    val onRecentReadingLongClick: (com.example.paperlessmeeting.data.local.ReadingProgress) -> Unit = { progress ->
+        if (progress.uniqueId !in pendingDeleteIds) {
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
+                selectedReadingIds
+            } else {
+                selectedReadingIds + progress.uniqueId
+            }
+        }
+    }
 
     LaunchedEffect(state.readingProgress, selectedReadingIds) {
         val existingIds = state.readingProgress.map { it.uniqueId }.toSet()
@@ -206,10 +241,12 @@ fun DashboardContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     text = "$greeting, ${state.userName}",
-                    style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+                    style = if (isPhone) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -351,33 +388,51 @@ fun DashboardContent(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // 左侧列：快捷功能标题 + 卡片
-            Column(modifier = Modifier.weight(0.3f)) {
+            Column(modifier = Modifier.weight(0.32f)) {
                 Text(
                     text = "快捷功能",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(quickSectionCardHeight),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.26f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    QuickActionPrimaryButton(
-                        icon = Icons.Default.HowToVote,
-                        title = "投票",
-                        onClick = onVoteClick
-                    )
-                    QuickActionPrimaryButton(
-                        icon = Icons.Default.Refresh,
-                        title = "抽签",
-                        onClick = onLotteryClick
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            quickActions.forEach { action ->
+                                QuickActionPrimaryButton(
+                                    icon = action.icon,
+                                    title = action.title,
+                                    onClick = action.onClick,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // 右侧列：最近阅读标题 + 卡片
-            Column(modifier = Modifier.weight(0.7f)) {
+            Column(modifier = Modifier.weight(0.68f)) {
                 Text(
                     text = if (isSelectionMode) "已选择 ${selectedReadingIds.size} 项" else "最近阅读",
                     style = MaterialTheme.typography.titleMedium,
@@ -386,17 +441,21 @@ fun DashboardContent(
                 )
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)
-                    )
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp)
+                            .padding(14.dp)
                     ) {
-                        // 选择模式下的操作栏
                         if (isSelectionMode) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -441,7 +500,7 @@ fun DashboardContent(
                         if (visibleReadingProgress.isNotEmpty()) {
                             LazyRow(
                                 state = recentReadingListState,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 items(
@@ -454,27 +513,8 @@ fun DashboardContent(
                                             isSelectionMode = isSelectionMode,
                                             isSelected = progress.uniqueId in selectedReadingIds,
                                             isDeleting = false,
-                                            onClick = {
-                                                if (isSelectionMode) {
-                                                    selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
-                                                        selectedReadingIds.filterNot { it == progress.uniqueId }
-                                                    } else {
-                                                        selectedReadingIds + progress.uniqueId
-                                                    }
-                                                } else {
-                                                    onReadingClick(progress.uniqueId, progress.fileName, progress.currentPage)
-                                                }
-                                            },
-                                            onLongClick = {
-                                                if (progress.uniqueId !in pendingDeleteIds) {
-                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    selectedReadingIds = if (progress.uniqueId in selectedReadingIds) {
-                                                        selectedReadingIds
-                                                    } else {
-                                                        selectedReadingIds + progress.uniqueId
-                                                    }
-                                                }
-                                            }
+                                            onClick = { onRecentReadingClick(progress) },
+                                            onLongClick = { onRecentReadingLongClick(progress) }
                                         )
                                     }
                                 }
@@ -507,7 +547,7 @@ fun DashboardContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(if (isPhone) 128.dp else 148.dp))
+        Spacer(modifier = Modifier.height(if (isPhone) 96.dp else 104.dp))
         }
 
         androidx.compose.animation.AnimatedVisibility(
@@ -761,45 +801,40 @@ fun QuickActionItem(
 fun QuickActionPrimaryButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
-        modifier = Modifier.fillMaxWidth().height(52.dp)
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(6.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
+        FilledTonalIconButton(
+            onClick = onClick,
+            modifier = Modifier.size(52.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
             )
+        ) {
             Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.size(20.dp)
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
             )
         }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
+
+private data class DashboardQuickAction(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val title: String,
+    val onClick: () -> Unit
+)
