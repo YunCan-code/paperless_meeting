@@ -1,100 +1,186 @@
 <template>
   <div class="landing-page">
-    <!-- Navbar (Logo only) -->
-    <nav class="navbar">
-      <div class="logo">
-        <el-icon class="logo-icon"><Lightning /></el-icon>
-        <span class="logo-text">无纸化会议系统</span>
-      </div>
-
-      <div class="nav-links">
-        <a href="https://komari.coso.top" target="_blank" class="probe-link">
-          <el-icon class="link-icon"><Connection /></el-icon>
-          VPS 探针
-        </a>
-        <a href="https://github.com/YunCan-code/paperless_meeting" target="_blank" class="probe-link">
-          <el-icon class="link-icon"><Link /></el-icon>
-          GitHub
-        </a>
-      </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <main class="hero-section">
-      <div class="hero-content">
-        <div class="hero-badge">高效协同 · 绿色办公</div>
-        <h1 class="main-title">无纸化会议系统</h1>
-        
-        <div class="cta-group">
-          <!-- Enter System Button -->
-          <el-button type="primary" size="large" class="enter-btn" @click="enterSystem">
-            立即进入系统 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-          </el-button>
-
-          <!-- Download Android Button (with Popover) -->
-          <el-popover
-            trigger="click"
-            title="扫码下载安卓端"
-            :width="200"
-            placement="bottom"
-          >
-            <template #reference>
-              <el-button size="large" class="download-btn">
-                <el-icon class="el-icon--left"><Cellphone /></el-icon>
-                下载安卓端
-              </el-button>
-            </template>
-            
-            <div class="qr-container">
-              <qrcode-vue v-if="downloadUrl" :value="fullDownloadUrl" :size="160" level="H" />
-              <div v-else class="loading-text">获取链接中...</div>
-              
-              <div class="version-info" v-if="latestVersion">
-                v{{ latestVersion.version_name }}
-              </div>
-              
-              <a v-if="downloadUrl" :href="fullDownloadUrl" target="_blank" class="direct-link">
-                点击直接下载
-              </a>
-            </div>
-          </el-popover>
+    <div class="landing-shell">
+      <header class="landing-header">
+        <div class="brand-block">
+          <div class="brand-mark">
+            <el-icon><Monitor /></el-icon>
+          </div>
+          <div class="brand-copy">
+            <span class="brand-title">无纸化会议系统</span>
+            <span class="brand-subtitle">实时协同、投票抽签、文档同步</span>
+          </div>
         </div>
-      </div>
-      
-      <!-- Decorative Elements -->
-      <div class="hero-decoration">
-        <div class="decoration-circle circle-1"></div>
-        <div class="decoration-circle circle-2"></div>
-        <div class="decoration-circle circle-3"></div>
-      </div>
-    </main>
 
-    <!-- No Footer -->
+        <div class="header-actions">
+          <button type="button" class="theme-toggle" @click="toggleDark">
+            <el-icon>
+              <Sunny v-if="isDark" />
+              <MoonNight v-else />
+            </el-icon>
+            <span>{{ isDark ? '浅色模式' : '夜间模式' }}</span>
+          </button>
+
+          <a
+            href="https://komari.coso.top"
+            target="_blank"
+            rel="noreferrer"
+            class="header-link"
+          >
+            <el-icon><Connection /></el-icon>
+            <span>VPS 探针</span>
+          </a>
+
+          <a
+            href="https://github.com/YunCan-code/paperless_meeting"
+            target="_blank"
+            rel="noreferrer"
+            class="header-link"
+          >
+            <el-icon><Link /></el-icon>
+            <span>GitHub</span>
+          </a>
+        </div>
+      </header>
+
+      <main class="hero-panel">
+        <section class="hero-content">
+          <div class="hero-badge">
+            <span class="badge-dot"></span>
+            会务入口
+          </div>
+
+          <h1 class="hero-title">让会议组织、展示与协同更顺畅</h1>
+          <p class="hero-description">
+            从会议资料同步到投票、抽签和终端协作，都可以在同一套系统里完成。首页保持轻量，
+            进入后台即可继续处理日常会务工作。
+          </p>
+
+          <div class="hero-highlights">
+            <span class="highlight-pill">实时投票</span>
+            <span class="highlight-pill">抽签互动</span>
+            <span class="highlight-pill">文档同步</span>
+          </div>
+
+          <div class="hero-actions">
+            <el-button type="primary" size="large" class="primary-action" @click="enterSystem">
+              进入系统
+              <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </section>
+
+        <aside class="download-card">
+          <div class="card-topline">安卓客户端</div>
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">扫码安装到平板或手机</h2>
+              <p class="card-subtitle">{{ downloadHint }}</p>
+            </div>
+            <div class="card-version">{{ versionText }}</div>
+          </div>
+
+          <div class="card-body">
+            <div class="qr-panel" :class="{ 'qr-panel-empty': !hasDownload }">
+              <qrcode-vue
+                v-if="hasDownload"
+                :value="fullDownloadUrl"
+                :size="180"
+                level="H"
+                render-as="svg"
+              />
+              <div v-else class="empty-state">
+                <el-icon class="empty-icon"><Download /></el-icon>
+                <span>{{ downloadEmptyText }}</span>
+              </div>
+            </div>
+
+            <div class="card-notes">
+              <div class="note-item">
+                <span class="note-label">安装方式</span>
+                <span class="note-value">扫码下载或复制链接到浏览器</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <a
+              v-if="hasDownload"
+              :href="fullDownloadUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="direct-download-link"
+            >
+              下载最新安装包
+            </a>
+            <span v-else class="direct-download-link disabled">{{ downloadEmptyText }}</span>
+          </div>
+        </aside>
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Lightning, ArrowRight, Connection, Cellphone, Link } from '@element-plus/icons-vue'
+import {
+  ArrowRight,
+  Connection,
+  Download,
+  Link,
+  Monitor,
+  MoonNight,
+  Sunny
+} from '@element-plus/icons-vue'
 import QrcodeVue from 'qrcode.vue'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
+const { isDark, toggleDark } = useTheme()
+
 const downloadUrl = ref('')
 const latestVersion = ref(null)
+const apkStatus = ref('loading')
 
-// Compute full URL for QR code (linking to backend static file or external URL)
 const fullDownloadUrl = computed(() => {
   if (!downloadUrl.value) return ''
   if (downloadUrl.value.startsWith('http')) {
     return downloadUrl.value
   }
 
-  // 使用当前页面的 origin 作为基础 URL（适配内网部署）
   const baseUrl = window.location.origin
   return `${baseUrl}${downloadUrl.value.startsWith('/') ? '' : '/'}${downloadUrl.value}`
+})
+
+const hasDownload = computed(() => Boolean(fullDownloadUrl.value))
+
+const versionText = computed(() => {
+  if (latestVersion.value?.version_name) {
+    return `v${latestVersion.value.version_name}`
+  }
+  if (apkStatus.value === 'loading') {
+    return '版本同步中'
+  }
+  return '暂无版本信息'
+})
+
+const downloadHint = computed(() => {
+  if (hasDownload.value) {
+    return '保持与后台同一入口，扫码即可快速安装最新版。'
+  }
+  if (apkStatus.value === 'loading') {
+    return '正在读取最新发布记录，请稍候。'
+  }
+  return '当前未获取到可用安装包，可稍后重试。'
+})
+
+const downloadEmptyText = computed(() => {
+  if (apkStatus.value === 'loading') {
+    return '正在同步安装包信息'
+  }
+  return '暂未提供安卓安装包'
 })
 
 const enterSystem = () => {
@@ -102,28 +188,21 @@ const enterSystem = () => {
 }
 
 const fetchLatestApk = async () => {
+  apkStatus.value = 'loading'
+
   try {
-    // Assuming axios is configured globally with base URL, or use direct path
-    // Let's use relative path /api/updates/latest if proxy is set up, 
-    // or rely on the axios instance created in utils/request.js if available.
-    // Here we'll try to use the standard fetch for simplicity in this file scope
-    // or import the request utility.
-    
-    // Using global axios default or relative path
-    // Note: Project likely has a configured axios instance.
-    // Let's assume /api prefix via vite proxy or direct.
-    
-    // Quick fix: user project structure check showed axios use.
-    // Let's try to import request from utils if possible, otherwise use axios directly.
-    
-    const res = await axios.get('/api/updates/latest') // Assuming /api proxy
+    const res = await axios.get('/api/updates/latest')
     if (res.data) {
       latestVersion.value = res.data
-      downloadUrl.value = res.data.download_url
+      downloadUrl.value = res.data.download_url || ''
+      apkStatus.value = res.data.download_url ? 'ready' : 'empty'
+      return
     }
+
+    apkStatus.value = 'empty'
   } catch (error) {
     console.error('Failed to fetch latest APK:', error)
-    // ElMessage.warning('无法获取最新安卓版本')
+    apkStatus.value = 'error'
   }
 }
 
@@ -134,231 +213,501 @@ onMounted(() => {
 
 <style scoped>
 .landing-page {
+  --landing-hero-bg:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 34%),
+    radial-gradient(circle at 85% 18%, rgba(14, 165, 233, 0.14), transparent 24%),
+    linear-gradient(160deg, var(--bg-color) 0%, var(--bg-main) 100%);
+  --landing-glow: rgba(59, 130, 246, 0.16);
+  --landing-grid-line: rgba(148, 163, 184, 0.18);
+  --landing-card-shadow: 0 24px 60px -32px rgba(15, 23, 42, 0.28);
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
-  color: #0f172a;
-  font-family: 'Inter', sans-serif;
   position: relative;
   overflow: hidden;
+  background: var(--landing-hero-bg);
+  color: var(--text-main);
 }
 
-/* Navbar */
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 48px;
+.landing-page::before,
+.landing-page::after {
+  content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 10;
+  inset: 0;
+  pointer-events: none;
+}
+
+.landing-page::before {
+  background-image:
+    linear-gradient(var(--landing-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--landing-grid-line) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.42), transparent 78%);
+}
+
+.landing-page::after {
+  inset: auto -12% -24% auto;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--landing-glow) 0%, transparent 68%);
+  filter: blur(12px);
+}
+
+.landing-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding: 28px 32px 32px;
   box-sizing: border-box;
 }
 
-.logo {
+.landing-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
+  justify-content: space-between;
+  gap: 20px;
 }
 
-.logo-icon {
-  color: #3b82f6;
-  font-size: 28px;
-}
-
-.probe-link {
+.brand-block {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #64748b;
-  text-decoration: none;
-  font-size: 14px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s ease;
-  background: white;
+  gap: 14px;
 }
 
-.probe-link:hover {
-  color: #3b82f6;
-  border-color: #3b82f6;
-  background: #eff6ff;
-}
-
-.nav-links {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.link-icon {
-  font-size: 16px;
-}
-
-/* Hero Section */
-.hero-section {
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  width: 100%;
-  padding: 0 48px;
+  background: linear-gradient(135deg, var(--color-primary), #06b6d4);
+  color: #fff;
+  box-shadow: 0 16px 30px -18px rgba(37, 99, 235, 0.8);
+  font-size: 22px;
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1;
+}
+
+.brand-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.theme-toggle,
+.header-link {
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--card-bg) 82%, transparent);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background-color 0.2s ease;
+  box-shadow: 0 10px 24px -22px rgba(15, 23, 42, 0.55);
+}
+
+.theme-toggle:hover,
+.header-link:hover {
+  transform: translateY(-1px);
+  color: var(--text-main);
+  border-color: color-mix(in srgb, var(--color-primary) 34%, var(--border-color));
+  background: color-mix(in srgb, var(--card-bg) 94%, var(--bg-main));
+}
+
+.hero-panel {
+  min-height: calc(100vh - 128px);
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1.2fr);
+  gap: 32px;
+  align-items: center;
+  grid-template-areas: 'side main';
+}
+
+.hero-content,
+.download-card {
   position: relative;
-  text-align: center;
-  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, transparent), color-mix(in srgb, var(--card-bg) 88%, transparent));
+  box-shadow: var(--landing-card-shadow);
+  backdrop-filter: blur(18px);
 }
 
 .hero-content {
-  z-index: 2;
-  max-width: 800px;
+  grid-area: main;
+  padding: 48px 52px;
+  border-radius: 32px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  /* Visual adjustment: Shift UP */
-  margin-bottom: 25vh; 
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.download-card {
+  grid-area: side;
+  padding: 28px;
+  border-radius: 28px;
 }
 
 .hero-badge {
-  display: inline-block;
-  padding: 8px 20px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  color: #3b82f6;
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 32px;
-  border: 1px solid #bfdbfe;
-  letter-spacing: 1px;
-}
-
-.main-title {
-  font-size: 64px;
-  font-weight: 800;
-  line-height: 1.1;
-  margin-bottom: 48px;
-  letter-spacing: -1.5px;
-  color: #0f172a;
-  background: linear-gradient(120deg, #0f172a 0%, #334155 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.cta-group {
-  display: flex;
-  gap: 24px;
+  align-self: flex-start;
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--card-bg));
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.enter-btn {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
-  border-radius: 12px;
-  padding: 20px 40px;
-  font-size: 17px;
-  font-weight: 600;
-  height: auto;
-  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
-  transition: all 0.2s;
+.badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 18%, transparent);
 }
 
-.enter-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 30px -10px rgba(59, 130, 246, 0.5);
+.hero-title {
+  margin: 20px 0 18px;
+  font-size: clamp(40px, 6vw, 66px);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  color: var(--text-main);
 }
 
-.download-btn {
-  background: white;
-  border: 2px solid #e2e8f0;
-  color: #475569;
-  border-radius: 12px;
-  padding: 20px 40px;
-  font-size: 17px;
-  font-weight: 600;
-  height: auto;
-  transition: all 0.2s;
+.hero-description {
+  max-width: none;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.9;
+  color: var(--text-secondary);
 }
 
-.download-btn:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
-  background: #f8fafc;
-}
-
-/* QR Code Popover Content */
-.qr-container {
+.hero-highlights {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px;
-  text-align: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 34px;
 }
 
-.loading-text {
-  padding: 20px;
-  color: #94a3b8;
-}
-
-.version-info {
-  margin-top: 12px;
+.highlight-pill {
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-main) 72%, var(--card-bg));
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
   font-size: 14px;
-  color: #64748b;
   font-weight: 500;
 }
 
-.direct-link {
-  margin-top: 8px;
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.primary-action {
+  min-width: 196px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 16px 30px -18px rgba(37, 99, 235, 0.7);
+}
+
+.card-topline {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-main) 70%, var(--card-bg));
+  color: var(--text-secondary);
   font-size: 12px;
-  color: #3b82f6;
-  text-decoration: none;
-}
-.direct-link:hover {
-  text-decoration: underline;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-/* Decorative Elements */
-.hero-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text-main);
+}
+
+.card-subtitle {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.card-version {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--card-bg));
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card-body {
+  margin-top: 26px;
+  display: grid;
+  gap: 22px;
+}
+
+.qr-panel {
+  min-height: 228px;
+  border-radius: 24px;
+  border: 1px solid var(--border-color);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 100%, transparent), color-mix(in srgb, var(--bg-main) 45%, var(--card-bg)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.qr-panel-empty {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-main) 60%, var(--card-bg)), color-mix(in srgb, var(--bg-main) 85%, var(--card-bg)));
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-state {
+  min-height: 148px;
+  font-size: 14px;
+}
+
+.empty-icon {
+  font-size: 22px;
+  color: var(--color-primary);
+}
+
+.card-notes {
+  display: grid;
+  gap: 12px;
+}
+
+.note-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-main) 52%, var(--card-bg));
+}
+
+.note-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.note-value {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.card-footer {
+  margin-top: 20px;
+}
+
+.direct-download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  height: 100%;
-  z-index: 1;
-  pointer-events: none;
-  overflow: hidden;
+  min-height: 48px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--card-bg));
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
-.decoration-circle {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.6;
+.direct-download-link:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--card-bg));
 }
 
-.circle-1 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
-  top: -100px;
-  right: -100px;
+.direct-download-link.disabled {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-main) 70%, var(--card-bg));
+  cursor: default;
 }
 
-.circle-2 {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(34, 197, 94, 0.08) 0%, transparent 70%);
-  bottom: 50px;
-  left: -50px;
+html.dark .landing-page {
+  --landing-hero-bg:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.22), transparent 30%),
+    radial-gradient(circle at 80% 12%, rgba(14, 165, 233, 0.16), transparent 24%),
+    linear-gradient(160deg, var(--bg-color) 0%, var(--bg-main) 100%);
+  --landing-glow: rgba(56, 189, 248, 0.18);
+  --landing-grid-line: rgba(51, 65, 85, 0.4);
+  --landing-card-shadow: 0 26px 64px -36px rgba(2, 6, 23, 0.85);
 }
 
-.circle-3 {
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%);
-  top: 40%;
-  right: 10%;
+html.dark .theme-toggle,
+html.dark .header-link,
+html.dark .hero-content,
+html.dark .download-card {
+  background:
+    linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.88));
+}
+
+@media (max-width: 1080px) {
+  .landing-shell {
+    padding: 22px 20px 24px;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'main'
+      'side';
+    gap: 22px;
+    padding-top: 28px;
+  }
+
+  .hero-content,
+  .download-card {
+    padding: 28px 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .landing-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: stretch;
+  }
+
+  .theme-toggle,
+  .header-link {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+  }
+
+  .hero-panel {
+    min-height: auto;
+  }
+
+  .hero-content {
+    padding: 24px 20px;
+    border-radius: 24px;
+  }
+
+  .download-card {
+    padding: 24px 20px;
+    border-radius: 24px;
+  }
+
+  .hero-title {
+    font-size: clamp(34px, 12vw, 48px);
+  }
+
+  .hero-description {
+    font-size: 15px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .primary-action {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .card-header,
+  .note-item {
+    flex-direction: column;
+  }
+
+  .note-value {
+    text-align: left;
+  }
+}
+
+@media (max-width: 520px) {
+  .theme-toggle,
+  .header-link {
+    flex-basis: 100%;
+  }
+
+  .hero-highlights {
+    gap: 10px;
+  }
+
+  .highlight-pill {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
 }
 </style>
