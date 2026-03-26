@@ -51,6 +51,7 @@ fun AdaptiveMeetingScreen(
     meetingTypeName: String, // Can be "ALL"
     navController: NavController,
     initialMeetingId: Int? = null,
+    onNavigateToMedia: (() -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -195,6 +196,16 @@ fun AdaptiveMeetingScreen(
                                      val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                                      val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
                                      navController.navigate("reader?url=$encodedUrl&name=$encodedName")
+                                },
+                                onMediaClick = {
+                                    if (onNavigateToMedia != null) {
+                                        onNavigateToMedia()
+                                    } else {
+                                        navController.getBackStackEntry("main_tabs")
+                                            .savedStateHandle
+                                            .set("target_tab", 2)
+                                        navController.popBackStack("main_tabs", inclusive = false)
+                                    }
                                 }
                             )
                             // Close Button Overlay (Top Right)

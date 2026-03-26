@@ -124,7 +124,12 @@ fun MainScreen(
                             )
                             1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                                 meetingTypeName = "ALL",
-                                navController = navController
+                                navController = navController,
+                                onNavigateToMedia = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(2)
+                                    }
+                                }
                             )
                             2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
                             3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
@@ -152,10 +157,16 @@ fun MainScreen(
                     )
                 ) { backStackEntry ->
                     val meetingId = backStackEntry.arguments?.getString("meetingId")?.toIntOrNull()
-                    com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = "ALL",
                         navController = navController,
-                        initialMeetingId = meetingId
+                        initialMeetingId = meetingId,
+                        onNavigateToMedia = {
+                            navController.getBackStackEntry("main_tabs")
+                                .savedStateHandle
+                                .set("target_tab", 2)
+                            navController.popBackStack("main_tabs", inclusive = false)
+                        }
                     )
                 }
                 composable(
@@ -163,9 +174,15 @@ fun MainScreen(
                     arguments = listOf(androidx.navigation.navArgument("typeName") { type = androidx.navigation.NavType.StringType })
                 ) { backStackEntry ->
                     val typeName = backStackEntry.arguments?.getString("typeName") ?: "ALL"
-                    com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = typeName,
-                        navController = navController
+                        navController = navController,
+                        onNavigateToMedia = {
+                            navController.getBackStackEntry("main_tabs")
+                                .savedStateHandle
+                                .set("target_tab", 2)
+                            navController.popBackStack("main_tabs", inclusive = false)
+                        }
                     )
                 }
 

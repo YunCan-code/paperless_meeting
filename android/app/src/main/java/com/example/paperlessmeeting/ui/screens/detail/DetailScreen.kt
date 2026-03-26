@@ -101,6 +101,12 @@ fun DetailScreen(
                              val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                              val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
                              navController.navigate("reader?url=$encodedUrl&name=$encodedName")
+                        },
+                        onMediaClick = {
+                            navController.getBackStackEntry("main_tabs")
+                                .savedStateHandle
+                                .set("target_tab", 2)
+                            navController.popBackStack("main_tabs", inclusive = false)
                         }
                     )
                 }
@@ -185,7 +191,8 @@ fun DetailScreen(
 fun MeetingDetailContent(
     meeting: Meeting,
     staticBaseUrl: String,
-    onAttachmentClick: (String, String) -> Unit
+    onAttachmentClick: (String, String) -> Unit,
+    onMediaClick: () -> Unit
 ) {
     val context = LocalContext.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -220,7 +227,7 @@ fun MeetingDetailContent(
     val maxVisibleAttendees = 5
 
     val InfoSectionContent: @Composable () -> Unit = {
-        SectionHeader(title = "与会人员")
+        SectionHeader(title = "参会人员")
         Spacer(modifier = Modifier.height(8.dp))
 
         val attendeesList = meeting.attendees?.sortedBy {
@@ -245,24 +252,26 @@ fun MeetingDetailContent(
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f)
                         )
-                        androidx.compose.material3.Surface(
-                            color = when (attendee.meetingRole) {
-                                "主讲人" -> Color(0xFFFFF3E0)
-                                "特邀嘉宾" -> Color(0xFFF3E5F5)
-                                else -> Color(0xFFE3F2FD)
-                            },
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = attendee.meetingRole,
-                                style = MaterialTheme.typography.labelSmall,
+                        if (attendee.meetingRole != "参会人员") {
+                            androidx.compose.material3.Surface(
                                 color = when (attendee.meetingRole) {
-                                    "主讲人" -> Color(0xFFE65100)
-                                    "特邀嘉宾" -> Color(0xFF4A148C)
-                                    else -> Color(0xFF0D47A1)
+                                    "主讲人" -> Color(0xFFFFF3E0)
+                                    "特邀嘉宾" -> Color(0xFFF3E5F5)
+                                    else -> Color(0xFFE3F2FD)
                                 },
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = attendee.meetingRole,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = when (attendee.meetingRole) {
+                                        "主讲人" -> Color(0xFFE65100)
+                                        "特邀嘉宾" -> Color(0xFF4A148C)
+                                        else -> Color(0xFF0D47A1)
+                                    },
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -350,31 +359,7 @@ fun MeetingDetailContent(
         SectionHeader(title = "会议资料")
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (!meeting.attachments.isNullOrEmpty()) {
-            meeting.attachments.forEach { file ->
-                val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
-                val fullUrl = "${staticBaseUrl}$encodedName"
-                val extension = file.filename.substringAfterLast(".", "pdf")
-                val uniqueName = "${fullUrl.hashCode()}.$extension"
-                val localFile = File(context.cacheDir, uniqueName)
-
-                FileItem(
-                    name = file.displayName,
-                    size = formatFileSize(file.fileSize),
-                    localFile = if (localFile.exists()) localFile else null,
-                    onClick = { onAttachmentClick(fullUrl, file.displayName) }
-                )
-            }
-        } else {
-            Text(
-                text = "本次会议暂无上传附件",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
         if (meeting.showMediaLink) {
-            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -382,12 +367,7 @@ fun MeetingDetailContent(
                         MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
                         androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                     )
-                    .clickable {
-                        val uri = android.net.Uri.parse(
-                            "${staticBaseUrl.substringBefore("/static").trimEnd('/')}/admin/media"
-                        )
-                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
-                    }
+                    .clickable(onClick = onMediaClick)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -418,6 +398,31 @@ fun MeetingDetailContent(
                     tint = MaterialTheme.colorScheme.secondary,
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        if (!meeting.attachments.isNullOrEmpty()) {
+            meeting.attachments.forEach { file ->
+                val encodedName = java.net.URLEncoder.encode(file.filename, "UTF-8").replace("+", "%20")
+                val fullUrl = "${staticBaseUrl}$encodedName"
+                val extension = file.filename.substringAfterLast(".", "pdf")
+                val uniqueName = "${fullUrl.hashCode()}.$extension"
+                val localFile = File(context.cacheDir, uniqueName)
+
+                FileItem(
+                    name = file.displayName,
+                    size = formatFileSize(file.fileSize),
+                    localFile = if (localFile.exists()) localFile else null,
+                    onClick = { onAttachmentClick(fullUrl, file.displayName) }
+                )
+            }
+        } else {
+            Text(
+                text = "本次会议暂无上传附件",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 
