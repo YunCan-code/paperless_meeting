@@ -42,6 +42,8 @@ import androidx.navigation.NavController
 import androidx.compose.foundation.gestures.animateScrollBy
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.MeetingType
+import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
+import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import com.example.paperlessmeeting.ui.screens.detail.MeetingDetailContent
 import com.example.paperlessmeeting.ui.screens.adaptive.MeetingListContent
 import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
@@ -201,10 +203,8 @@ fun AdaptiveMeetingScreen(
                                     if (onNavigateToMedia != null) {
                                         onNavigateToMedia()
                                     } else {
-                                        navController.getBackStackEntry("main_tabs")
-                                            .savedStateHandle
-                                            .set("target_tab", 2)
-                                        navController.popBackStack("main_tabs", inclusive = false)
+                                        navController.requestMainTabTransition(2)
+                                        navController.popBackStack(MAIN_TABS_ROUTE, inclusive = false)
                                     }
                                 }
                             )

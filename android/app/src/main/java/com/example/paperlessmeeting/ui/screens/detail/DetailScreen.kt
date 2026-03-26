@@ -1,10 +1,16 @@
 package com.example.paperlessmeeting.ui.screens.detail
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.platform.LocalContext
@@ -40,11 +46,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +71,11 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.components.MeetingStatusBadge
+import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
+import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
+import kotlinx.coroutines.delay
+
+private const val DETAIL_TO_MEDIA_EXIT_DURATION_MS = 240
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,14 +84,38 @@ fun DetailScreen(
     viewModel: DetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val currentVote by viewModel.currentVote.collectAsState()
+    val voteResult by viewModel.voteResult.collectAsState()
+    val hasVoted by viewModel.hasVoted.collectAsState()
+    val showVoteSheet by viewModel.showVoteSheet.collectAsState()
+    var isNavigatingToMedia by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold { innerPadding ->
-        // We ignore innerPadding for the top image behind status bar effect
+    LaunchedEffect(isNavigatingToMedia) {
+        if (!isNavigatingToMedia) {
+            return@LaunchedEffect
+        }
+
+        delay(DETAIL_TO_MEDIA_EXIT_DURATION_MS.toLong())
+        navController.requestMainTabTransition(2)
+        val popped = navController.popBackStack(MAIN_TABS_ROUTE, inclusive = false)
+        if (!popped) {
+            isNavigatingToMedia = false
+        }
+    }
+
+    Scaffold { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             when (val state = uiState) {
                 is DetailUiState.Loading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    DetailOverlayTopBar(
+                        currentVote = currentVote,
+                        onVoteClick = viewModel::openVoteSheet,
+                        onCloseClick = { navController.popBackStack() },
+                        enabled = true
+                    )
                 }
+
                 is DetailUiState.Error -> {
                     Box(
                         modifier = Modifier
@@ -92,86 +129,62 @@ fun DetailScreen(
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
-                }
-                is DetailUiState.Success -> {
-                    MeetingDetailContent(
-                        meeting = state.meeting,
-                        staticBaseUrl = viewModel.staticBaseUrl,
-                        onAttachmentClick = { url, name ->
-                             val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
-                             val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-                             navController.navigate("reader?url=$encodedUrl&name=$encodedName")
-                        },
-                        onMediaClick = {
-                            navController.getBackStackEntry("main_tabs")
-                                .savedStateHandle
-                                .set("target_tab", 2)
-                            navController.popBackStack("main_tabs", inclusive = false)
-                        }
+
+                    DetailOverlayTopBar(
+                        currentVote = currentVote,
+                        onVoteClick = viewModel::openVoteSheet,
+                        onCloseClick = { navController.popBackStack() },
+                        enabled = true
                     )
                 }
-            }
 
-            // Overlay Navigation Buttons (Back & Close)
-            // Placed at the end to render ON TOP of the content/image
-            TopAppBar(
-                title = { },
-                actions = {
-                    val currentVote by viewModel.currentVote.collectAsState()
-                    if (currentVote != null) {
-                        // Vote Button with Glassy Style
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(40.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(Color.Black.copy(alpha = 0.3f))
-                                .clickable { viewModel.openVoteSheet() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Poll,
-                                contentDescription = "Vote",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
+                is DetailUiState.Success -> {
+                    AnimatedVisibility(
+                        visible = !isNavigatingToMedia,
+                        enter = fadeIn(),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(
+                                durationMillis = DETAIL_TO_MEDIA_EXIT_DURATION_MS,
+                                easing = FastOutSlowInEasing
+                            ),
+                            targetOffsetX = { fullWidth -> -(fullWidth * 0.24f).toInt() }
+                        ) + fadeOut(
+                            animationSpec = tween(durationMillis = DETAIL_TO_MEDIA_EXIT_DURATION_MS)
+                        )
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            MeetingDetailContent(
+                                meeting = state.meeting,
+                                staticBaseUrl = viewModel.staticBaseUrl,
+                                onAttachmentClick = { url, name ->
+                                    val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+                                    val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
+                                    navController.navigate("reader?url=$encodedUrl&name=$encodedName")
+                                },
+                                isMediaNavigating = isNavigatingToMedia,
+                                onMediaClick = {
+                                    if (!isNavigatingToMedia) {
+                                        isNavigatingToMedia = true
+                                    }
+                                }
+                            )
+
+                            DetailOverlayTopBar(
+                                currentVote = currentVote,
+                                onVoteClick = viewModel::openVoteSheet,
+                                onCloseClick = { navController.popBackStack() },
+                                enabled = !isNavigatingToMedia
                             )
                         }
                     }
+                }
+            }
 
-                    // Close Button with Glassy Style
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(40.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .background(Color.Black.copy(alpha = 0.3f))
-                            .clickable { navController.popBackStack() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-
-            // Vote Bottom Sheet
-            val currentVote by viewModel.currentVote.collectAsState()
-            val voteResult by viewModel.voteResult.collectAsState()
-            val hasVoted by viewModel.hasVoted.collectAsState()
-            val showVoteSheet by viewModel.showVoteSheet.collectAsState()
-            
             if (showVoteSheet && currentVote != null) {
                 com.example.paperlessmeeting.ui.components.VoteBottomSheet(
                     vote = currentVote!!,
                     hasVoted = hasVoted,
-                    result = voteResult, // Pass result if available (e.g. after vote end)
+                    result = voteResult,
                     onSubmit = { optionIds ->
                         viewModel.submitVote(optionIds)
                     },
@@ -187,11 +200,65 @@ fun DetailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DetailOverlayTopBar(
+    currentVote: com.example.paperlessmeeting.domain.model.Vote?,
+    onVoteClick: () -> Unit,
+    onCloseClick: () -> Unit,
+    enabled: Boolean
+) {
+    TopAppBar(
+        title = { },
+        actions = {
+            if (currentVote != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(40.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(enabled = enabled, onClick = onVoteClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Poll,
+                        contentDescription = "Vote",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .padding(end = 16.dp)
+                    .size(40.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable(enabled = enabled, onClick = onCloseClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Transparent
+        )
+    )
+}
+
 @Composable
 fun MeetingDetailContent(
     meeting: Meeting,
     staticBaseUrl: String,
     onAttachmentClick: (String, String) -> Unit,
+    isMediaNavigating: Boolean = false,
     onMediaClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -360,14 +427,41 @@ fun MeetingDetailContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (meeting.showMediaLink) {
+            val mediaLinkInteractionSource = remember { MutableInteractionSource() }
+            val isMediaLinkPressed by mediaLinkInteractionSource.collectIsPressedAsState()
+            val mediaLinkScale by animateFloatAsState(
+                targetValue = when {
+                    isMediaNavigating -> 0.985f
+                    isMediaLinkPressed -> 0.992f
+                    else -> 1f
+                },
+                animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
+                label = "mediaLinkScale"
+            )
+            val mediaLinkAlpha by animateFloatAsState(
+                targetValue = if (isMediaNavigating) 0.88f else 1f,
+                animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
+                label = "mediaLinkAlpha"
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = mediaLinkScale
+                        scaleY = mediaLinkScale
+                        alpha = mediaLinkAlpha
+                    }
                     .background(
                         MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
                         androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                     )
-                    .clickable(onClick = onMediaClick)
+                    .clickable(
+                        enabled = !isMediaNavigating,
+                        interactionSource = mediaLinkInteractionSource,
+                        indication = null,
+                        onClick = onMediaClick
+                    )
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)

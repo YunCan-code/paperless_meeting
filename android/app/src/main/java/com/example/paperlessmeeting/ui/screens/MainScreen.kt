@@ -1,10 +1,13 @@
 package com.example.paperlessmeeting.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,11 +21,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,10 +33,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,9 +51,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
 import com.example.paperlessmeeting.ui.navigation.Screen
+import com.example.paperlessmeeting.ui.navigation.clearMainTabTransitionTarget
+import com.example.paperlessmeeting.ui.navigation.mainTabTransitionTarget
+import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import kotlin.math.abs
 import kotlinx.coroutines.launch
+
+private const val MAIN_TAB_ANIMATION_DURATION_MS = 340
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -72,11 +81,49 @@ fun MainScreen(
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
-    val isReaderScreen = currentDestination?.route?.startsWith("reader") == true
+    val currentRoute = currentDestination?.route?.substringBefore("?")
+    val isReaderScreen = currentRoute == "reader"
     val navScrollPosition = resolveNavBarScrollPosition(
-        currentRoute = currentDestination?.route,
+        currentRoute = currentRoute,
         pagerScrollPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
     )
+
+    fun animateToMainTab(targetPage: Int) {
+        coroutineScope.launch {
+            if (pagerState.currentPage == targetPage && pagerState.currentPageOffsetFraction == 0f) {
+                return@launch
+            }
+
+            pagerState.animateScrollToPage(
+                page = targetPage,
+                animationSpec = tween(
+                    durationMillis = MAIN_TAB_ANIMATION_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
+        }
+    }
+
+    fun navigateToMainTab(targetPage: Int) {
+        if (currentRoute == MAIN_TABS_ROUTE) {
+            animateToMainTab(targetPage)
+            return
+        }
+
+        navController.requestMainTabTransition(targetPage)
+        navController.popBackStack(MAIN_TABS_ROUTE, inclusive = false)
+    }
+
+    LaunchedEffect(currentRoute) {
+        if (currentRoute != MAIN_TABS_ROUTE) {
+            return@LaunchedEffect
+        }
+
+        val mainTabsEntry = navController.getBackStackEntry(MAIN_TABS_ROUTE)
+        val targetPage = mainTabsEntry.savedStateHandle.mainTabTransitionTarget() ?: return@LaunchedEffect
+        mainTabsEntry.savedStateHandle.clearMainTabTransitionTarget()
+        animateToMainTab(targetPage)
+    }
 
     SideEffect {
         onPortraitExemptionChanged(isReaderScreen)
@@ -87,16 +134,14 @@ fun MainScreen(
         color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Content
             NavHost(
                 navController = navController,
-                startDestination = "main_tabs",
+                startDestination = MAIN_TABS_ROUTE,
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.systemBars)
             ) {
-                // 主标签页：HorizontalPager 包裹 4 个页面
-                composable("main_tabs") {
+                composable(MAIN_TABS_ROUTE) {
                     HorizontalPager(
                         state = pagerState,
                         beyondBoundsPageCount = 1,
@@ -122,16 +167,17 @@ fun MainScreen(
                                     navController.navigate(Screen.CheckInDashboard.route)
                                 }
                             )
+
                             1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                                 meetingTypeName = "ALL",
                                 navController = navController,
                                 onNavigateToMedia = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(2)
-                                    }
+                                    navigateToMainTab(2)
                                 }
                             )
+
                             2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
+
                             3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
                                 navController = navController,
                                 onLogout = onLogout
@@ -157,31 +203,30 @@ fun MainScreen(
                     )
                 ) { backStackEntry ->
                     val meetingId = backStackEntry.arguments?.getString("meetingId")?.toIntOrNull()
-                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                    com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = "ALL",
                         navController = navController,
                         initialMeetingId = meetingId,
                         onNavigateToMedia = {
-                            navController.getBackStackEntry("main_tabs")
-                                .savedStateHandle
-                                .set("target_tab", 2)
-                            navController.popBackStack("main_tabs", inclusive = false)
+                            navigateToMainTab(2)
                         }
                     )
                 }
+
                 composable(
-                    "meeting_split/{typeName}",
-                    arguments = listOf(androidx.navigation.navArgument("typeName") { type = androidx.navigation.NavType.StringType })
+                    route = "meeting_split/{typeName}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("typeName") {
+                            type = androidx.navigation.NavType.StringType
+                        }
+                    )
                 ) { backStackEntry ->
                     val typeName = backStackEntry.arguments?.getString("typeName") ?: "ALL"
-                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                    com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = typeName,
                         navController = navController,
                         onNavigateToMedia = {
-                            navController.getBackStackEntry("main_tabs")
-                                .savedStateHandle
-                                .set("target_tab", 2)
-                            navController.popBackStack("main_tabs", inclusive = false)
+                            navigateToMainTab(2)
                         }
                     )
                 }
@@ -261,7 +306,6 @@ fun MainScreen(
                 }
             }
 
-            // Floating card navigation bar
             AnimatedVisibility(
                 visible = !isReaderScreen,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -275,11 +319,7 @@ fun MainScreen(
                     scrollPosition = navScrollPosition,
                     onTabClick = { screen ->
                         val index = tabs.indexOf(screen)
-                        // 如果在子路由上，先返回 main_tabs
-                        navController.popBackStack("main_tabs", inclusive = false)
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(index)
-                        }
+                        navigateToMainTab(index)
                     }
                 )
             }
@@ -291,9 +331,9 @@ private fun resolveNavBarScrollPosition(
     currentRoute: String?,
     pagerScrollPosition: Float
 ): Float {
-    val route = currentRoute?.substringBefore("?") ?: return pagerScrollPosition
+    val route = currentRoute ?: return pagerScrollPosition
     return when {
-        route == "main_tabs" -> pagerScrollPosition
+        route == MAIN_TABS_ROUTE -> pagerScrollPosition
         route.startsWith(Screen.Meetings.route) -> 1f
         route.startsWith("meeting_split") -> 1f
         route.startsWith("detail") -> 1f
@@ -328,7 +368,6 @@ private fun FloatingNavBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEachIndexed { index, screen ->
-                // 根据 pager 滑动位置计算每个 tab 的选中分数 (0f ~ 1f)
                 val selectionFraction = (1f - abs(scrollPosition - index)).coerceIn(0f, 1f)
                 FloatingNavItem(
                     icon = screen.icon,
@@ -352,7 +391,6 @@ private fun FloatingNavItem(
     isPhone: Boolean = false,
     shape: RoundedCornerShape = RoundedCornerShape(50)
 ) {
-    // 直接使用 selectionFraction 驱动所有视觉属性，跟随手指平滑过渡
     val capsuleAlpha = selectionFraction
     val capsuleScale = 0.96f + 0.04f * selectionFraction
 
@@ -364,6 +402,7 @@ private fun FloatingNavItem(
     val itemHeight = if (isPhone) 52.dp else 56.dp
     val horizontalPadding = if (isPhone) 10.dp else 12.dp
     val verticalPadding = 7.dp
+
     Box(
         modifier = Modifier
             .width(itemWidth)

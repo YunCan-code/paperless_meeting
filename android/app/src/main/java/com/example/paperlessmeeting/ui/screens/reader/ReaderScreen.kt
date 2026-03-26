@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.reader
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.pdf.PdfRenderer
@@ -107,15 +108,26 @@ fun ReaderScreen(
     
     // Inline Annotation Mode
     var isAnnotating by remember { mutableStateOf(false) }
+    var annotPageOffsetX by remember { mutableStateOf(0f) }
+    var annotPageOffsetY by remember { mutableStateOf(0f) }
     var annotPageWidth by remember { mutableStateOf(0f) }
     var annotPageHeight by remember { mutableStateOf(0f) }
-    var viewWidthPx by remember { mutableStateOf(0f) }
     
     var isHorizontalScroll by remember { mutableStateOf(false) } // Default Vertical
     
     var currentPage by remember { mutableIntStateOf(initialPage) }
     var totalPages by remember { mutableIntStateOf(0) }
     var isProgrammaticScroll by remember { mutableStateOf(true) } // Prevent scroll fighting
+    val isAnnotationViewportReady by remember(annotPageWidth, annotPageHeight) {
+        derivedStateOf { annotPageWidth > 0f && annotPageHeight > 0f }
+    }
+
+    LaunchedEffect(currentPage) {
+        annotPageOffsetX = 0f
+        annotPageOffsetY = 0f
+        annotPageWidth = 0f
+        annotPageHeight = 0f
+    }
 
     // Handle Sync Jumps
     LaunchedEffect(oneShotJumpPage) {
@@ -418,7 +430,6 @@ fun ReaderScreen(
                     // Reading mode is always rendered as the base layer
                     Box(modifier = Modifier
                         .fillMaxSize()
-                        .onSizeChanged { viewWidthPx = it.width.toFloat() }
                     ) {
                         // ====== MODE A: Reading Mode ======
                         // 1. PDF Content
@@ -432,7 +443,9 @@ fun ReaderScreen(
                             pageAnnotations = pageAnnotations,
                             isAnnotating = isAnnotating,
                             annotatingPage = currentPage,
-                            onPageRenderInfo = { w, h ->
+                            onPageRenderInfo = { x, y, w, h ->
+                                annotPageOffsetX = x
+                                annotPageOffsetY = y
                                 annotPageWidth = w
                                 annotPageHeight = h
                             },
@@ -490,15 +503,17 @@ fun ReaderScreen(
                                 currentPage = currentPage,
                                 totalPages = totalPages,
                                 isEditing = false, // Always false here as we aren't in edit mode
+                                isAnnotationEnabled = isAnnotationViewportReady,
                                 isNightMode = isNightMode,
                                 onTocClick = { scope.launch { drawerState.open() } }, // Open TOC
                                 onGridClick = { showThumbnailSheet = true },
                                 onPenClick = {
-                                    isProgrammaticScroll = true
-                                    currentPage = currentPage // ensure jumpTo fires
-                                    pdfViewRef?.jumpTo(currentPage, false)
-                                    isAnnotating = true
-                                    showOverlay = true
+                                    if (isAnnotationViewportReady) {
+                                        isAnnotating = true
+                                        showOverlay = true
+                                    } else {
+                                        pdfViewRef?.invalidate()
+                                    }
                                 },
                                 onSettingsClick = { isNightMode = !isNightMode }
                             )
@@ -530,16 +545,13 @@ fun ReaderScreen(
                             enter = fadeIn(animationSpec = tween(200)),
                             exit = fadeOut(animationSpec = tween(200))
                         ) {
-                            val pageOffsetX = if (annotPageWidth > 0)
-                                (viewWidthPx - annotPageWidth) / 2f else 0f
-
                             InlineAnnotationOverlay(
                                 pageIndex = currentPage,
                                 initialStrokes = pageAnnotations[currentPage] ?: emptyList(),
                                 pageRenderWidth = annotPageWidth,
                                 pageRenderHeight = annotPageHeight,
-                                pageOffsetX = pageOffsetX,
-                                pageOffsetY = 0f,
+                                pageOffsetX = annotPageOffsetX,
+                                pageOffsetY = annotPageOffsetY,
                                 onCancel = {
                                     isAnnotating = false
                                     pdfViewRef?.invalidate()
@@ -575,7 +587,7 @@ fun PDFViewerContent(
     pageAnnotations: Map<Int, List<AnnotationStroke>>,
     isAnnotating: Boolean = false,
     annotatingPage: Int = 0,
-    onPageRenderInfo: (Float, Float) -> Unit = { _, _ -> },
+    onPageRenderInfo: (Float, Float, Float, Float) -> Unit = { _, _, _, _ -> },
     onPdfViewReady: (PDFView) -> Unit,
     onPageChange: (Int, Int) -> Unit,
     onPdfLoaded: (Int) -> Unit,
@@ -643,7 +655,16 @@ fun PDFViewerContent(
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
                              // Report page render dimensions for inline annotation overlay
                              if (pageIdx == currentPageState) {
-                                 currentOnPageRenderInfo(pageWidth, pageHeight)
+                                 val matrix = Matrix()
+                                 val values = FloatArray(9)
+                                 canvas.getMatrix(matrix)
+                                 matrix.getValues(values)
+                                 currentOnPageRenderInfo(
+                                     values[Matrix.MTRANS_X],
+                                     values[Matrix.MTRANS_Y],
+                                     pageWidth,
+                                     pageHeight
+                                 )
                              }
 
                              // Skip rendering strokes on the annotating page
@@ -799,6 +820,7 @@ fun FloatingControlCapsule(
     currentPage: Int,
     totalPages: Int,
     isEditing: Boolean,
+    isAnnotationEnabled: Boolean,
     isNightMode: Boolean,
     onTocClick: () -> Unit,
     onGridClick: () -> Unit,
@@ -848,9 +870,16 @@ fun FloatingControlCapsule(
                 }
 
                 // 3. Annotation (Pen)
-                IconButton(onClick = onPenClick) {
+                IconButton(
+                    onClick = onPenClick,
+                    enabled = isAnnotationEnabled
+                ) {
                     val tint = if(isEditing) MaterialTheme.colorScheme.primary else IconGrey
-                    Icon(Icons.Default.Edit, "Annotate", tint = tint)
+                    Icon(
+                        Icons.Default.Edit,
+                        "Annotate",
+                        tint = if (isAnnotationEnabled) tint else IconGrey.copy(alpha = 0.35f)
+                    )
                 }
 
                 // 4. Night Mode / Settings
