@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -51,11 +52,63 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-// --- Design System: Minimalist Colors ---
-private val PaperBackground = Color(0xFFF9F7F1) // Warm Cream / Parchment
-private val InkText = Color(0xFF2C2C2C)       // Soft Black
-private val IconGrey = Color(0xFF5F6368)      // Subtle Grey
-private val FloatingSurface = Color.White.copy(alpha = 0.95f) // Frosted Glass-ish
+// --- Design System: Reader Backgrounds ---
+private val StandardRootBackground = Color(0xFFF4F5F7)
+private val StandardPanelSurface = Color.White.copy(alpha = 0.96f)
+private val StandardText = Color(0xFF2C2C2C)
+private val StandardMutedText = Color(0xFF5F6368)
+private val StandardDivider = Color(0x1F5F6368)
+private val StandardSheetContainer = Color(0xFFF7F8FA)
+private val StandardProgressTrack = Color(0xFFE6E9EE)
+
+private val PaperRootBackground = Color(0xFFF4ECDE)
+private val PaperPanelSurface = Color(0xFFF3E7D4).copy(alpha = 0.98f)
+private val PaperText = Color(0xFF3D3428)
+private val PaperMutedText = Color(0xFF7B6A58)
+private val PaperDivider = Color(0x1F7B6A58)
+private val PaperSheetContainer = Color(0xFFF1E7D7)
+private val PaperPdfBackground = Color(0xFFF7EEDC)
+private val PaperPageTint = Color(0x30E7D5B4)
+private val PaperProgressTrack = Color(0xFFE4D8C6)
+
+private enum class ReadingDisplayMode {
+    Standard,
+    Paper
+}
+
+private data class ReaderChromePalette(
+    val rootBackground: Color,
+    val panelSurface: Color,
+    val panelText: Color,
+    val panelMutedText: Color,
+    val divider: Color,
+    val sheetContainer: Color,
+    val pdfBackground: Color,
+    val progressTrack: Color
+)
+
+private fun readerChromePalette(mode: ReadingDisplayMode): ReaderChromePalette = when (mode) {
+    ReadingDisplayMode.Standard -> ReaderChromePalette(
+        rootBackground = StandardRootBackground,
+        panelSurface = StandardPanelSurface,
+        panelText = StandardText,
+        panelMutedText = StandardMutedText,
+        divider = StandardDivider,
+        sheetContainer = StandardSheetContainer,
+        pdfBackground = Color.White,
+        progressTrack = StandardProgressTrack
+    )
+    ReadingDisplayMode.Paper -> ReaderChromePalette(
+        rootBackground = PaperRootBackground,
+        panelSurface = PaperPanelSurface,
+        panelText = PaperText,
+        panelMutedText = PaperMutedText,
+        divider = PaperDivider,
+        sheetContainer = PaperSheetContainer,
+        pdfBackground = PaperPdfBackground,
+        progressTrack = PaperProgressTrack
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,7 +157,9 @@ fun ReaderScreen(
 
     // --- State Management ---
     var showOverlay by remember { mutableStateOf(true) }
-    var isNightMode by remember { mutableStateOf(false) }
+    var readingDisplayMode by remember { mutableStateOf(ReadingDisplayMode.Standard) }
+    val isPaperBackground = readingDisplayMode == ReadingDisplayMode.Paper
+    val chromePalette = remember(readingDisplayMode) { readerChromePalette(readingDisplayMode) }
     
     // Inline Annotation Mode
     var isAnnotating by remember { mutableStateOf(false) }
@@ -164,17 +219,14 @@ fun ReaderScreen(
     // PDF View Reference for capturing state
     var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
 
-    // --- Window Insets Logic (Immersive Mode) ---
-    LaunchedEffect(showOverlay, isAnnotating) {
+    // Keep system bars independent from the reader overlay to avoid PDF relayout
+    // when the user taps to show or hide in-app controls.
+    LaunchedEffect(isAnnotating) {
         val window = (context as? Activity)?.window
         if (window != null) {
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            if (showOverlay || isAnnotating) {
-                insetsController.show(WindowInsetsCompat.Type.systemBars())
-            } else {
-                insetsController.hide(WindowInsetsCompat.Type.systemBars())
-            }
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
         }
     }
     DisposableEffect(Unit) {
@@ -204,7 +256,7 @@ fun ReaderScreen(
         gesturesEnabled = drawerState.isOpen, // Only allow closing via gesture, prevent opening conflict
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = PaperBackground,
+                drawerContainerColor = chromePalette.sheetContainer,
                 modifier = Modifier.width(300.dp)
             ) {
                 Column(modifier = Modifier.fillMaxHeight()) {
@@ -212,15 +264,15 @@ fun ReaderScreen(
                         "目录大纲",
                         modifier = Modifier.padding(24.dp),
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            color = InkText, 
+                            color = chromePalette.panelText,
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold
                         )
                     )
-                    HorizontalDivider(color = IconGrey.copy(alpha = 0.2f))
+                    HorizontalDivider(color = chromePalette.divider)
                     if (tocList.isEmpty()) {
                         Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text("暂无目录", color = IconGrey)
+                            Text("暂无目录", color = chromePalette.panelMutedText)
                         }
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -233,7 +285,7 @@ fun ReaderScreen(
                                                 bookmark.title, 
                                                 maxLines = 1, 
                                                 overflow = TextOverflow.Ellipsis, 
-                                                color = InkText.copy(alpha = 0.8f)
+                                                color = chromePalette.panelText.copy(alpha = 0.84f)
                                             )
                                         }
                                     },
@@ -257,13 +309,13 @@ fun ReaderScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isNightMode) Color.Black else PaperBackground)
+                .background(chromePalette.rootBackground)
         ) {
             when (val state = uiState) {
                 is ReaderUiState.Loading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center), 
-                        color = InkText
+                        color = chromePalette.panelText
                     )
                 }
                 is ReaderUiState.Downloading -> {
@@ -273,7 +325,7 @@ fun ReaderScreen(
                     ) {
                         // 顶部栏
                         Surface(
-                            color = FloatingSurface,
+                            color = chromePalette.panelSurface,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -284,13 +336,13 @@ fun ReaderScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 IconButton(onClick = { navController.popBackStack() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = InkText.copy(alpha = 0.8f))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = chromePalette.panelText.copy(alpha = 0.82f))
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "下载中...",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = InkText,
+                                    color = chromePalette.panelText,
                                     maxLines = 1
                                 )
                             }
@@ -310,13 +362,13 @@ fun ReaderScreen(
                                 Text(
                                     text = "正在下载文件",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = InkText
+                                    color = chromePalette.panelText
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = state.fileName,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = IconGrey,
+                                    color = chromePalette.panelMutedText,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -339,7 +391,7 @@ fun ReaderScreen(
                                             .height(8.dp)
                                             .clip(RoundedCornerShape(4.dp)),
                                         color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        trackColor = chromePalette.progressTrack
                                     )
                                 } else {
                                     // 未知进度 - 显示无限循环动画
@@ -348,7 +400,7 @@ fun ReaderScreen(
                                     Text(
                                         text = "文件大小未知...",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = IconGrey
+                                        color = chromePalette.panelMutedText
                                     )
                                 }
                                 
@@ -356,7 +408,7 @@ fun ReaderScreen(
                                 Text(
                                     text = "返回后下载将在后台继续",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = IconGrey
+                                    color = chromePalette.panelMutedText
                                 )
                             }
                         }
@@ -379,7 +431,7 @@ fun ReaderScreen(
                         // 错误标题
                         Text(
                             text = if (state.canRetry) "下载失败" else "加载错误",
-                            color = InkText,
+                            color = chromePalette.panelText,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                         )
@@ -388,7 +440,7 @@ fun ReaderScreen(
                         // 错误详情
                         Text(
                             text = state.message,
-                            color = IconGrey,
+                            color = chromePalette.panelMutedText,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
@@ -398,7 +450,7 @@ fun ReaderScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             // 返回按钮
                             TextButton(onClick = { navController.popBackStack() }) {
-                                Text("返回", color = IconGrey)
+                                Text("返回", color = chromePalette.panelMutedText)
                             }
 
                             // 重试按钮
@@ -436,7 +488,7 @@ fun ReaderScreen(
                         PDFViewerContent(
                             file = state.file,
                             defaultStartPage = state.initialPage,
-                            isNightMode = isNightMode,
+                            pdfBackgroundColor = chromePalette.pdfBackground,
                             isHorizontalScroll = isHorizontalScroll,
                             currentPage = currentPage,
                             isProgrammaticScroll = isProgrammaticScroll,
@@ -470,6 +522,14 @@ fun ReaderScreen(
                             modifier = Modifier.fillMaxSize()
                         )
 
+                        AnimatedVisibility(
+                            visible = isPaperBackground,
+                            enter = fadeIn(animationSpec = tween(durationMillis = 180)),
+                            exit = fadeOut(animationSpec = tween(durationMillis = 140))
+                        ) {
+                            PaperPageTintOverlay()
+                        }
+
                         // 2. Floating Top Bar (hidden during annotation)
                         AnimatedVisibility(
                             visible = showOverlay && !isAnnotating,
@@ -479,7 +539,7 @@ fun ReaderScreen(
                         ) {
                             MinimalistTopBar(
                                 title = cleanTitle,
-                                isNightMode = isNightMode,
+                                palette = chromePalette,
                                 isPresenter = isPresenter,
                                 isPresenterSyncing = isPresenterSyncing,
                                 isFollowing = isFollowing,
@@ -504,7 +564,8 @@ fun ReaderScreen(
                                 totalPages = totalPages,
                                 isEditing = false, // Always false here as we aren't in edit mode
                                 isAnnotationEnabled = isAnnotationViewportReady,
-                                isNightMode = isNightMode,
+                                palette = chromePalette,
+                                isPaperBackground = isPaperBackground,
                                 onTocClick = { scope.launch { drawerState.open() } }, // Open TOC
                                 onGridClick = { showThumbnailSheet = true },
                                 onPenClick = {
@@ -515,7 +576,13 @@ fun ReaderScreen(
                                         pdfViewRef?.invalidate()
                                     }
                                 },
-                                onSettingsClick = { isNightMode = !isNightMode }
+                                onSettingsClick = {
+                                    readingDisplayMode = if (isPaperBackground) {
+                                        ReadingDisplayMode.Standard
+                                    } else {
+                                        ReadingDisplayMode.Paper
+                                    }
+                                }
                             )
                         }
 
@@ -524,11 +591,11 @@ fun ReaderScreen(
                             ModalBottomSheet(
                                 onDismissRequest = { showThumbnailSheet = false },
                                 sheetState = sheetState,
-                                containerColor = if(isNightMode) Color.DarkGray else PaperBackground
+                                containerColor = chromePalette.sheetContainer
                             ) {
                                PdfThumbnailGrid(
                                    file = state.file,
-                                   isNightMode = isNightMode,
+                                   palette = chromePalette,
                                    currentPage = currentPage,
                                    onPageClick = { page ->
                                        isProgrammaticScroll = true
@@ -577,10 +644,19 @@ fun ReaderScreen(
 // =========================================================================================
 
 @Composable
+private fun PaperPageTintOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PaperPageTint)
+    )
+}
+
+@Composable
 fun PDFViewerContent(
     file: File,
     defaultStartPage: Int = 0,
-    isNightMode: Boolean,
+    pdfBackgroundColor: Color,
     isHorizontalScroll: Boolean,
     currentPage: Int,
     isProgrammaticScroll: Boolean,
@@ -618,13 +694,14 @@ fun PDFViewerContent(
                     localPdfViewRef = this
                     onPdfViewReady(this)
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    setBackgroundColor(if(isNightMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                    setBackgroundColor(pdfBackgroundColor.toArgb())
                 }
             },
             modifier = Modifier.fillMaxSize(),
             update = { pdfView ->
-                // Fix Flicker: Only reload if file/nightmode changes.
-                val configKey = "${file.absolutePath}_${isNightMode}"
+                pdfView.setBackgroundColor(pdfBackgroundColor.toArgb())
+                // Avoid reloading the PDF when only the reading display mode changes.
+                val configKey = file.absolutePath
 
                 if (pdfView.tag != configKey) {
                     isPdfLoaded = false // Reset load state on new file
@@ -637,7 +714,7 @@ fun PDFViewerContent(
                         .autoSpacing(false)
                         .pageFling(true)
                         .fitEachPage(false)
-                        .nightMode(isNightMode)
+                        .nightMode(false)
                         .enableAnnotationRendering(true)
                         .enableAntialiasing(true)
                         .spacing(10)
@@ -724,9 +801,9 @@ fun PDFViewerContent(
 }
 
 @Composable
-fun MinimalistTopBar(
+private fun MinimalistTopBar(
     title: String,
-    isNightMode: Boolean,
+    palette: ReaderChromePalette,
     isPresenter: Boolean,
     isPresenterSyncing: Boolean,
     isFollowing: Boolean,
@@ -735,8 +812,8 @@ fun MinimalistTopBar(
     onPresenterToggle: () -> Unit,
     onFollowToggle: () -> Unit
 ) {
-    val textColor = if(isNightMode) Color.White else InkText
-    val backgroundColor = if(isNightMode) Color.Black else FloatingSurface
+    val textColor = palette.panelText
+    val backgroundColor = palette.panelSurface
 
     Surface(
         color = backgroundColor,
@@ -771,7 +848,7 @@ fun MinimalistTopBar(
                 TextButton(
                     onClick = onPresenterToggle,
                     colors = ButtonDefaults.textButtonColors(
-                        contentColor = if (isPresenterSyncing) Color(0xFFFF5252) else IconGrey
+                        contentColor = if (isPresenterSyncing) Color(0xFFFF5252) else palette.panelMutedText
                     )
                 ) {
                     Icon(
@@ -798,7 +875,7 @@ fun MinimalistTopBar(
                 TextButton(
                     onClick = onFollowToggle,
                     colors = ButtonDefaults.textButtonColors(
-                        contentColor = if (isFollowing) Color(0xFF4CAF50) else IconGrey
+                        contentColor = if (isFollowing) Color(0xFF4CAF50) else palette.panelMutedText
                     ),
                     modifier = Modifier.alpha(if(isSyncActive && !isFollowing) pulseAlpha else 1f)
                 ) {
@@ -816,19 +893,20 @@ fun MinimalistTopBar(
 }
 
 @Composable
-fun FloatingControlCapsule(
+private fun FloatingControlCapsule(
     currentPage: Int,
     totalPages: Int,
     isEditing: Boolean,
     isAnnotationEnabled: Boolean,
-    isNightMode: Boolean,
+    palette: ReaderChromePalette,
+    isPaperBackground: Boolean,
     onTocClick: () -> Unit,
     onGridClick: () -> Unit,
     onPenClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Surface(
-        color = FloatingSurface,
+        color = palette.panelSurface,
         shape = RoundedCornerShape(50),
         shadowElevation = 8.dp,
         modifier = Modifier
@@ -849,24 +927,24 @@ fun FloatingControlCapsule(
                     fontFeatureSettings = "tnum",
                     fontWeight = FontWeight.Medium
                 ),
-                color = IconGrey,
+                color = palette.panelMutedText,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
             // Vertical Divider
-            VerticalDivider(modifier = Modifier.height(20.dp), color = Color.LightGray)
+            VerticalDivider(modifier = Modifier.height(20.dp), color = palette.divider)
 
             // Right: Icons Container
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 
                 // 1. TOC (List)
                 IconButton(onClick = onTocClick) {
-                    Icon(Icons.Default.Menu, "TOC", tint = IconGrey)
+                    Icon(Icons.Default.Menu, "TOC", tint = palette.panelMutedText)
                 }
                 
                 // 2. Thumbnails (Grid)
                 IconButton(onClick = onGridClick) {
-                    Icon(Icons.Default.Apps, "Thumbnails", tint = IconGrey)
+                    Icon(Icons.Default.Apps, "Thumbnails", tint = palette.panelMutedText)
                 }
 
                 // 3. Annotation (Pen)
@@ -874,20 +952,20 @@ fun FloatingControlCapsule(
                     onClick = onPenClick,
                     enabled = isAnnotationEnabled
                 ) {
-                    val tint = if(isEditing) MaterialTheme.colorScheme.primary else IconGrey
+                    val tint = if (isEditing) MaterialTheme.colorScheme.primary else palette.panelMutedText
                     Icon(
                         Icons.Default.Edit,
                         "Annotate",
-                        tint = if (isAnnotationEnabled) tint else IconGrey.copy(alpha = 0.35f)
+                        tint = if (isAnnotationEnabled) tint else palette.panelMutedText.copy(alpha = 0.35f)
                     )
                 }
 
-                // 4. Night Mode / Settings
+                // 4. Reading Background
                 IconButton(onClick = onSettingsClick) {
                     Icon(
-                        imageVector = if(isNightMode) Icons.Default.WbSunny else Icons.Default.NightlightRound, 
-                        contentDescription = "Night Mode", 
-                        tint = IconGrey
+                        imageVector = Icons.Default.Palette,
+                        contentDescription = "切换阅读背景",
+                        tint = if (isPaperBackground) MaterialTheme.colorScheme.primary else palette.panelMutedText
                     )
                 }
             }
@@ -896,9 +974,9 @@ fun FloatingControlCapsule(
 }
 
 @Composable
-fun PdfThumbnailGrid(
+private fun PdfThumbnailGrid(
     file: File,
-    isNightMode: Boolean,
+    palette: ReaderChromePalette,
     currentPage: Int,
     onPageClick: (Int) -> Unit
 ) {
@@ -926,7 +1004,7 @@ fun PdfThumbnailGrid(
              PdfPageThumbnail(
                  renderer = renderer,
                  pageIndex = pageIndex,
-                 isNightMode = isNightMode,
+                 palette = palette,
                  isSelected = pageIndex == currentPage,
                  onClick = { onPageClick(pageIndex) }
              )
@@ -935,10 +1013,10 @@ fun PdfThumbnailGrid(
 }
 
 @Composable
-fun PdfPageThumbnail(
+private fun PdfPageThumbnail(
     renderer: PdfRenderer,
     pageIndex: Int,
-    isNightMode: Boolean,
+    palette: ReaderChromePalette,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -984,7 +1062,7 @@ fun PdfPageThumbnail(
         Text(
             "${pageIndex + 1}", 
             style = MaterialTheme.typography.labelSmall, 
-            color = if(isNightMode) Color.White else IconGrey
+            color = palette.panelMutedText
         )
     }
 }
