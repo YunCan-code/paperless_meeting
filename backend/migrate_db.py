@@ -37,12 +37,22 @@ def run_migration():
                             print(f"✅ SQLite: {column_name} 列已存在，无需添加。")
                         else:
                             print(f"❌ SQLite 变更失败: {e}")
+
+                try:
+                    conn.execute(text("ALTER TABLE meeting ADD COLUMN show_media_link BOOLEAN DEFAULT 0;"))
+                    print("✅ SQLite: 成功为 meeting 表添加 show_media_link 列。")
+                except Exception as e:
+                    if "duplicate column name" in str(e).lower():
+                        print("✅ SQLite: show_media_link 列已存在，无需添加。")
+                    else:
+                        print(f"❌ SQLite 变更失败: {e}")
             else:
                 conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITHOUT TIME ZONE;"))
                 print("✅ PostgreSQL: 成功为 meeting 表添加 end_time 列。")
                 conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS manual_attendees TEXT;"))
                 conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS meeting_contacts TEXT;"))
-                print("✅ PostgreSQL: 成功为 meeting 表添加 manual_attendees / meeting_contacts 列。")
+                conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS show_media_link BOOLEAN DEFAULT FALSE;"))
+                print("✅ PostgreSQL: 成功为 meeting 表添加 manual_attendees / meeting_contacts / show_media_link 列。")
                 
         except Exception as e:
             print(f"❌ 数据库升级遇到异常 (可能已存在或语法差异): {e}")
