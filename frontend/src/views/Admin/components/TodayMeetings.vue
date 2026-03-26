@@ -34,12 +34,8 @@
            <div class="session-top">
               <span class="session-time">{{ formatTimeRange(meeting) }}</span>
            </div>
-           <div class="session-footer">
-             <!-- Location shown only if specific location exists, otherwise hidden as requested -->
-             <span v-if="meeting.location && meeting.location !== '线上'" class="location-text">
-               <el-icon><Location /></el-icon> {{ meeting.location }}
-             </span>
-           </div>
+            <div class="session-footer">
+            </div>
         </div>
         <div class="session-arrow">
           <el-icon><ArrowRight /></el-icon>

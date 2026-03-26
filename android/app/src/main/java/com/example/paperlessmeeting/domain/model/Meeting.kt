@@ -31,10 +31,15 @@ data class Attachment(
 
 data class Attendee(
     @com.google.gson.annotations.SerializedName("user_id")
-    val userId: Int,
+    val userId: Int? = null,
+    val type: String = "user",
     val name: String,
     @com.google.gson.annotations.SerializedName("meeting_role")
     val meetingRole: String
+)
+
+data class AgendaItemPayload(
+    val content: String
 )
 
 data class Meeting(
@@ -58,8 +63,12 @@ data class Meeting(
     val cardImageThumbUrl: String? = null,
     val speaker: String? = null,
     val agenda: String? = null,
+    @com.google.gson.annotations.SerializedName("agenda_items")
+    val agendaItems: List<AgendaItemPayload>? = emptyList(),
     val attachments: List<Attachment>? = emptyList(),
-    val attendees: List<Attendee>? = emptyList()
+    val attendees: List<Attendee>? = emptyList(),
+    @com.google.gson.annotations.SerializedName("show_media_link")
+    val showMediaLink: Boolean = false
 ) {
     // Helper to map backend status string to UI Enum
     // Or calculate dynamically if backend status is missing

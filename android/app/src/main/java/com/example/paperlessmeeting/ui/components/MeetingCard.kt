@@ -304,23 +304,27 @@ private fun parseDateTime(isoString: String): LocalDateTime? {
 }
 
 // Helper: Format Time Range
-// 同一天: MM-dd HH:mm-HH:mm
-// 不同天: MM-dd HH:mm - MM-dd HH:mm
 fun formatTimeRange(start: String, end: String?): String {
     val startDt = parseDateTime(start)
     val endDt = end?.takeIf { it.isNotBlank() }?.let { parseDateTime(it) }
 
     if (startDt == null) return start
 
-    val dateFmt = DateTimeFormatter.ofPattern("MM-dd HH:mm")
+    val dateFmt = DateTimeFormatter.ofPattern("M月d日")
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+    val weekdayFmt = DateTimeFormatter.ofPattern("EEE", java.util.Locale.CHINA)
+    val startLabel = "${startDt.format(dateFmt)}（${startDt.format(weekdayFmt)}）"
+    val startPeriod = if (startDt.hour < 12) "上午" else "下午"
+    val startTime = startDt.format(timeFmt)
 
-    if (endDt == null) return startDt.format(dateFmt)
+    if (endDt == null) return "$startLabel $startPeriod $startTime"
 
     return if (startDt.toLocalDate() == endDt.toLocalDate()) {
-        "${startDt.format(dateFmt)}-${endDt.format(timeFmt)}"
+        "$startLabel $startPeriod $startTime-${endDt.format(timeFmt)}"
     } else {
-        "${startDt.format(dateFmt)} - ${endDt.format(dateFmt)}"
+        val endLabel = "${endDt.format(dateFmt)}（${endDt.format(weekdayFmt)}）"
+        val endPeriod = if (endDt.hour < 12) "上午" else "下午"
+        "$startLabel $startPeriod $startTime 至 $endLabel $endPeriod ${endDt.format(timeFmt)}"
     }
 }
 

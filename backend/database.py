@@ -47,6 +47,7 @@ def create_db_and_tables():
     """
     try:
         SQLModel.metadata.create_all(engine)
+        _ensure_compatible_meeting_schema()
         _ensure_compatible_device_schema()
     except Exception as e:
         # 在多 worker 启动时，可能会遇到并发创建表的竞争条件
@@ -72,6 +73,41 @@ def _ensure_compatible_device_schema():
         print("[INFO] Added device.app_version_code column")
     except Exception as e:
         print(f"[WARN] Device schema compatibility check failed: {e}")
+
+def _ensure_compatible_meeting_schema():
+    """
+    兼容旧库，补齐会议扩展字段。
+    """
+    try:
+        inspector = inspect(engine)
+        if "meeting" not in inspector.get_table_names():
+            return
+
+        existing_columns = {column["name"] for column in inspector.get_columns("meeting")}
+        statements = []
+
+        if "manual_attendees" not in existing_columns:
+            if "sqlite" in DATABASE_URL:
+                statements.append("ALTER TABLE meeting ADD COLUMN manual_attendees TEXT")
+            else:
+                statements.append("ALTER TABLE meeting ADD COLUMN manual_attendees TEXT")
+
+        if "meeting_contacts" not in existing_columns:
+            if "sqlite" in DATABASE_URL:
+                statements.append("ALTER TABLE meeting ADD COLUMN meeting_contacts TEXT")
+            else:
+                statements.append("ALTER TABLE meeting ADD COLUMN meeting_contacts TEXT")
+
+        if not statements:
+            return
+
+        with engine.begin() as connection:
+            for statement in statements:
+                connection.execute(text(statement))
+
+        print("[INFO] Added meeting compatibility columns")
+    except Exception as e:
+        print(f"[WARN] Meeting schema compatibility check failed: {e}")
 
 def get_session():
     """

@@ -243,7 +243,7 @@ fun MeetingDetailContent(
                         Text(
                             text = "· ${attendee.name}",
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.width(80.dp)
+                            modifier = Modifier.weight(1f)
                         )
                         androidx.compose.material3.Surface(
                             color = when (attendee.meetingRole) {
@@ -297,31 +297,33 @@ fun MeetingDetailContent(
     }
 
     val AgendaSectionContent: @Composable () -> Unit = {
-        val hasValidAgenda = !meeting.agenda.isNullOrEmpty() && meeting.agenda.trim() != "[]"
+        val normalizedAgendaItems = extractAgendaItems(meeting)
+        val hasValidAgenda = normalizedAgendaItems.isNotEmpty()
         val hasValidDescription = !meeting.description.isNullOrEmpty()
 
-        SectionHeader(title = "会议内容 / 议程")
+        SectionHeader(title = "主要内容及议程")
         Spacer(modifier = Modifier.height(8.dp))
 
         if (hasValidAgenda || hasValidDescription) {
             if (hasValidAgenda) {
-                val agendaItems = parseAgenda(meeting.agenda!!)
-                if (agendaItems.isNotEmpty()) {
-                    agendaItems.forEach { item ->
+                normalizedAgendaItems.forEachIndexed { index, item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "${index + 1}.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.width(28.dp)
+                        )
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                                .weight(1f)
                         ) {
-                            if (item.time.isNotEmpty()) {
-                                Text(
-                                    text = item.time,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.width(60.dp)
-                                )
-                            }
                             Text(
                                 text = item.content,
                                 style = MaterialTheme.typography.bodyLarge,
@@ -330,13 +332,6 @@ fun MeetingDetailContent(
                             )
                         }
                     }
-                } else if (hasValidDescription) {
-                    Text(
-                        text = meeting.description!!,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 24.sp
-                    )
                 }
             } else if (hasValidDescription) {
                 Text(
@@ -347,7 +342,7 @@ fun MeetingDetailContent(
                 )
             }
         } else {
-            EmptySection("暂无议程安排")
+            EmptySection("暂无主要内容及议程")
         }
     }
 
@@ -376,6 +371,53 @@ fun MeetingDetailContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        if (meeting.showMediaLink) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                    )
+                    .clickable {
+                        val uri = android.net.Uri.parse(
+                            "${staticBaseUrl.substringBefore("/static").trimEnd('/')}/admin/media"
+                        )
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                    }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "媒体页查看更多",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = "本次会议包含图片/视频，点击前往媒体页",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(180f),
+                    tint = MaterialTheme.colorScheme.secondary,
+                )
+            }
         }
     }
 
@@ -636,18 +678,25 @@ private fun formatMeetingDateTimeRange(start: String?, end: String?): String {
         return start?.ifBlank { "" } ?: ""
     }
 
-    val dateFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
+    val dateFmt = java.time.format.DateTimeFormatter.ofPattern("M月d日")
     val timeFmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+    val weekdayFmt = java.time.format.DateTimeFormatter.ofPattern("EEE", java.util.Locale.CHINA)
+
+    val startDateLabel = "${startParsed.format(dateFmt)}（${startParsed.format(weekdayFmt)}）"
+    val startPeriod = if (startParsed.hour < 12) "上午" else "下午"
+    val startTime = startParsed.format(timeFmt)
 
     if (endParsed == null) {
-        return startParsed.format(dateFmt)
+        return "$startDateLabel $startPeriod $startTime"
     }
 
     val sameDay = startParsed.toLocalDate() == endParsed.toLocalDate()
     return if (sameDay) {
-        "${startParsed.format(dateFmt)}-${endParsed.format(timeFmt)}"
+        "$startDateLabel $startPeriod $startTime-${endParsed.format(timeFmt)}"
     } else {
-        "${startParsed.format(dateFmt)} - ${endParsed.format(dateFmt)}"
+        val endDateLabel = "${endParsed.format(dateFmt)}（${endParsed.format(weekdayFmt)}）"
+        val endPeriod = if (endParsed.hour < 12) "上午" else "下午"
+        "$startDateLabel $startPeriod $startTime 至 $endDateLabel $endPeriod ${endParsed.format(timeFmt)}"
     }
 }
 
@@ -667,16 +716,40 @@ private fun parseMeetingDateTime(raw: String?): java.time.LocalDateTime? {
 
 // Agenda Item data class
 data class AgendaItem(
-    val time: String = "",
     val content: String = ""
 )
+
+private fun extractAgendaItems(meeting: Meeting): List<AgendaItem> {
+    val fromNewField = meeting.agendaItems
+        ?.mapNotNull { item ->
+            item.content.takeIf { it.isNotBlank() }?.let { AgendaItem(content = it) }
+        }
+        .orEmpty()
+
+    if (fromNewField.isNotEmpty()) return fromNewField
+    return meeting.agenda?.let { parseAgenda(it) } ?: emptyList()
+}
 
 // Parse agenda JSON string into list of AgendaItems
 fun parseAgenda(agendaJson: String): List<AgendaItem> {
     return try {
-        val gson = com.google.gson.Gson()
-        val type = object : com.google.gson.reflect.TypeToken<List<AgendaItem>>() {}.type
-        gson.fromJson(agendaJson, type) ?: emptyList()
+        val rawList = org.json.JSONArray(agendaJson)
+        buildList {
+            for (index in 0 until rawList.length()) {
+                val item = rawList.optJSONObject(index)
+                if (item != null) {
+                    val content = item.optString("content").trim()
+                    if (content.isNotEmpty()) {
+                        add(AgendaItem(content = content))
+                    }
+                } else {
+                    val content = rawList.optString(index).trim()
+                    if (content.isNotEmpty()) {
+                        add(AgendaItem(content = content))
+                    }
+                }
+            }
+        }
     } catch (e: Exception) {
         emptyList()
     }

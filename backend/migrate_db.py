@@ -27,9 +27,22 @@ def run_migration():
                         print("✅ SQLite: end_time 列已存在，无需添加。")
                     else:
                         print(f"❌ SQLite 变更失败: {e}")
+
+                for column_name in ("manual_attendees", "meeting_contacts"):
+                    try:
+                        conn.execute(text(f"ALTER TABLE meeting ADD COLUMN {column_name} TEXT;"))
+                        print(f"✅ SQLite: 成功为 meeting 表添加 {column_name} 列。")
+                    except Exception as e:
+                        if "duplicate column name" in str(e).lower():
+                            print(f"✅ SQLite: {column_name} 列已存在，无需添加。")
+                        else:
+                            print(f"❌ SQLite 变更失败: {e}")
             else:
                 conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITHOUT TIME ZONE;"))
                 print("✅ PostgreSQL: 成功为 meeting 表添加 end_time 列。")
+                conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS manual_attendees TEXT;"))
+                conn.execute(text("ALTER TABLE meeting ADD COLUMN IF NOT EXISTS meeting_contacts TEXT;"))
+                print("✅ PostgreSQL: 成功为 meeting 表添加 manual_attendees / meeting_contacts 列。")
                 
         except Exception as e:
             print(f"❌ 数据库升级遇到异常 (可能已存在或语法差异): {e}")

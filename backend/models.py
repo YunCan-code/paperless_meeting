@@ -77,10 +77,13 @@ class MeetingBase(SQLModel):
     speaker: Optional[str] = None # 主讲人
     agenda: Optional[str] = None # 议程 (JSON format: [{"time": "10:00", "content": "Intro"}, ...])
     status: str = Field(default="scheduled") # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
+    show_media_link: bool = Field(default=False) # 是否在安卓端资料旁显示媒体页入口 # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
 
 class Meeting(MeetingBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.now) # 创建时间
+    manual_attendees: Optional[str] = None # 手填与会对象 JSON
+    meeting_contacts: Optional[str] = None # 会议联系人 JSON
     
     # 关联属性
     attendees: List[User] = Relationship(back_populates="meetings", link_model=MeetingAttendeeLink) # 参会人员列表
@@ -89,6 +92,9 @@ class Meeting(MeetingBase, table=True):
 class MeetingRead(MeetingBase):
     id: int
     created_at: datetime
+    manual_attendees: Optional[str] = None
+    meeting_contacts: Optional[str] = None
+    show_media_link: bool = False
 
 # 备忘录/后续事项模型
 class NoteBase(SQLModel):

@@ -112,7 +112,7 @@
     <el-dialog 
       v-model="detailDialogVisible" 
       title="会议详情" 
-      width="800px" 
+      width="1100px" 
       destroy-on-close 
       align-center
       class="meeting-dialog detail-mode"
@@ -137,50 +137,57 @@
             <div class="meta-card">
               <div class="meta-icon bg-green-50 text-green-500"><el-icon><Clock /></el-icon></div>
               <div class="meta-info">
-                <div class="meta-label">开始时间</div>
-                <div class="meta-value">{{ new Date(currentDetail.start_time).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'}) }}</div>
-              </div>
-            </div>
-
-            <div class="meta-card">
-              <div class="meta-icon bg-blue-50 text-blue-500"><el-icon><Clock /></el-icon></div>
-              <div class="meta-info">
-                <div class="meta-label">结束时间</div>
-                <div class="meta-value">
-                  {{ currentDetail.end_time ? new Date(currentDetail.end_time).toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'}) : '未设置' }}
-                </div>
+                <div class="meta-label">会议时间</div>
+                <div class="meta-value">{{ formatMeetingTimeRange(currentDetail.start_time, currentDetail.end_time) }}</div>
               </div>
             </div>
 
             <div class="meta-card" v-if="currentDetail.attendees && currentDetail.attendees.length > 0">
                <div class="meta-icon bg-orange-50 text-orange-500"><el-icon><User /></el-icon></div>
                <div class="meta-info">
-                 <div class="meta-label">与会人员 ({{currentDetail.attendees.length}}人)</div>
+                 <div class="meta-label">参会人员 ({{currentDetail.attendees.length}}人)</div>
                  <div class="meta-value" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
                     <el-tag 
-                      v-for="a in [...currentDetail.attendees].sort((x, y) => {
-                        const order = { '主讲人': 0, '特邀嘉宾': 1, '参会人员': 2 }
-                        return (order[x.meeting_role] ?? 3) - (order[y.meeting_role] ?? 3)
-                      })" 
-                      :key="a.user_id" 
+                      v-for="(a, idx) in sortedDetailAttendees" 
+                      :key="`${a.type || 'user'}-${a.user_id ?? a.name}-${idx}`" 
                       size="small" 
-                      :type="a.meeting_role === '主讲人' ? 'danger' : (a.meeting_role === '特邀嘉宾' ? 'warning' : 'info')"
-                    >
-                      {{ a.name }} <span style="opacity: 0.7; font-size: 11px; margin-left: 2px;">[{{ a.meeting_role }}]</span>
+                       style="max-width: 100%; height: auto; white-space: normal; word-break: break-all; line-height: 1.6; padding: 2px 8px;"
+                       :type="a.meeting_role === '主讲人' ? 'danger' : (a.meeting_role === '特邀嘉宾' ? 'warning' : 'info')"
+                     >
+                       {{ a.name }}
+                      <span style="opacity: 0.7; font-size: 11px; margin-left: 2px;">
+                        [{{ a.meeting_role }}{{ a.type === 'manual' ? ' · 手填' : '' }}]
+                      </span>
                     </el-tag>
                  </div>
                </div>
             </div>
 
-            <!-- 议程 meta-card -->
-            <div class="meta-card meta-card-agenda" v-if="currentDetail.agenda && currentDetail.agenda !== '[]'">
+            <div class="meta-card meta-card-agenda" v-if="detailAgendaItems.length > 0">
               <div class="meta-icon bg-yellow-50 text-yellow-500"><el-icon><List /></el-icon></div>
               <div class="meta-info">
-                <div class="meta-label">会议议程</div>
+                <div class="meta-label">主要内容及议程</div>
                 <div class="agenda-list" style="margin-top: 6px;">
-                  <div v-for="(item, idx) in parseAgenda(currentDetail.agenda)" :key="idx" class="agenda-item">
-                    <span class="agenda-time">{{ item.time }}</span>
+                  <div v-for="(item, idx) in detailAgendaItems" :key="idx" class="agenda-item">
+                    <span class="agenda-index">{{ idx + 1 }}</span>
                     <span class="agenda-content">{{ item.content }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="meta-card" v-if="detailContacts.length > 0">
+              <div class="meta-icon bg-blue-50 text-blue-500"><el-icon><Phone /></el-icon></div>
+              <div class="meta-info">
+                <div class="meta-label">会议联系人 ({{ detailContacts.length }}位)</div>
+                <div class="contact-list">
+                  <div v-for="(contact, idx) in detailContacts" :key="`${contact.name}-${idx}`" class="contact-item">
+                    <div class="contact-name">{{ contact.name }}</div>
+                    <div class="contact-lines">
+                      <span v-if="contact.short_phone">短号：{{ contact.short_phone }}</span>
+                      <span v-if="contact.phone">长号：{{ contact.phone }}</span>
+                      <span v-if="contact.email">邮箱：{{ contact.email }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -200,6 +207,16 @@
         <div class="dialog-right">
           <div class="section-header">
             <h4 class="section-title">会议资料 ({{ currentDetail.attachments?.length || 0 }})</h4>
+          </div>
+          <!-- 安卓端媒体入口状态（只读） -->
+          <div class="media-link-toggle" :class="{ active: currentDetail.show_media_link }">
+            <div class="media-link-toggle-left">
+              <div class="media-link-dot"></div>
+              <span class="media-link-label">安卓端提示点击媒体页</span>
+            </div>
+            <el-tag :type="currentDetail.show_media_link ? 'success' : 'info'" size="small" round>
+              {{ currentDetail.show_media_link ? '已启用' : '未启用' }}
+            </el-tag>
           </div>
           <div class="file-list-container">
              <div v-if="!currentDetail.attachments || currentDetail.attachments.length === 0" class="empty-state">
@@ -236,97 +253,244 @@
     <el-dialog 
       v-model="dialogVisible" 
       :title="isEditMode ? '编辑会议' : '发起新会议'" 
-      width="1000px" 
+      width="1100px" 
       destroy-on-close 
       align-center
-      class="meeting-dialog"
+      class="meeting-dialog edit-mode"
     >
       <div class="dialog-layout">
         <!-- 左侧：会议信息 -->
-        <div class="dialog-left">
-          <h4 class="section-title">基本信息</h4>
-          <el-form :model="form" label-position="top" size="large">
-            <el-form-item label="会议主题" required>
-              <el-input v-model="form.title" placeholder="请输入会议主题" />
-            </el-form-item>
-            <el-form-item label="会议类型" required>
-              <el-select v-model="form.meeting_type_id" placeholder="选择会议类型" style="width: 100%">
-                <el-option v-for="item in meetingTypes" :key="item.id" :label="item.name" :value="item.id" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="开始时间" required>
-              <el-date-picker 
-                v-model="form.start_time" 
-                type="datetime" 
-                placeholder="选择会议时间" 
-                style="width: 100%" 
-                format="YYYY-MM-DD HH:mm"
-              />
-            </el-form-item>
-            <el-form-item label="结束时间">
-              <el-date-picker
-                v-model="form.end_time"
-                type="datetime"
-                placeholder="选择结束时间（可选）"
-                style="width: 100%"
-                format="YYYY-MM-DD HH:mm"
-              />
-            </el-form-item>
-            
-            <div style="margin-bottom: 12px; font-weight: 600; color: #334155;">与会人员分配</div>
-            <div v-for="(attendee, index) in form.attendees_roles" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start;">
-                <el-select 
-                   v-model="attendee.user_id" 
-                   placeholder="选择参会人" 
-                   filterable 
-                   style="flex: 1;"
-                >
-                   <el-option
-                      v-for="item in userOptions"
-                      :key="item.value"
-                      :label="item.label"
-                      :value="item.value"
-                   />
-                </el-select>
-                <el-select
-                   v-model="attendee.meeting_role"
-                   placeholder="角色身份"
-                   style="width: 120px; flex-shrink: 0;"
-                >
-                   <el-option label="参会人员" value="参会人员"/>
-                   <el-option label="主讲人" value="主讲人"/>
-                   <el-option label="特邀嘉宾" value="特邀嘉宾"/>
-                </el-select>
-                <el-button type="danger" link @click="removeAttendee(index)">
-                   <el-icon><Delete /></el-icon>
-                </el-button>
-            </div>
-            <el-button type="primary" link @click="addAttendee" style="margin-bottom: 18px;">
-               <el-icon><Plus /></el-icon> 添加与会人员
-            </el-button>
-    
-            <div style="margin-bottom: 12px; font-weight: 600; color: #334155;">会议议程</div>
-            <div v-for="(item, index) in form.agendaItems" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start;">
-                <el-time-picker
-                   v-model="item.timeObj"
-                   format="HH:mm"
-                   placeholder="时间"
-                   style="width: 120px; flex-shrink: 0;"
-                   :clearable="false"
-                   @change="(val) => handleTimeChange(val, item)"
+        <div class="dialog-left modern-form-container">
+          <el-form :model="form" label-position="top" size="large" class="meeting-form modern-meeting-form">
+            <!-- 基础设置 -->
+            <!-- 基础设置 -->
+            <div class="form-section">
+              <el-form-item class="modern-form-item is-required">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><Document /></el-icon> 会议主题
+                  </div>
+                </template>
+                <el-input 
+                   v-model="form.title" 
+                   placeholder="请输入会议主题" 
+                   type="textarea"
+                   :autosize="{ minRows: 1, maxRows: 3 }"
                 />
-                <el-input v-model="item.content" placeholder="议程内容" style="flex: 1;" />
-                <el-button type="danger" link @click="removeAgendaItem(index)">
-                   <el-icon><Delete /></el-icon>
-                </el-button>
+              </el-form-item>
+
+              <el-form-item class="modern-form-item is-required">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><CollectionTag /></el-icon> 会议类型
+                  </div>
+                </template>
+                <el-select v-model="form.meeting_type_id" placeholder="请选择会议类型" style="width: 100%" effect="light">
+                  <el-option v-for="item in meetingTypes" :key="item.id" :label="item.name" :value="item.id" />
+                </el-select>
+              </el-form-item>
             </div>
-            <el-button type="primary" link @click="addAgendaItem" style="margin-bottom: 18px;">
-               <el-icon><Plus /></el-icon> 添加议程项
-            </el-button>
-            
-            <el-form-item label="会议地点" prop="location">
-               <el-input v-model="form.location" placeholder="请输入会议地点" />
-            </el-form-item>
+
+            <el-divider class="form-divider" />
+
+            <!-- 时间 -->
+            <div class="form-section">
+              <el-form-item class="modern-form-item is-required">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><Clock /></el-icon> 会议时间
+                  </div>
+                </template>
+                <button
+                  v-if="meetingTimePreview && !timeEditorVisible"
+                  type="button"
+                  class="meeting-time-preview"
+                  @click.stop="timeEditorVisible = true"
+                >
+                  <div class="meeting-time-preview-main">
+                    <el-icon><Calendar /></el-icon>
+                    <span>{{ meetingTimePreview.fullLabel }}</span>
+                  </div>
+                  <div class="meeting-time-preview-action">
+                    <el-icon><EditPen /></el-icon>
+                    <span>修改</span>
+                  </div>
+                </button>
+                <div v-else class="time-grid-modern-wrapper">
+                  <div class="time-grid-modern">
+                    <el-date-picker 
+                      v-model="form.start_time" 
+                      type="datetime" 
+                      placeholder="开始时间" 
+                      style="width: 100%" 
+                      format="YYYY-MM-DD HH:mm"
+                    />
+                    <div class="time-separator"><el-icon><Right /></el-icon></div>
+                    <el-date-picker
+                      v-model="form.end_time"
+                      type="datetime"
+                      placeholder="结束时间"
+                      style="width: 100%"
+                      format="YYYY-MM-DD HH:mm"
+                    />
+                  </div>
+                  <div v-if="meetingTimePreview" class="time-editor-actions" style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                    <el-button text type="primary" @click.stop="timeEditorVisible = false" size="small">
+                      完成时间设置
+                    </el-button>
+                  </div>
+                </div>
+              </el-form-item>
+            </div>
+
+            <el-divider class="form-divider" />
+
+            <!-- 详细内容与地点 -->
+            <div class="form-section">
+              <el-form-item class="modern-form-item">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><User /></el-icon> 参会人员
+                  </div>
+                </template>
+                <div class="dynamic-list">
+                  <div v-for="(attendee, index) in form.attendee_entries" :key="index" class="dynamic-list-item align-center">
+                    <el-popover
+                       placement="bottom-start"
+                       :width="280"
+                       trigger="click"
+                       popper-class="attendee-popover"
+                       :visible="attendee.showPopover"
+                    >
+                       <template #reference>
+                          <el-input 
+                             v-model="attendee.user_name"
+                             type="textarea"
+                             :autosize="{ minRows: 1, maxRows: 4 }"
+                             placeholder="输入姓名或在此搜索"
+                             class="flex-1"
+                             @input="handleAttendeeInput(attendee)"
+                             @focus="attendee.showPopover = true"
+                             @click="attendee.showPopover = true"
+                             @blur="hidePopoverDelay(attendee)"
+                          />
+                       </template>
+                       <div class="attendee-suggestions">
+                          <div v-if="getSuggestions(attendee.user_name).length === 0" class="no-data">无相关系统人员，直接点击外部即可作为自定义人员</div>
+                          <div 
+                             v-for="u in getSuggestions(attendee.user_name)" 
+                             :key="u.id" 
+                             class="suggestion-item"
+                             @mousedown.prevent
+                             @click="handleUserSelect(attendee, u)"
+                          >
+                             <span class="sugg-name">{{ u.name }}</span>
+                             <span v-if="u.department" class="sugg-dept">{{ u.department }}</span>
+                          </div>
+                       </div>
+                    </el-popover>
+                    <el-select
+                       v-model="attendee.meeting_role"
+                       placeholder="角色"
+                       style="width: 110px; flex-shrink: 0;"
+                       effect="light"
+                    >
+                       <el-option label="参会人员" value="参会人员"/>
+                       <el-option label="主讲人" value="主讲人"/>
+                       <el-option label="特邀嘉宾" value="特邀嘉宾"/>
+                    </el-select>
+                    <el-button type="danger" link class="delete-btn-subtle" @click.stop="removeAttendee(index)">
+                       <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                  <el-button type="primary" link class="add-btn-subtle" @click.stop="addAttendee">
+                     <el-icon><Plus /></el-icon> 添加参会人员
+                  </el-button>
+                </div>
+              </el-form-item>
+
+              <el-form-item class="modern-form-item">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><List /></el-icon> 主要内容及议程
+                  </div>
+                </template>
+                <div class="dynamic-list">
+                  <div v-for="(item, index) in form.agendaItems" :key="index" class="dynamic-list-item align-center">
+                    <span class="list-index">{{ index + 1 }}</span>
+                    <el-input 
+                       v-model="item.content" 
+                       placeholder="输入议程内容" 
+                       class="flex-1" 
+                       type="textarea" 
+                       :autosize="{ minRows: 1, maxRows: 4 }" 
+                    />
+                    <el-button type="danger" link class="delete-btn-subtle" @click.stop="removeAgendaItem(index)">
+                       <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                  <el-button type="primary" link class="add-btn-subtle" @click.stop="addAgendaItem">
+                     <el-icon><Plus /></el-icon> 添加议程
+                  </el-button>
+                </div>
+              </el-form-item>
+
+              <el-form-item class="modern-form-item">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><Phone /></el-icon> 会议联系人
+                  </div>
+                </template>
+                <div class="dynamic-list">
+                  <div v-for="(contact, index) in form.meeting_contacts" :key="index" class="dynamic-list-item contact-item-modern">
+                    <span class="list-index" style="align-self: flex-start; margin-top: 10px;">{{ index + 1 }}</span>
+                    <div class="contact-inputs flex-1" style="display: flex; flex-direction: column; gap: 8px;">
+                      <!-- 第一行：姓名 -->
+                      <el-input 
+                        v-model="contact.name" placeholder="请输入姓名" 
+                        type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" 
+                      />
+                      <!-- 第二行：电话 -->
+                      <div class="contact-row" style="display: flex; gap: 8px;">
+                        <el-input 
+                          v-model="contact.phone" placeholder="长号" style="flex: 1;"
+                          type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" 
+                        />
+                        <el-input 
+                          v-model="contact.short_phone" placeholder="短号" style="flex: 1;"
+                          type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" 
+                        />
+                      </div>
+                      <!-- 第三行：邮箱 -->
+                      <el-input 
+                        v-model="contact.email" placeholder="请输入邮箱地址" 
+                        type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" 
+                      />
+                    </div>
+                    <el-button type="danger" link class="delete-btn-subtle contact-delete" @click.stop="removeContact(index)">
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                  <el-button type="primary" link class="add-btn-subtle" @click.stop="addContact">
+                    <el-icon><Plus /></el-icon> 添加联系人
+                  </el-button>
+                </div>
+              </el-form-item>
+
+              <el-form-item class="modern-form-item">
+                <template #label>
+                  <div class="form-item-label-with-icon">
+                    <el-icon><LocationInformation /></el-icon> 会议地点
+                  </div>
+                </template>
+                <el-input 
+                   v-model="form.location" 
+                   placeholder="例如：1号会议室 / 线上会议" 
+                   type="textarea" 
+                   :autosize="{ minRows: 1, maxRows: 4 }" 
+                />
+              </el-form-item>
+            </div>
           </el-form>
         </div>
       
@@ -348,7 +512,15 @@
               <el-button type="primary" link size="small"><el-icon class="el-icon--left"><Plus/></el-icon>添加文件</el-button>
             </el-upload>
           </div>
-          
+
+          <!-- 媒体入口开关 -->
+          <div class="media-link-toggle" :class="{ active: form.show_media_link }">
+            <div class="media-link-toggle-left">
+              <div class="media-link-dot"></div>
+              <span class="media-link-label">安卓端提示点击媒体页</span>
+            </div>
+            <el-switch v-model="form.show_media_link" size="small" />
+          </div>
           <div class="file-list-container">
             <div v-if="attachmentList.length === 0" class="empty-state">
               <el-icon :size="48" color="#e2e8f0"><UploadFilled /></el-icon>
@@ -408,13 +580,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch, reactive } from 'vue'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Calendar, Timer as Clock, User, CircleCheck, Fold, Expand, 
   Document, UploadFilled, Top, Bottom, Delete, Edit, Plus,
-  CollectionTag, LocationInformation, FolderOpened, Download, DataAnalysis, List
+  CollectionTag, LocationInformation, FolderOpened, Download, DataAnalysis, List, Phone, Right, VideoPlay
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import SessionCalendar from './components/SessionCalendar.vue'
@@ -464,9 +636,12 @@ const form = ref({
   start_time: null, 
   end_time: null,
   location: '',
-  attendees_roles: [],
-  agendaItems: []
+  attendee_entries: [],
+  agendaItems: [],
+  meeting_contacts: []
 })
+const timeEditorVisible = ref(true)
+
 
 const currentSelectedDate = ref(new Date())
 
@@ -588,6 +763,226 @@ const formatSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
+const meetingRoleOrder = {
+  '主讲人': 0,
+  '特邀嘉宾': 1,
+  '参会人员': 2
+}
+
+const sortAttendees = (list = []) => [...list].sort((a, b) => {
+  const orderDiff = (meetingRoleOrder[a.meeting_role] ?? 3) - (meetingRoleOrder[b.meeting_role] ?? 3)
+  if (orderDiff !== 0) return orderDiff
+  return String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN')
+})
+
+const sortedDetailAttendees = computed(() => sortAttendees(currentDetail.value?.attendees || []))
+
+const parseAgendaItems = (agendaItems = [], agendaJson = '') => {
+  if (Array.isArray(agendaItems) && agendaItems.length > 0) {
+    return agendaItems
+      .map(item => ({ content: String(item.content || '').trim() }))
+      .filter(item => item.content)
+  }
+
+  try {
+    const parsed = JSON.parse(agendaJson || '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map(item => ({ content: String(item?.content || '').trim() }))
+      .filter(item => item.content)
+  } catch (e) {
+    return []
+  }
+}
+
+const detailAgendaItems = computed(() => parseAgendaItems(currentDetail.value?.agenda_items, currentDetail.value?.agenda))
+const detailContacts = computed(() => Array.isArray(currentDetail.value?.meeting_contacts) ? currentDetail.value.meeting_contacts : [])
+
+const weekdayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const weekdayShortNames = ['日', '一', '二', '三', '四', '五', '六']
+const formatTwoDigits = (value) => String(value).padStart(2, '0')
+const DAY_IN_MS = 24 * 60 * 60 * 1000
+const USER_OPTION_PREFIX = 'user:'
+
+const getDayPeriod = (date) => {
+  const hour = date.getHours()
+  if (hour < 6) return '凌晨'
+  if (hour < 12) return '上午'
+  if (hour < 14) return '中午'
+  if (hour < 18) return '下午'
+  return '晚上'
+}
+
+const normalizeDate = (value) => {
+  if (!value) return null
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const startOfWeek = (date) => {
+  const result = new Date(date)
+  result.setHours(0, 0, 0, 0)
+  const dayOffset = (result.getDay() + 6) % 7
+  result.setDate(result.getDate() - dayOffset)
+  return result
+}
+
+const getWeekdayContext = (date) => {
+  const currentWeekStart = startOfWeek(new Date())
+  const targetWeekStart = startOfWeek(date)
+  const diffWeeks = Math.round((targetWeekStart.getTime() - currentWeekStart.getTime()) / (7 * DAY_IN_MS))
+  const weekday = weekdayShortNames[date.getDay()]
+
+  if (diffWeeks === 0) return `本周${weekday}`
+  if (diffWeeks === 1) return `下周${weekday}`
+  if (diffWeeks === -1) return `上周${weekday}`
+  return weekdayNames[date.getDay()]
+}
+
+const formatClockTime = (date) => `${formatTwoDigits(date.getHours())}:${formatTwoDigits(date.getMinutes())}`
+
+const formatPreviewDateLabel = (date) => `${date.getMonth() + 1}月${date.getDate()}日（${getWeekdayContext(date)}）`
+
+const formatMeetingTimePreviewData = (start, end) => {
+  const startDate = normalizeDate(start)
+  if (!startDate) return null
+
+  const dateLabel = formatPreviewDateLabel(startDate)
+  const startTime = formatClockTime(startDate)
+  const endDate = normalizeDate(end)
+
+  if (!endDate) {
+    return {
+      dateLabel,
+      timeLabel: `${getDayPeriod(startDate)} ${startTime}`,
+      fullLabel: `${dateLabel} ${getDayPeriod(startDate)} ${startTime}`
+    }
+  }
+
+  const endTime = formatClockTime(endDate)
+  const isSameDay =
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate()
+
+  if (isSameDay) {
+    const startPeriod = getDayPeriod(startDate)
+    const endPeriod = getDayPeriod(endDate)
+    if (startPeriod === endPeriod) {
+      return {
+        dateLabel,
+        timeLabel: `${startPeriod} ${startTime}-${endTime}`,
+        fullLabel: `${dateLabel} ${startPeriod} ${startTime}-${endTime}`
+      }
+    }
+    return {
+      dateLabel,
+      timeLabel: `${startPeriod} ${startTime} - ${endPeriod} ${endTime}`,
+      fullLabel: `${dateLabel} ${startPeriod} ${startTime} - ${endPeriod} ${endTime}`
+    }
+  }
+
+  return {
+    dateLabel,
+    timeLabel: `${getDayPeriod(startDate)} ${startTime} - ${formatPreviewDateLabel(endDate)} ${getDayPeriod(endDate)} ${endTime}`,
+    fullLabel: `${dateLabel} ${getDayPeriod(startDate)} ${startTime} - ${formatPreviewDateLabel(endDate)} ${getDayPeriod(endDate)} ${endTime}`
+  }
+}
+
+const formatMeetingTimeRange = (start, end) => {
+  const startDate = normalizeDate(start)
+  if (!startDate) return start ? String(start) : '未设置'
+
+  const startLabel = `${startDate.getMonth() + 1}月${startDate.getDate()}日 ${weekdayNames[startDate.getDay()]}`
+  const startTime = formatClockTime(startDate)
+
+  if (!end) {
+    return `${startLabel} ${getDayPeriod(startDate)} ${startTime}`
+  }
+
+  const endDate = normalizeDate(end)
+  if (!endDate) {
+    return `${startLabel} ${getDayPeriod(startDate)} ${startTime}`
+  }
+
+  const endTime = formatClockTime(endDate)
+  const isSameDay =
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate()
+
+  if (isSameDay) {
+    return `${startLabel} ${getDayPeriod(startDate)} ${startTime}-${endTime}`
+  }
+
+  const endLabel = `${endDate.getMonth() + 1}月${endDate.getDate()}日 ${weekdayNames[endDate.getDay()]}`
+  return `${startLabel} ${getDayPeriod(startDate)} ${startTime} 至 ${endLabel} ${getDayPeriod(endDate)} ${endTime}`
+}
+
+const resetActiveCards = () => {}
+const meetingTimePreview = computed(() => formatMeetingTimePreviewData(form.value.start_time, form.value.end_time))
+watch(
+  () => [form.value.start_time, form.value.end_time],
+  ([start, end], [prevStart, prevEnd] = []) => {
+    const hasCompleteRange = Boolean(normalizeDate(start) && normalizeDate(end))
+    const hadCompleteRange = Boolean(normalizeDate(prevStart) && normalizeDate(prevEnd))
+
+    if (!hasCompleteRange) {
+      timeEditorVisible.value = true
+      return
+    }
+
+    if (!hadCompleteRange) {
+      timeEditorVisible.value = false
+    }
+  },
+  { immediate: true }
+)
+
+const createUserOptionValue = (userId) => `${USER_OPTION_PREFIX}${userId}`
+
+const handleAttendeeInput = (attendee) => {
+  attendee.user_id = null
+  attendee.showPopover = true
+}
+
+const hidePopoverDelay = (attendee) => {
+  setTimeout(() => {
+    attendee.showPopover = false
+  }, 200)
+}
+
+const getSuggestions = (queryString) => {
+  if (!userOptions.value || userOptions.value.length === 0) return []
+  return queryString
+    ? userOptions.value.filter(u => u.name && u.name.toLowerCase().includes(queryString.toLowerCase()))
+    : userOptions.value
+}
+
+const handleUserSelect = (attendee, item) => {
+  attendee.user_name = item.name
+  attendee.user_id = item.id
+  attendee.showPopover = false
+}
+
+const createEmptyAttendeeEntry = () => ({
+  user_name: '',
+  user_id: null,
+  meeting_role: '参会人员',
+  showPopover: false
+})
+
+const createEmptyAgendaItem = () => ({
+  content: ''
+})
+
+const createEmptyContact = () => ({
+  name: '',
+  short_phone: '',
+  phone: '',
+  email: ''
+})
+
 // Fetch
 const fetchMeetings = async () => {
   loading.value = true
@@ -615,12 +1010,7 @@ const handleDeleteMeeting = async () => {
 // Details
 const viewDetails = async (row) => {
   try {
-    const res = await request.get(`/meetings/${row.id}`)
-    currentDetail.value = res
-    // Sort attachments by sort_order
-    if (currentDetail.value.attachments) {
-       currentDetail.value.attachments.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-    }
+    await refreshMeetingDetail(row.id)
     detailDialogVisible.value = true
   } catch (e) { ElMessage.error('获取详情失败') }
 }
@@ -628,6 +1018,26 @@ const viewDetails = async (row) => {
 // Unified File List
  // Structure: { id, name, size, type: 'existing'|'new', raw?: File, existingId?: int }
 const attachmentList = ref([])
+
+const setAttachmentListFromMeeting = (meeting) => {
+  const sorted = [...(meeting?.attachments || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+  attachmentList.value = sorted.map(a => ({
+    id: `${a.id}-${a.sort_order || 0}`,
+    existingId: a.id,
+    name: a.display_name,
+    size: a.file_size,
+    type: 'existing'
+  }))
+}
+
+const refreshMeetingDetail = async (meetingId) => {
+  const res = await request.get(`/meetings/${meetingId}`)
+  if (res.attachments) {
+    res.attachments.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+  }
+  currentDetail.value = res
+  return res
+}
 
 // File Actions
 const handleFileSelect = (uploadFile) => {
@@ -666,6 +1076,15 @@ const removeFile = async (index) => {
   }
 }
 
+const moveFile = (index, delta) => {
+  const targetIndex = index + delta
+  if (targetIndex < 0 || targetIndex >= attachmentList.value.length) return
+  const list = [...attachmentList.value]
+  const [item] = list.splice(index, 1)
+  list.splice(targetIndex, 0, item)
+  attachmentList.value = list
+}
+
 
 
 // Users/Attendees
@@ -675,37 +1094,35 @@ const fetchUsers = async () => {
       const res = await request.get('/users/', { params: { page: 1, page_size: 500 } })
       const users = res.items || []
       userOptions.value = users.map(u => ({
-          label: u.name,
-          value: u.id
+          value: u.name,
+          name: u.name,
+          id: u.id,
+          department: u.department || ''
       }))
    } catch(e) {}
 }
 
 const addAttendee = () => {
-    form.value.attendees_roles.push({ user_id: null, meeting_role: '参会人员' })
+    form.value.attendee_entries.push(createEmptyAttendeeEntry())
 }
 const removeAttendee = (index) => {
-    form.value.attendees_roles.splice(index, 1)
-}
-
-const parseAgenda = (jsonStr) => {
-    try {
-        return JSON.parse(jsonStr || '[]')
-    } catch(e) { return [] }
+    form.value.attendee_entries.splice(index, 1)
 }
 
 // Agenda
 const addAgendaItem = () => {
-    form.value.agendaItems.push({ timeObj: new Date().setHours(9,0,0,0), timeStr: '09:00', content: '' })
+    form.value.agendaItems.push(createEmptyAgendaItem())
 }
 const removeAgendaItem = (index) => {
     form.value.agendaItems.splice(index, 1)
 }
-const handleTimeChange = (val, item) => {
-    if(!val) return
-    const hours = val.getHours().toString().padStart(2, '0')
-    const minutes = val.getMinutes().toString().padStart(2, '0')
-    item.timeStr = `${hours}:${minutes}`
+
+const addContact = () => {
+  form.value.meeting_contacts.push(createEmptyContact())
+}
+
+const removeContact = (index) => {
+  form.value.meeting_contacts.splice(index, 1)
 }
 
 // Actions
@@ -714,10 +1131,19 @@ const openCreate = () => {
   isEditMode.value = false
   editingId.value = null
   const defaultLoc = localStorage.getItem('defaultMeetingLocation') || ''
-  
-  const defaultAgenda = []
+  resetActiveCards()
 
-  form.value = { title: '', meeting_type_id: null, start_time: null, end_time: null, location: defaultLoc, attendees_roles: [], agendaItems: defaultAgenda }
+  form.value = {
+    title: '',
+    meeting_type_id: null,
+    start_time: null,
+    end_time: null,
+    location: defaultLoc,
+    attendee_entries: [],
+    agendaItems: [],
+    meeting_contacts: [],
+    show_media_link: false
+  }
   attachmentList.value = []
   dialogVisible.value = true
 }
@@ -725,21 +1151,9 @@ const openCreate = () => {
 const openEdit = () => {
   if (!currentDetail.value) return
   const m = currentDetail.value
-  
-  let agendaItems = []
-  try {
-      const parsed = JSON.parse(m.agenda || '[]')
-      agendaItems = parsed.map(p => {
-          const [h, min] = (p.time || '09:00').split(':')
-          const d = new Date()
-          d.setHours(parseInt(h), parseInt(min), 0)
-          return { timeObj: d, timeStr: p.time, content: p.content } 
-      })
-  } catch(e) {}
-  
-  // if(agendaItems.length === 0) agendaItems.push({ timeObj: new Date().setHours(9,0,0), timeStr: '09:00', content: '' })
-  
+
   if(userOptions.value.length === 0) fetchUsers()
+  resetActiveCards()
 
   form.value = { 
       title: m.title, 
@@ -747,39 +1161,78 @@ const openEdit = () => {
       start_time: m.start_time, 
       end_time: m.end_time || null,
       location: m.location,
-      attendees_roles: (m.attendees || []).map(a => ({ user_id: a.user_id, meeting_role: a.meeting_role })),
-      agendaItems: agendaItems
+      attendee_entries: (m.attendees || []).map(a => ({
+        user_name: a.name || '',
+        user_id: a.user_id || null,
+        meeting_role: a.meeting_role || '参会人员',
+        showPopover: false
+      })),
+      agendaItems: parseAgendaItems(m.agenda_items, m.agenda),
+      meeting_contacts: Array.isArray(m.meeting_contacts)
+        ? m.meeting_contacts.map(contact => ({
+            name: contact.name || '',
+            short_phone: contact.short_phone || '',
+            phone: contact.phone || '',
+            email: contact.email || ''
+          }))
+        : [],
+      show_media_link: m.show_media_link || false
   }
   editingId.value = m.id
   isEditMode.value = true
   
-  const sorted = [...(m.attachments || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-  attachmentList.value = sorted.map(a => ({
-     id: Date.now() + Math.random(),
-     existingId: a.id,
-     name: a.display_name,
-     size: a.file_size,
-     type: 'existing'
-  }))
+  setAttachmentListFromMeeting(m)
   
   detailDialogVisible.value = false
   dialogVisible.value = true
 }
 
 const handleSubmit = async () => {
-  if (!form.value.title || !form.value.start_time || !form.value.meeting_type_id) return ElMessage.warning('请填写完整')
-  
-  // Serialize Agenda
-  const agendaJson = JSON.stringify((form.value.agendaItems || []).map(i => ({
-      time: i.timeStr || '09:00',
-      content: i.content
-  })))
+  if (!form.value.title || !form.value.start_time || !form.value.end_time || !form.value.meeting_type_id) {
+    return ElMessage.warning('请填写完整')
+  }
+
+  if (new Date(form.value.end_time) < new Date(form.value.start_time)) {
+    return ElMessage.warning('结束时间不能早于开始时间')
+  }
+
+  const attendeeEntries = (form.value.attendee_entries || [])
+    .map(item => {
+      const nameStr = String(item.user_name || '').trim()
+      if (!nameStr) return null
+      return {
+        type: item.user_id ? 'user' : 'manual',
+        user_id: item.user_id || null,
+        name: item.user_id ? null : nameStr,
+        meeting_role: item.meeting_role || '参会人员'
+      }
+    })
+    .filter(Boolean)
+
+  const agendaItems = (form.value.agendaItems || [])
+    .map(item => ({ content: String(item.content || '').trim() }))
+    .filter(item => item.content)
+
+  const meetingContacts = (form.value.meeting_contacts || [])
+    .map(contact => ({
+      name: String(contact.name || '').trim(),
+      short_phone: String(contact.short_phone || '').trim(),
+      phone: String(contact.phone || '').trim(),
+      email: String(contact.email || '').trim()
+    }))
+    .filter(contact => contact.name)
 
   const payload = {
-    ...form.value,
-    agenda: agendaJson,
+    title: form.value.title,
+    meeting_type_id: form.value.meeting_type_id,
+    start_time: form.value.start_time,
+    end_time: form.value.end_time,
+    location: form.value.location,
+    attendee_entries: attendeeEntries,
+    agenda_items: agendaItems,
+    meeting_contacts: meetingContacts,
+    show_media_link: form.value.show_media_link || false
   }
-  delete payload.agendaItems
 
   try {
     submitting.value = true
@@ -795,9 +1248,7 @@ const handleSubmit = async () => {
        targetId = res.id
        editingId.value = targetId
     }
-    dialogVisible.value = false
-    fetchMeetings()
-    
+
     // Process new files...
     const newFiles = attachmentList.value.filter(f => f.type === 'new')
     if (newFiles.length > 0) {
@@ -816,6 +1267,14 @@ const handleSubmit = async () => {
         }
         ElMessage.success('附件上传完成')
     }
+    await fetchMeetings()
+
+    if (targetId) {
+      await refreshMeetingDetail(targetId)
+      detailDialogVisible.value = true
+    }
+
+    dialogVisible.value = false
 } catch (e) {
     console.error('Save meeting error:', e)
     ElMessage.error(e.message || '保存失败')
@@ -849,6 +1308,10 @@ const downloadFile = (file) => {
 .meta-label { font-size: 13px; color: #94a3b8; margin-bottom: 2px; }
 .meta-value { font-size: 15px; color: #334155; font-weight: 600; }
 .detail-footer { display: flex; justify-content: flex-end; gap: 12px; width: 100%; }
+.contact-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.contact-item { padding: 10px 12px; border-radius: 10px; background: var(--bg-main); }
+.contact-name { font-size: 14px; font-weight: 700; color: var(--text-main); }
+.contact-lines { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
 
 /* Colors Utility */
 .bg-blue-50 { background-color: #eff6ff; } .text-blue-500 { color: #3b82f6; }
@@ -899,11 +1362,386 @@ const downloadFile = (file) => {
 /* Dialog Styles */
 .meeting-dialog :deep(.el-dialog__body) { padding: 0; }
 .dialog-layout { display: flex; height: 500px; }
+.detail-mode :deep(.el-dialog),
+.edit-mode :deep(.el-dialog) { width: min(1100px, 92vw) !important; }
+.detail-mode .dialog-layout,
+.edit-mode .dialog-layout { height: min(680px, 76vh); }
+.detail-mode .dialog-right,
+.edit-mode .dialog-right { width: 440px; }
 .dialog-left { flex: 1; padding: 24px; border-right: 1px solid var(--border-color); overflow-y: auto; }
 .dialog-right { width: 400px; background-color: var(--bg-main); display: flex; flex-direction: column; }
+@media screen and (max-width: 991px) {
+  .detail-mode :deep(.el-dialog),
+  .edit-mode :deep(.el-dialog) { width: min(1100px, 96vw) !important; }
+  .detail-mode .dialog-layout,
+  .edit-mode .dialog-layout {
+    height: auto;
+    min-height: 560px;
+    max-height: 82vh;
+    flex-direction: column;
+  }
+  .detail-mode .dialog-left,
+  .edit-mode .dialog-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .detail-mode .dialog-right,
+  .edit-mode .dialog-right {
+    width: 100%;
+    min-height: 260px;
+  }
+}
+/* Modern Form Redesign */
+.modern-form-container {
+  padding: 32px 40px !important;
+  background-color: #ffffff;
+}
+.modern-meeting-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.form-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.form-divider {
+  margin: 28px 0;
+  border-top-color: transparent;
+  background: linear-gradient(to right, transparent, rgba(148, 163, 184, 0.25), transparent);
+  height: 1px;
+}
+.modern-form-item {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.modern-form-item :deep(.el-form-item__label) {
+  padding-bottom: 6px;
+  line-height: 1.2;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+.modern-form-item.is-required :deep(.el-form-item__label)::before {
+  content: '*';
+  color: #ef4444;
+  margin-right: 4px;
+}
+
+/* Base input overrides */
+.modern-meeting-form :deep(.el-input),
+.modern-meeting-form :deep(.el-select),
+.modern-meeting-form :deep(.el-textarea),
+.modern-meeting-form :deep(.el-date-editor) {
+  width: 100%;
+}
+.modern-meeting-form :deep(.el-input__wrapper),
+.modern-meeting-form :deep(.el-select__wrapper),
+.modern-meeting-form :deep(.el-textarea__inner) {
+  background-color: #f8fafc !important;
+  box-shadow: none !important;
+  border-radius: 8px;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+.modern-meeting-form :deep(.el-input__inner),
+.modern-meeting-form :deep(.el-select__placeholder),
+.modern-meeting-form :deep(.el-textarea__inner) {
+  font-size: 15px;
+  color: #1e293b;
+}
+.modern-meeting-form :deep(.el-textarea__inner) {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.modern-meeting-form :deep(.el-input__inner::placeholder),
+.modern-meeting-form :deep(.el-textarea__inner::placeholder) {
+  color: #94a3b8;
+}
+.modern-meeting-form :deep(.el-input__wrapper.is-focus),
+.modern-meeting-form :deep(.el-select__wrapper.is-focused),
+.modern-meeting-form :deep(.el-input__wrapper:hover),
+.modern-meeting-form :deep(.el-select__wrapper:hover),
+.modern-meeting-form :deep(.el-textarea__inner:focus),
+.modern-meeting-form :deep(.el-textarea__inner:hover) {
+  background-color: #ffffff !important;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+html.dark .modern-form-container {
+  background-color: transparent !important;
+}
+html.dark .modern-meeting-form :deep(.el-input__inner),
+html.dark .modern-meeting-form :deep(.el-select__inner),
+html.dark .modern-meeting-form :deep(.el-select__placeholder),
+html.dark .modern-meeting-form :deep(.el-textarea__inner) {
+  color: #f8fafc;
+}
+html.dark .modern-meeting-form :deep(.el-input__wrapper),
+html.dark .modern-meeting-form :deep(.el-select__wrapper),
+html.dark .modern-meeting-form :deep(.el-textarea__inner) {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+html.dark .modern-meeting-form :deep(.el-input__wrapper.is-focus),
+html.dark .modern-meeting-form :deep(.el-select__wrapper.is-focused),
+html.dark .modern-meeting-form :deep(.el-input__wrapper:hover),
+html.dark .modern-meeting-form :deep(.el-select__wrapper:hover),
+html.dark .modern-meeting-form :deep(.el-textarea__inner:focus),
+html.dark .modern-meeting-form :deep(.el-textarea__inner:hover) {
+  background-color: #1e293b !important;
+  border-color: #3b82f6 !important;
+}
+
+.attendee-popover {
+  padding: 8px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+html.dark .attendee-popover {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+.attendee-suggestions {
+  max-height: 200px;
+  overflow-y: auto;
+}
+.suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+.suggestion-item:hover {
+  background-color: #f1f5f9;
+}
+html.dark .suggestion-item:hover {
+  background-color: #334155;
+}
+.sugg-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+html.dark .sugg-name {
+  color: #f8fafc;
+}
+.sugg-dept {
+  color: #94a3b8;
+  font-size: 13px;
+}
+.no-data {
+  padding: 12px;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 13px;
+}
+
 .section-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-main); }
 .section-tip { font-size: 12px; color: #f59e0b; margin-top: 4px; }
+
+/* Time preview */
+.meeting-time-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #f8fafc;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #1e293b;
+  font-size: 15px;
+}
+.meeting-time-preview:hover {
+  background-color: #f1f5f9;
+  border-color: #bfdbfe;
+}
+.meeting-time-preview-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.meeting-time-preview-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+/* Time Grid */
+.time-grid-modern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.time-separator {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dynamic Lists */
+.dynamic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.dynamic-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+.dynamic-list-item:hover {
+  background-color: #f1f5f9;
+}
+.list-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.delete-btn-subtle {
+  opacity: 0;
+  margin-top: 0;
+  transition: all 0.2s;
+  height: 32px;
+}
+.dynamic-list-item:hover .delete-btn-subtle {
+  opacity: 1;
+}
+.add-btn-subtle {
+  margin-top: 4px;
+  justify-content: flex-start;
+  padding-left: 8px;
+  font-weight: 600;
+}
+.flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Contact List specific */
+.contact-item-modern {
+  flex-direction: row;
+  align-items: flex-start;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+html.dark .contact-item-modern {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+.modern-meeting-form :deep(.contact-item-modern .el-textarea__inner),
+.modern-meeting-form :deep(.contact-item-modern .el-input__wrapper) {
+  background-color: #ffffff !important;
+}
+html.dark .modern-meeting-form :deep(.contact-item-modern .el-textarea__inner),
+html.dark .modern-meeting-form :deep(.contact-item-modern .el-input__wrapper) {
+  background-color: #0f172a !important;
+}
+.contact-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.contact-half-input {
+  flex: 1;
+}
+.contact-delete {
+  margin-top: 4px;
+}
+
+/* Media Link Toggle */
+.media-link-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 10px;
+  background: transparent;
+  transition: background 0.2s;
+}
+.media-link-toggle.active {
+  background: rgba(139, 92, 246, 0.06);
+}
+.media-link-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.media-link-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.media-link-toggle.active .media-link-dot {
+  opacity: 1;
+  box-shadow: 0 0 4px #8b5cf6;
+}
+.media-link-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.media-link-toggle.active .media-link-label {
+  color: #8b5cf6;
+  font-weight: 500;
+}
 .file-list-container { flex: 1; padding: 16px; overflow-y: auto; }
 .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); gap: 12px; }
 .file-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; transition: all 0.2s; }
@@ -921,7 +1759,7 @@ const downloadFile = (file) => {
 /* Agenda Styles */
 .agenda-list { display: flex; flex-direction: column; gap: 8px; }
 .agenda-item { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; }
-.agenda-time { font-family: monospace; font-weight: 600; color: var(--color-primary); background: var(--bg-main); padding: 2px 6px; border-radius: 4px; }
+.agenda-index { width: 24px; height: 24px; border-radius: 999px; background: var(--bg-main); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
 .agenda-content { color: var(--text-main); line-height: 1.5; }
 
 /* Clickable Stat Card */
@@ -965,5 +1803,78 @@ html.dark .meta-label {
 }
 html.dark .meta-value {
     color: #e2e8f0;
+}
+html.dark .contact-item {
+    background-color: #1f2937;
+}
+/* Modern Form Dark Mode */
+html.dark .meeting-time-preview { background-color: #0f172a; color: #f8fafc; }
+html.dark .meeting-time-preview:hover { background-color: #1e293b; border-color: #3b82f6; }
+html.dark .modern-form-container {
+  background-color: #1e293b;
+}
+html.dark .modern-form-item :deep(.el-form-item__label) {
+  color: #e2e8f0;
+}
+html.dark .form-section-title {
+  color: #64748b;
+}
+html.dark .modern-meeting-form :deep(.el-input__wrapper),
+html.dark .modern-meeting-form :deep(.el-select__wrapper),
+html.dark .modern-meeting-form :deep(.el-textarea__wrapper) {
+  background-color: #0f172a !important;
+  border-color: transparent !important;
+}
+html.dark .modern-meeting-form :deep(.el-input__inner),
+html.dark .modern-meeting-form :deep(.el-select__placeholder),
+html.dark .modern-meeting-form :deep(.el-select__selected-item) {
+  color: #f8fafc !important;
+}
+html.dark .modern-meeting-form :deep(.el-input__wrapper.is-focus),
+html.dark .modern-meeting-form :deep(.el-select__wrapper.is-focused),
+html.dark .modern-meeting-form :deep(.el-input__wrapper:hover),
+html.dark .modern-meeting-form :deep(.el-select__wrapper:hover) {
+  background-color: #1e293b !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+html.dark .dynamic-list-item:hover {
+  background-color: #0f172a;
+}
+html.dark .list-index {
+  background-color: #334155;
+  color: #94a3b8;
+}
+html.dark .form-divider {
+  border-top-color: #334155;
+}
+
+@media (max-width: 768px) {
+  .time-grid-modern {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .time-separator {
+    display: none;
+  }
+  .contact-phones {
+    grid-template-columns: 1fr;
+  }
+  .dynamic-list-item {
+    flex-wrap: wrap;
+  }
+}
+.form-item-label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+.form-item-label-with-icon .el-icon {
+  font-size: 16px;
+  color: #3b82f6;
+}
+html.dark .form-item-label-with-icon .el-icon {
+  color: #60a5fa;
 }
 </style>

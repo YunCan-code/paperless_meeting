@@ -6,9 +6,10 @@ import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+import json
 
 from database import get_session
-from models import Meeting, MeetingType, Attachment, User, MeetingRead, AttachmentRead, MeetingBase, Vote, VoteOption, UserVote, MeetingAttendeeLink
+from models import Meeting, MeetingType, Attachment, AttachmentRead, Vote, VoteOption, UserVote, MeetingAttendeeLink, User
 from socket_manager import sio, broadcast_meeting_changed
 
 from pydantic import BaseModel
@@ -17,11 +18,65 @@ class AttendeeRoleInput(BaseModel):
     user_id: int
     meeting_role: str = "参会人员"
 
-class MeetingCreateInput(MeetingBase):
-    attendees_roles: Optional[List[AttendeeRoleInput]] = None
+class AttendeeEntryInput(BaseModel):
+    type: str = "user"
+    user_id: Optional[int] = None
+    name: Optional[str] = None
+    meeting_role: str = "参会人员"
 
-class MeetingUpdateInput(MeetingBase):
+class AgendaItemInput(BaseModel):
+    content: str
+
+class MeetingContactInput(BaseModel):
+    name: str
+    short_phone: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+class MeetingCreateInput(BaseModel):
+    title: str
+    meeting_type_id: Optional[int] = None
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    location: Optional[str] = None
+    speaker: Optional[str] = None
+    agenda: Optional[str] = None
+    status: str = "scheduled"
     attendees_roles: Optional[List[AttendeeRoleInput]] = None
+    attendee_entries: Optional[List[AttendeeEntryInput]] = None
+    agenda_items: Optional[List[AgendaItemInput]] = None
+    meeting_contacts: Optional[List[MeetingContactInput]] = None
+    show_media_link: bool = False
+
+class MeetingUpdateInput(BaseModel):
+    title: Optional[str] = None
+    meeting_type_id: Optional[int] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    location: Optional[str] = None
+    speaker: Optional[str] = None
+    agenda: Optional[str] = None
+    status: Optional[str] = None
+    attendees_roles: Optional[List[AttendeeRoleInput]] = None
+    attendee_entries: Optional[List[AttendeeEntryInput]] = None
+    agenda_items: Optional[List[AgendaItemInput]] = None
+    meeting_contacts: Optional[List[MeetingContactInput]] = None
+    show_media_link: Optional[bool] = None
+
+class AgendaItemOutput(BaseModel):
+    content: str
+
+class MeetingContactOutput(BaseModel):
+    name: str
+    short_phone: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+class AttendeeOutput(BaseModel):
+    type: str = "user"
+    user_id: Optional[int] = None
+    name: str
+    meeting_role: str = "参会人员"
 
 # 创建路由器，前缀为 /meetings
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -35,38 +90,182 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXTENSIONS = {'.pdf'}  # 仅允许 PDF 文件（与前端一致）
 MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200MB
 
+MEETING_BASE_FIELDS = {
+    "title",
+    "meeting_type_id",
+    "start_time",
+    "end_time",
+    "location",
+    "speaker",
+    "agenda",
+    "status",
+    "show_media_link",
+}
+
+def _parse_datetime_value(value):
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError:
+            return value
+    return value
+
+def _load_json_list(raw_value: Optional[str]) -> List:
+    if not raw_value:
+        return []
+    try:
+        parsed = json.loads(raw_value)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+def _normalize_agenda_items(
+    agenda_items: Optional[List[AgendaItemInput]] = None,
+    agenda_raw: Optional[str] = None
+) -> List[dict]:
+    if agenda_items is not None:
+        normalized = []
+        for item in agenda_items:
+            content = (item.content or "").strip()
+            if content:
+                normalized.append({"content": content})
+        return normalized
+
+    normalized = []
+    for item in _load_json_list(agenda_raw):
+        if isinstance(item, dict):
+            content = str(item.get("content") or "").strip()
+            if content:
+                normalized.append({"content": content})
+        elif isinstance(item, str):
+            content = item.strip()
+            if content:
+                normalized.append({"content": content})
+    return normalized
+
+def _serialize_agenda_items(
+    agenda_items: Optional[List[AgendaItemInput]] = None,
+    agenda_raw: Optional[str] = None
+) -> Optional[str]:
+    normalized = _normalize_agenda_items(agenda_items, agenda_raw)
+    if not normalized:
+        return None
+    return json.dumps(normalized, ensure_ascii=False)
+
+def _normalize_meeting_contacts(
+    contacts: Optional[List[MeetingContactInput]]
+) -> List[dict]:
+    if contacts is None:
+        return []
+
+    normalized = []
+    for contact in contacts:
+        name = (contact.name or "").strip()
+        if not name:
+            continue
+        normalized.append({
+            "name": name,
+            "short_phone": (contact.short_phone or "").strip() or None,
+            "phone": (contact.phone or "").strip() or None,
+            "email": (contact.email or "").strip() or None,
+        })
+    return normalized
+
+def _serialize_meeting_contacts(contacts: Optional[List[MeetingContactInput]]) -> Optional[str]:
+    normalized = _normalize_meeting_contacts(contacts)
+    if not normalized:
+        return None
+    return json.dumps(normalized, ensure_ascii=False)
+
+def _parse_meeting_contacts(raw_value: Optional[str]) -> List[MeetingContactOutput]:
+    return [
+        MeetingContactOutput(
+            name=str(item.get("name") or "").strip(),
+            short_phone=item.get("short_phone"),
+            phone=item.get("phone"),
+            email=item.get("email")
+        )
+        for item in _load_json_list(raw_value)
+        if isinstance(item, dict) and str(item.get("name") or "").strip()
+    ]
+
+def _split_attendees_payload(
+    attendee_entries: Optional[List[AttendeeEntryInput]] = None,
+    attendees_roles: Optional[List[AttendeeRoleInput]] = None
+):
+    user_entries = []
+    manual_entries = []
+
+    if attendee_entries is not None:
+        for entry in attendee_entries:
+            role = (entry.meeting_role or "参会人员").strip() or "参会人员"
+            if entry.type == "manual":
+                name = (entry.name or "").strip()
+                if name:
+                    manual_entries.append({"name": name, "meeting_role": role})
+            else:
+                if entry.user_id is not None:
+                    user_entries.append({"user_id": entry.user_id, "meeting_role": role})
+        return user_entries, manual_entries
+
+    if attendees_roles is not None:
+        for attendee in attendees_roles:
+            user_entries.append({
+                "user_id": attendee.user_id,
+                "meeting_role": (attendee.meeting_role or "参会人员").strip() or "参会人员"
+            })
+
+    return user_entries, manual_entries
+
+def _serialize_manual_attendees(manual_entries: List[dict]) -> Optional[str]:
+    if not manual_entries:
+        return None
+    return json.dumps(manual_entries, ensure_ascii=False)
+
+def _parse_manual_attendees(raw_value: Optional[str]) -> List[AttendeeOutput]:
+    return [
+        AttendeeOutput(
+            type="manual",
+            user_id=None,
+            name=str(item.get("name") or "").strip(),
+            meeting_role=str(item.get("meeting_role") or "参会人员").strip() or "参会人员"
+        )
+        for item in _load_json_list(raw_value)
+        if isinstance(item, dict) and str(item.get("name") or "").strip()
+    ]
+
 @router.post("/", response_model=Meeting)
 def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(get_session)):
     """
     创建新会议
     """
-    # 修复: Pydantic 有时未能将 ISO 字符串自动转换为 datetime 对象，导致 SQLite 报错
-    if isinstance(meeting_in.start_time, str):
-        try:
-            meeting_in.start_time = datetime.fromisoformat(meeting_in.start_time.replace('Z', '+00:00'))
-        except ValueError:
-            pass
-            
-    if hasattr(meeting_in, 'end_time') and isinstance(meeting_in.end_time, str):
-        try:
-            meeting_in.end_time = datetime.fromisoformat(meeting_in.end_time.replace('Z', '+00:00'))
-        except ValueError:
-            pass
+    payload = {
+        key: _parse_datetime_value(value) if key in {"start_time", "end_time"} else value
+        for key, value in meeting_in.model_dump().items()
+        if key in MEETING_BASE_FIELDS
+    }
+    payload["agenda"] = _serialize_agenda_items(meeting_in.agenda_items, meeting_in.agenda)
+    user_entries, manual_entries = _split_attendees_payload(
+        attendee_entries=meeting_in.attendee_entries,
+        attendees_roles=meeting_in.attendees_roles
+    )
+    payload["manual_attendees"] = _serialize_manual_attendees(manual_entries)
+    payload["meeting_contacts"] = _serialize_meeting_contacts(meeting_in.meeting_contacts)
 
-    meeting = Meeting(**meeting_in.model_dump(exclude={"attendees_roles"}))
+    meeting = Meeting(**payload)
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
     
     # Handle Attendees and Roles
-    if meeting_in.attendees_roles is not None:
-        for attendee in meeting_in.attendees_roles:
-            link = MeetingAttendeeLink(
-                meeting_id=meeting.id,
-                user_id=attendee.user_id,
-                meeting_role=attendee.meeting_role
-            )
-            session.add(link)
+    for attendee in user_entries:
+        link = MeetingAttendeeLink(
+            meeting_id=meeting.id,
+            user_id=attendee["user_id"],
+            meeting_role=attendee["meeting_role"]
+        )
+        session.add(link)
+    if user_entries:
         session.commit()
 
     try:
@@ -202,11 +401,24 @@ import random
 import os
 
 # Enhanced Response Model
-class MeetingCardResponse(MeetingRead):
+class MeetingCardResponse(BaseModel):
+    id: int
+    title: str
+    meeting_type_id: Optional[int] = None
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    location: Optional[str] = None
+    speaker: Optional[str] = None
+    agenda: Optional[str] = None
+    status: str = "scheduled"
+    created_at: datetime
     card_image_url: Optional[str] = None
     card_image_thumb_url: Optional[str] = None
     meeting_type_name: Optional[str] = None
     attachments: List[AttachmentRead] = []
+    agenda_items: List[AgendaItemOutput] = []
+    meeting_contacts: List[MeetingContactOutput] = []
+    show_media_link: bool = False
 
 # Default Image Pool for Random Strategy (Fallback)
 DEFAULT_IMAGES = {
@@ -469,7 +681,22 @@ def read_meetings(
     bg_root = UPLOAD_DIR / "meeting_backgrounds"
     
     for m in meetings:
-        resp = MeetingCardResponse.model_validate(m)
+        resp = MeetingCardResponse(
+            id=m.id,
+            title=m.title,
+            meeting_type_id=m.meeting_type_id,
+            start_time=m.start_time,
+            end_time=m.end_time,
+            location=m.location,
+            speaker=m.speaker,
+            agenda=m.agenda,
+            status=m.status,
+            created_at=m.created_at,
+            attachments=[AttachmentRead(**attachment.model_dump()) for attachment in (m.attachments or [])],
+            agenda_items=[AgendaItemOutput(**item) for item in _normalize_agenda_items(agenda_raw=m.agenda)],
+            meeting_contacts=_parse_meeting_contacts(m.meeting_contacts),
+            show_media_link=m.show_media_link
+        )
         m_type = all_types.get(m.meeting_type_id)
         
         final_url = None
@@ -518,14 +745,8 @@ def read_meetings(
         
     return results
 
-class AttendeeRoleOutput(BaseModel):
-    user_id: int
-    name: str
-    meeting_role: str
-
 class MeetingWithAttachments(MeetingCardResponse):
-    attachments: List[AttachmentRead] = []
-    attendees: List[AttendeeRoleOutput] = []
+    attendees: List[AttendeeOutput] = []
 
 @router.get("/{meeting_id}", response_model=MeetingWithAttachments)
 def read_meeting(
@@ -540,11 +761,22 @@ def read_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
-    # 构造响应对象
-    # 手动取出标量字典进行构造，以防止 Pydantic 自动去提取 meeting.attendees[User] 导致验证崩溃
-    m_dict = meeting.model_dump()
-    resp = MeetingWithAttachments(**m_dict)
-    resp.attachments = meeting.attachments
+    resp = MeetingWithAttachments(
+        id=meeting.id,
+        title=meeting.title,
+        meeting_type_id=meeting.meeting_type_id,
+        start_time=meeting.start_time,
+        end_time=meeting.end_time,
+        location=meeting.location,
+        speaker=meeting.speaker,
+        agenda=meeting.agenda,
+        status=meeting.status,
+        created_at=meeting.created_at,
+        attachments=[AttachmentRead(**attachment.model_dump()) for attachment in (meeting.attachments or [])],
+        agenda_items=[AgendaItemOutput(**item) for item in _normalize_agenda_items(agenda_raw=meeting.agenda)],
+        meeting_contacts=_parse_meeting_contacts(meeting.meeting_contacts),
+        show_media_link=meeting.show_media_link
+    )
     # 补充 computed fields
     m_type = session.get(MeetingType, meeting.meeting_type_id) if meeting.meeting_type_id else None
     resp.meeting_type_name = m_type.name if m_type else "普通会议"
@@ -594,32 +826,24 @@ def read_meeting(
         users = session.exec(select(User).where(User.id.in_(user_ids))).all()
         user_map = {u.id: u.name for u in users}
         
-        resp.attendees = [
-            AttendeeRoleOutput(
+        resp.attendees.extend([
+            AttendeeOutput(
+                type="user",
                 user_id=link.user_id,
                 name=user_map.get(link.user_id, "未知"),
                 meeting_role=link.meeting_role
             )
             for link in attendee_links
-        ]
+        ])
+
+    resp.attendees.extend(_parse_manual_attendees(meeting.manual_attendees))
         
     return resp
-
-class MeetingUpdate(SQLModel):
-    title: Optional[str] = None
-    meeting_type_id: Optional[int] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    location: Optional[str] = None
-    status: Optional[str] = None
-    speaker: Optional[str] = None
-    agenda: Optional[str] = None
-    attendees_roles: Optional[List[AttendeeRoleInput]] = None
 
 @router.put("/{meeting_id}", response_model=Meeting)
 def update_meeting(
     meeting_id: int, 
-    meeting_update: MeetingUpdate, 
+    meeting_update: MeetingUpdateInput, 
     session: Session = Depends(get_session)
 ):
     """更新会议基本信息"""
@@ -627,7 +851,10 @@ def update_meeting(
     if not db_meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
         
-    meeting_data = meeting_update.model_dump(exclude_unset=True, exclude={"attendees_roles"})
+    meeting_data = meeting_update.model_dump(
+        exclude_unset=True,
+        exclude={"attendees_roles", "attendee_entries", "agenda_items", "meeting_contacts"}
+    )
     for key, value in meeting_data.items():
         if key in ('start_time', 'end_time') and isinstance(value, str):
              try:
@@ -635,18 +862,29 @@ def update_meeting(
                 value = datetime.fromisoformat(value.replace('Z', '+00:00'))
              except: pass
         setattr(db_meeting, key, value)
-        
+
+    if "agenda_items" in meeting_update.model_fields_set or "agenda" in meeting_update.model_fields_set:
+        db_meeting.agenda = _serialize_agenda_items(meeting_update.agenda_items, meeting_update.agenda)
+
+    if "meeting_contacts" in meeting_update.model_fields_set:
+        db_meeting.meeting_contacts = _serialize_meeting_contacts(meeting_update.meeting_contacts)
+
     session.add(db_meeting)
     
-    if meeting_update.attendees_roles is not None:
+    if "attendee_entries" in meeting_update.model_fields_set or "attendees_roles" in meeting_update.model_fields_set:
         # 删除旧的关联
         session.exec(delete(MeetingAttendeeLink).where(MeetingAttendeeLink.meeting_id == meeting_id))
-        # 插入新的关联
-        for attendee in meeting_update.attendees_roles:
+        user_entries, manual_entries = _split_attendees_payload(
+            attendee_entries=meeting_update.attendee_entries,
+            attendees_roles=meeting_update.attendees_roles
+        )
+        db_meeting.manual_attendees = _serialize_manual_attendees(manual_entries)
+        # 插入新的用户关联
+        for attendee in user_entries:
             link = MeetingAttendeeLink(
                 meeting_id=meeting_id,
-                user_id=attendee.user_id,
-                meeting_role=attendee.meeting_role
+                user_id=attendee["user_id"],
+                meeting_role=attendee["meeting_role"]
             )
             session.add(link)
             
