@@ -1,9 +1,7 @@
 package com.example.paperlessmeeting.ui.components
 
-import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -21,19 +19,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
-import coil.compose.rememberAsyncImagePainter
-import coil.request.CachePolicy
-import coil.request.ImageRequest
-import coil.size.Precision
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.MeetingStatus
+import com.example.paperlessmeeting.ui.components.image.AppImageSlot
+import com.example.paperlessmeeting.ui.components.image.MeetingCoverImage
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -77,63 +69,21 @@ fun MeetingCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // 1. Background Image
-            // Priority: Backend Config > Local Fallback
-            val bgImage = meeting.cardImageThumbUrl ?: meeting.cardImageUrl ?: when(uiType) {
-                com.example.paperlessmeeting.domain.model.MeetingType.Weekly -> "https://images.unsplash.com/photo-1431540015161-0bf868a2d407?q=80&w=2070&auto=format&fit=crop"
-                com.example.paperlessmeeting.domain.model.MeetingType.Urgent -> "https://images.unsplash.com/photo-1516387938699-a93567ec168e?q=80&w=2071&auto=format&fit=crop"
-                com.example.paperlessmeeting.domain.model.MeetingType.Review -> "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070&auto=format&fit=crop"
-                com.example.paperlessmeeting.domain.model.MeetingType.Kickoff -> "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=2070&auto=format&fit=crop"
-                else -> "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
-            }
-            val context = LocalContext.current
-            val optimizedBgImage = remember(bgImage) { optimizeMeetingCardImageUrl(bgImage) }
-            val imageRequest = remember(context, optimizedBgImage) {
-                ImageRequest.Builder(context)
-                    .data(optimizedBgImage)
-                    .crossfade(false)
-                    .allowHardware(true)
-                    .precision(Precision.INEXACT)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .networkCachePolicy(CachePolicy.ENABLED)
-                    .build()
-            }
+            MeetingCoverImage(
+                meeting = meeting,
+                slot = AppImageSlot.MeetingCard,
+                accentColor = typeColor,
+                modifier = Modifier.fillMaxSize()
+            )
 
-            val painter = rememberAsyncImagePainter(model = imageRequest)
-            val painterState = painter.state
-
-            Box(
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                typeColor.copy(alpha = 0.96f),
-                                typeColor.copy(alpha = 0.65f),
-                                Color(0xFF0F172A)
-                            )
-                        )
-                    )
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 16.dp, end = 16.dp)
-                        .size(88.dp),
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.07f)
-                ) {}
-            }
-
-            if (painterState is AsyncImagePainter.State.Success) {
-                Image(
-                    painter = painter,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+                    .align(Alignment.TopEnd)
+                    .padding(top = 16.dp, end = 16.dp)
+                    .size(88.dp),
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.07f)
+            ) {}
 
             // 2. Dark Gradient Overlay (for text readability)
             Box(
@@ -428,42 +378,4 @@ fun hslToColor(h: Float, s: Float, l: Float): Color {
     }
     
     return Color(r + m, g + m, b + m, 1f)
-}
-
-private const val CARD_IMAGE_WIDTH = 960
-private const val CARD_IMAGE_HEIGHT = 540
-private const val CARD_IMAGE_QUALITY = 70
-
-private fun optimizeMeetingCardImageUrl(url: String): String {
-    return try {
-        val uri = Uri.parse(url)
-        val host = uri.host ?: return url
-        if (!host.contains("images.unsplash.com", ignoreCase = true)) return url
-
-        val builder = uri.buildUpon().clearQuery()
-        uri.queryParameterNames
-            .filterNot { key ->
-                key.equals("w", ignoreCase = true) ||
-                key.equals("h", ignoreCase = true) ||
-                key.equals("q", ignoreCase = true) ||
-                key.equals("fit", ignoreCase = true) ||
-                key.equals("auto", ignoreCase = true)
-            }
-            .forEach { key ->
-                uri.getQueryParameters(key).forEach { value ->
-                    builder.appendQueryParameter(key, value)
-                }
-            }
-
-        builder
-            .appendQueryParameter("auto", "format")
-            .appendQueryParameter("fit", "crop")
-            .appendQueryParameter("w", CARD_IMAGE_WIDTH.toString())
-            .appendQueryParameter("h", CARD_IMAGE_HEIGHT.toString())
-            .appendQueryParameter("q", CARD_IMAGE_QUALITY.toString())
-            .build()
-            .toString()
-    } catch (e: Exception) {
-        url
-    }
 }

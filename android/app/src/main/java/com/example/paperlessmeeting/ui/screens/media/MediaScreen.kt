@@ -68,11 +68,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import coil.request.CachePolicy
-import coil.request.ImageRequest
-import coil.size.Precision
 import com.example.paperlessmeeting.domain.model.MediaItem
+import com.example.paperlessmeeting.ui.components.image.AppAsyncImage
+import com.example.paperlessmeeting.ui.components.image.MediaImageResolver
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -511,13 +509,9 @@ private fun FolderThumbnail() {
 
 @Composable
 private fun ImageThumbnail(item: MediaItem, staticBaseUrl: String) {
-    // Prefer thumbnailUrl for grid view, fall back to previewUrl (original image)
-    val rawUrl = (item.thumbnailUrl?.takeIf { it.isNotEmpty() } ?: item.previewUrl)
-        ?.takeIf { it.isNotEmpty() }
-    val imageUrl = rawUrl?.let {
-        staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
+    val imageModel = remember(item.id, item.thumbnailUrl, item.previewUrl, staticBaseUrl) {
+        MediaImageResolver.resolveGrid(item, staticBaseUrl)
     }
-    val context = LocalContext.current
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -530,32 +524,10 @@ private fun ImageThumbnail(item: MediaItem, staticBaseUrl: String) {
                 .aspectRatio(1f),
             contentAlignment = Alignment.Center
         ) {
-            if (imageUrl != null) {
-                val imageRequest = remember(context, imageUrl) {
-                    ImageRequest.Builder(context)
-                        .data(imageUrl)
-                        .crossfade(false)
-                        .allowHardware(true)
-                        .precision(Precision.INEXACT)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .networkCachePolicy(CachePolicy.ENABLED)
-                        .build()
-                }
-                AsyncImage(
-                    model = imageRequest,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.Image,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                )
-            }
+            AppAsyncImage(
+                model = imageModel,
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
@@ -565,11 +537,9 @@ private fun ImageThumbnail(item: MediaItem, staticBaseUrl: String) {
 @Composable
 @Suppress("UNUSED_PARAMETER")
 private fun VideoThumbnail(item: MediaItem, staticBaseUrl: String) {
-    val rawThumb = item.thumbnailUrl?.takeIf { it.isNotEmpty() }
-    val thumbUrl = rawThumb?.let {
-        staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
+    val imageModel = remember(item.id, item.thumbnailUrl, item.previewUrl, staticBaseUrl) {
+        MediaImageResolver.resolveGrid(item, staticBaseUrl)
     }
-    val context = LocalContext.current
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -582,32 +552,10 @@ private fun VideoThumbnail(item: MediaItem, staticBaseUrl: String) {
                 .aspectRatio(1f),
             contentAlignment = Alignment.Center
         ) {
-            if (thumbUrl != null) {
-                val imageRequest = remember(context, thumbUrl) {
-                    ImageRequest.Builder(context)
-                        .data(thumbUrl)
-                        .crossfade(false)
-                        .allowHardware(true)
-                        .precision(Precision.INEXACT)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .networkCachePolicy(CachePolicy.ENABLED)
-                        .build()
-                }
-                AsyncImage(
-                    model = imageRequest,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.VideoFile,
-                    contentDescription = null,
-                    modifier = Modifier.size(44.dp),
-                    tint = Color(0xFF4285F4).copy(alpha = 0.6f)
-                )
-            }
+            AppAsyncImage(
+                model = imageModel,
+                modifier = Modifier.fillMaxSize()
+            )
 
             Icon(
                 Icons.Default.PlayCircleFilled,
@@ -665,32 +613,16 @@ private fun MediaImagePagerDialog(
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val item = items[page]
-                val imageUrl = item.previewUrl?.takeIf { it.isNotEmpty() }?.let {
-                    staticBaseUrl.trimEnd('/') + it.removePrefix("/static")
+                val imageModel = remember(item.id, item.previewUrl, item.thumbnailUrl, staticBaseUrl) {
+                    MediaImageResolver.resolveFullscreen(item, staticBaseUrl)
                 }
 
-                if (imageUrl != null) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = item.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Image,
-                            contentDescription = null,
-                            modifier = Modifier.size(72.dp),
-                            tint = Color.White.copy(alpha = 0.35f)
-                        )
-                    }
-                }
+                AppAsyncImage(
+                    model = imageModel,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                )
             }
 
             IconButton(

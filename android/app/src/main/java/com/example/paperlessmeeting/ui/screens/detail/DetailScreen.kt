@@ -12,7 +12,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -81,13 +80,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import android.widget.Toast
-import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
-import coil.compose.rememberAsyncImagePainter
-import coil.request.ImageRequest
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.components.MeetingStatusBadge
 import com.example.paperlessmeeting.ui.components.generateThemeColor
+import com.example.paperlessmeeting.ui.components.image.AppImageSlot
+import com.example.paperlessmeeting.ui.components.image.MeetingCoverImage
 import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
 import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import kotlinx.coroutines.flow.collectLatest
@@ -328,7 +325,6 @@ fun MeetingDetailContent(
     val heroHeight = if (isPhone) 200.dp else 280.dp
     val heroHeightPx = with(LocalDensity.current) { heroHeight.toPx() }
     val scrollState = rememberScrollState()
-    val bgImage = meeting.cardImageUrl ?: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
     val heroAccentColor = remember(meeting.meetingTypeName, meeting.title) {
         generateThemeColor(meeting.meetingTypeName ?: meeting.title)
     }
@@ -598,7 +594,7 @@ fun MeetingDetailContent(
                     }
             ) {
                 MeetingHeroBackground(
-                    imageUrl = bgImage,
+                    meeting = meeting,
                     accentColor = heroAccentColor,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -761,44 +757,17 @@ fun SectionHeader(title: String) {
 
 @Composable
 private fun MeetingHeroBackground(
-    imageUrl: String,
+    meeting: Meeting,
     accentColor: Color,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val imageRequest = remember(context, imageUrl) {
-        ImageRequest.Builder(context)
-            .data(imageUrl)
-            .crossfade(true)
-            .build()
-    }
-    val painter = rememberAsyncImagePainter(model = imageRequest)
-    val painterState = painter.state
-
     Box(modifier = modifier) {
-        HeroFallbackArt(
+        MeetingCoverImage(
+            meeting = meeting,
+            slot = AppImageSlot.MeetingHero,
             accentColor = accentColor,
             modifier = Modifier.fillMaxSize()
         )
-
-        if (painterState is AsyncImagePainter.State.Success) {
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        if (painterState is AsyncImagePainter.State.Loading) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(28.dp),
-                color = Color.White.copy(alpha = 0.9f),
-                strokeWidth = 2.5.dp
-            )
-        }
     }
 }
 

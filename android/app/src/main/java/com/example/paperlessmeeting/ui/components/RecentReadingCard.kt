@@ -28,9 +28,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,18 +40,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.data.local.ReadingProgress
-
-private enum class PdfThumbnailState {
-    Loading,
-    Success,
-    Error
-}
+import com.example.paperlessmeeting.data.repository.DocumentThumbnailRepository
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -269,67 +267,34 @@ fun PdfThumbnail(
     filePath: String,
     modifier: Modifier = Modifier
 ) {
-    var bitmap by remember(filePath) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var thumbnailState by remember(filePath) { mutableStateOf(PdfThumbnailState.Loading) }
-
-    LaunchedEffect(filePath) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val file = java.io.File(filePath)
-                if (!file.exists() || !file.isFile || file.length() <= 0L) {
-                    thumbnailState = PdfThumbnailState.Error
-                    return@withContext
-                }
-
-                val fileDescriptor = android.os.ParcelFileDescriptor.open(
-                    file,
-                    android.os.ParcelFileDescriptor.MODE_READ_ONLY
-                )
-                val renderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
-                val page = renderer.openPage(0)
-
-                val width = 150
-                val height = (width * page.height / page.width.toFloat()).toInt().coerceAtLeast(1)
-                val bmp = android.graphics.Bitmap.createBitmap(
-                    width,
-                    height,
-                    android.graphics.Bitmap.Config.ARGB_8888
-                )
-                val canvas = android.graphics.Canvas(bmp)
-                canvas.drawColor(android.graphics.Color.WHITE)
-                page.render(
-                    bmp,
-                    null,
-                    null,
-                    android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
-                )
-
-                page.close()
-                renderer.close()
-                fileDescriptor.close()
-
-                bitmap = bmp
-                thumbnailState = PdfThumbnailState.Success
-            } catch (e: Exception) {
-                bitmap = null
-                thumbnailState = PdfThumbnailState.Error
-                android.util.Log.w(
-                    "RecentReadingCard",
-                    "PdfThumbnail: unable to render thumbnail for $filePath"
-                )
-            }
-        }
+    val context = LocalContext.current
+    val repository = remember(context) { DocumentThumbnailRepository.getInstance(context) }
+    var requestedSize by remember { mutableStateOf(IntSize.Zero) }
+    val targetWidthPx = requestedSize.width.coerceAtLeast(150)
+    val thumbnailState by produceState<PdfThumbnailUiState>(
+        initialValue = PdfThumbnailUiState.Loading,
+        key1 = filePath,
+        key2 = targetWidthPx,
+        key3 = repository
+    ) {
+        value = repository.getPdfCover(filePath, targetWidthPx)?.let {
+            PdfThumbnailUiState.Success(it)
+        } ?: PdfThumbnailUiState.Error
     }
 
-    if (thumbnailState == PdfThumbnailState.Success && bitmap != null) {
+    if (thumbnailState is PdfThumbnailUiState.Success) {
+        val bitmap = (thumbnailState as PdfThumbnailUiState.Success).bitmap
         Image(
-            bitmap = bitmap!!.asImageBitmap(),
+            bitmap = bitmap.asImageBitmap(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = modifier
+            modifier = modifier.onSizeChanged { requestedSize = it }
         )
-    } else if (thumbnailState == PdfThumbnailState.Error) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    } else if (thumbnailState is PdfThumbnailUiState.Error) {
+        Box(
+            modifier = modifier.onSizeChanged { requestedSize = it },
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = Icons.Default.Description,
                 contentDescription = null,
@@ -338,9 +303,18 @@ fun PdfThumbnail(
             )
         }
     } else {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Box(
+            modifier = modifier.onSizeChanged { requestedSize = it },
+            contentAlignment = Alignment.Center
+        ) {
             CircularProgressIndicator(modifier = Modifier.size(24.dp))
         }
     }
+}
+
+private sealed interface PdfThumbnailUiState {
+    data object Loading : PdfThumbnailUiState
+    data class Success(val bitmap: android.graphics.Bitmap) : PdfThumbnailUiState
+    data object Error : PdfThumbnailUiState
 }
 

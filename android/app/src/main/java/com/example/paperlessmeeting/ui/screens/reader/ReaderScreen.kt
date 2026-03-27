@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +47,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.paperlessmeeting.data.repository.DocumentThumbnailRepository
 import com.github.barteksc.pdfviewer.PDFView
 import com.shockwave.pdfium.PdfDocument.Bookmark
 import kotlinx.coroutines.Dispatchers
@@ -1036,18 +1038,25 @@ private fun PdfThumbnailGrid(
     currentPage: Int,
     onPageClick: (Int) -> Unit
 ) {
-    // Basic implementation of cached PDF Rendering
-    val renderer = remember(file) {
+    val context = LocalContext.current
+    val repository = remember(context) { DocumentThumbnailRepository.getInstance(context) }
+    val rendererHolder = remember(file) {
         try {
             val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            PdfRenderer(descriptor)
-        } catch (e: Exception) { null }
+            descriptor to PdfRenderer(descriptor)
+        } catch (e: Exception) {
+            null
+        }
     }
 
-    if(renderer == null) return
+    val descriptor = rendererHolder?.first ?: return
+    val renderer = rendererHolder.second
 
     DisposableEffect(file) {
-        onDispose { renderer.close() }
+        onDispose {
+            renderer.close()
+            descriptor.close()
+        }
     }
 
     LazyVerticalGrid(
@@ -1058,6 +1067,8 @@ private fun PdfThumbnailGrid(
     ) {
         items(renderer.pageCount) { pageIndex ->
              PdfPageThumbnail(
+                 filePath = file.absolutePath,
+                 repository = repository,
                  renderer = renderer,
                  pageIndex = pageIndex,
                  palette = palette,
@@ -1070,29 +1081,23 @@ private fun PdfThumbnailGrid(
 
 @Composable
 private fun PdfPageThumbnail(
+    filePath: String,
+    repository: DocumentThumbnailRepository,
     renderer: PdfRenderer,
     pageIndex: Int,
     palette: ReaderChromePalette,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(pageIndex) {
-        withContext(Dispatchers.IO) {
-            synchronized(renderer) {
-                try {
-                     val page = renderer.openPage(pageIndex)
-                     val width = 200
-                     val height = (width.toFloat() / page.width * page.height).toInt()
-                     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                     val canvas = android.graphics.Canvas(bmp)
-                     canvas.drawColor(android.graphics.Color.WHITE) // Always white base
-                     page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                     page.close()
-                     bitmap = bmp
-                } catch(e: Exception) { e.printStackTrace() }
-            }
-        }
+    val density = LocalDensity.current
+    val targetWidthPx = with(density) { 120.dp.roundToPx() }
+    val bitmap by produceState<Bitmap?>(null, filePath, pageIndex, targetWidthPx, repository, renderer) {
+        value = repository.getPdfPageThumbnail(
+            filePath = filePath,
+            pageIndex = pageIndex,
+            widthPx = targetWidthPx,
+            sharedRenderer = renderer
+        )
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick)) {

@@ -1,6 +1,5 @@
 package com.example.paperlessmeeting.ui.screens.login
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,7 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import coil.compose.rememberAsyncImagePainter
+import com.example.paperlessmeeting.ui.components.image.AppAsyncImage
+import com.example.paperlessmeeting.ui.components.image.MeetingImageResolver
 
 @Composable
 fun LoginScreen(
@@ -65,12 +64,9 @@ fun LoginScreen(
                     .weight(1f)
                     .fillMaxHeight()
             ) {
-                // Load random nice image
-                Image(
-                    painter = rememberAsyncImagePainter("https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"),
-                    contentDescription = "Background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                AppAsyncImage(
+                    model = remember { MeetingImageResolver.loginPosterModel() },
+                    modifier = Modifier.fillMaxSize()
                 )
                 // Overlay
                 Box(
