@@ -16,12 +16,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.HowToVote
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -39,7 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -66,7 +65,6 @@ fun DashboardScreen(
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
     onLotteryClick: () -> Unit = {},
     onVoteClick: () -> Unit = {},
-    onCheckInClick: () -> Unit = {},
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -104,8 +102,7 @@ fun DashboardScreen(
                 onReadingClick = onReadingClick,
                 onDeleteReading = viewModel::deleteReadingProgresses,
                 onVoteClick = onVoteClick,
-                onLotteryClick = onLotteryClick,
-                onCheckInClick = onCheckInClick
+                onLotteryClick = onLotteryClick
             )
         }
     }
@@ -119,8 +116,7 @@ fun DashboardContent(
     onReadingClick: (String, String, Int) -> Unit,
     onDeleteReading: (List<String>) -> Unit,
     onVoteClick: () -> Unit,
-    onLotteryClick: () -> Unit,
-    onCheckInClick: () -> Unit
+    onLotteryClick: () -> Unit
 ) {
     // Debug log
     android.util.Log.d("DashboardDebug", "Active Meetings Count: ${state.activeMeetings.size}")
@@ -143,7 +139,6 @@ fun DashboardContent(
 
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val isPhone = screenWidthDp < 600
-    val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
     val undoProgress = remember { Animatable(0f) }
     var selectedReadingIds by rememberSaveable(state.readingProgress) { mutableStateOf(listOf<String>()) }
@@ -529,7 +524,7 @@ fun DashboardContent(
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
-                                        imageVector = Icons.Default.MenuBook,
+                                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.size(28.dp)
@@ -741,8 +736,6 @@ fun QuickActionButton(
     onClick: () -> Unit
 ) {
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
-    val context = LocalContext.current
-    val contentPadding = if (isPhone) 16.dp else 24.dp
     val btnSize = if (isPhone) 48.dp else 56.dp
     val iconSize = if (isPhone) 24.dp else 28.dp
     Column(

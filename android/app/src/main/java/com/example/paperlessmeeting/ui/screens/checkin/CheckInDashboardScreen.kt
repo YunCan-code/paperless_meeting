@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.DateRange
@@ -70,7 +72,7 @@ fun CheckInDashboardScreen(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
                         )
                     ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -107,7 +109,7 @@ fun CheckInDashboardScreen(
                         .verticalScroll(scrollState)
                 ) {
                     // 2. 头部：用户状态概览
-                    HeaderSection(uiState)
+                    HeaderSection()
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -120,8 +122,7 @@ fun CheckInDashboardScreen(
                         // 签到卡片
                         ActionCard(
                             todayStatus = uiState.todayStatus,
-                            onCheckIn = { viewModel.checkIn(it) },
-                            onMakeup = { id, remark -> viewModel.makeupCheckIn(id, remark) }
+                            onCheckIn = { viewModel.checkIn(it) }
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -138,7 +139,7 @@ fun CheckInDashboardScreen(
                         // 5. 活跃度热力图 (GitHub Style)
                         if (uiState.heatmap.isNotEmpty()) {
                             SectionTitle("会议活跃度", Icons.Default.DateRange)
-                            HeatmapCard(heatmapData = uiState.heatmap)
+                            HeatmapCard()
                             Spacer(modifier = Modifier.height(24.dp))
                         }
 
@@ -176,7 +177,7 @@ fun CheckInDashboardScreen(
 // ================= 子组件设计 =================
 
 @Composable
-fun HeaderSection(uiState: CheckInDashboardUiState) {
+fun HeaderSection() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,8 +201,7 @@ fun HeaderSection(uiState: CheckInDashboardUiState) {
 @Composable
 fun ActionCard(
     todayStatus: TodayStatusResponse?,
-    onCheckIn: (Int) -> Unit,
-    onMakeup: (Int, String) -> Unit
+    onCheckIn: (Int) -> Unit
 ) {
     val unchecked = todayStatus?.todayMeetings?.filter { !it.checkedIn } ?: emptyList()
     val isAllDone = todayStatus != null && unchecked.isEmpty() && todayStatus.todayMeetings.isNotEmpty()
@@ -359,7 +359,7 @@ fun StatsSection(
                 label = "已签到",
                 value = stats.checkinCount,
                 unit = "次",
-                icon = Icons.Default.FactCheck,
+                icon = Icons.AutoMirrored.Filled.FactCheck,
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer
             )
             AnimatedStatCard(
@@ -425,7 +425,7 @@ fun AnimatedStatCard(
 
 // 仿 GitHub 热力图
 @Composable
-fun HeatmapCard(heatmapData: Map<String, Int>) {
+fun HeatmapCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -443,9 +443,9 @@ fun HeatmapCard(heatmapData: Map<String, Int>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                repeat(cols) { col ->
+                repeat(cols) { _ ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        repeat(rows) { row ->
+                        repeat(rows) { _ ->
                             // 模拟数据获取 (真实逻辑需要根据 col/row 推算日期)
                             // 这里仅做随机演示色块，你需要根据 heatmapData[date] 来决定颜色深度
                             // 实际开发建议封装一个 CalendarLogic 来计算 (col, row) -> date

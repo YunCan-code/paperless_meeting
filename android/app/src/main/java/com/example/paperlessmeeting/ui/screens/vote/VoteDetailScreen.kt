@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,7 +52,7 @@ fun VoteDetailScreen(
                 title = { Text("投票详情", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -158,7 +158,7 @@ fun VoteContent(
         if (voteResult != null) {
             // 显示结果条
             items(voteResult.results.sortedByDescending { it.count }) { resultItem ->
-                VoteResultItem(resultItem, voteResult.total_voters)
+                        VoteResultItem(resultItem)
             }
         } else {
             // 显示投票选项
@@ -338,7 +338,7 @@ fun VoteOptionItem(
 }
 
 @Composable
-fun VoteResultItem(result: com.example.paperlessmeeting.domain.model.VoteOptionResult, totalVoters: Int) {
+fun VoteResultItem(result: com.example.paperlessmeeting.domain.model.VoteOptionResult) {
     // 这里可以直接复用你之前的 ResultView 逻辑，或者将其简化为进度条形式
     Column(
         modifier = Modifier

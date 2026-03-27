@@ -228,9 +228,6 @@ fun MainScreen(
                                 },
                                 onLotteryClick = {
                                     navController.navigate(Screen.LotteryList.route)
-                                },
-                                onCheckInClick = {
-                                    navController.navigate(Screen.CheckInDashboard.route)
                                 }
                             )
 
@@ -247,7 +244,6 @@ fun MainScreen(
                             2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
 
                             3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
-                                navController = navController,
                                 onLogout = onLogout
                             )
                         }
