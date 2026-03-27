@@ -5,6 +5,7 @@ import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.CheckInResponse
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 
 interface MeetingRepository {
@@ -70,6 +71,8 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             val meeting = api.getMeeting(id, userId)
             com.example.paperlessmeeting.utils.Resource.Success(meeting)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: HttpException) {
             e.printStackTrace()
             com.example.paperlessmeeting.utils.Resource.Error("HTTP_${e.code()}")

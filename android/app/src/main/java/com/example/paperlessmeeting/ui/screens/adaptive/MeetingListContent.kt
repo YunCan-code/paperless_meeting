@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.components.MeetingCard
+import com.example.paperlessmeeting.ui.components.notice.rememberBottomOverlayPadding
 import com.example.paperlessmeeting.utils.currentMeetingDate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -47,6 +48,8 @@ fun MeetingListContent(
     hasMoreData: Boolean = true,
     onLoadMore: () -> Unit = {}
 ) {
+    val bottomOverlayPadding = rememberBottomOverlayPadding(hasFloatingNav = true)
+
     // Grouping Logic
     val groupedMeetings = remember(meetings) {
         meetings
@@ -218,7 +221,9 @@ fun MeetingListContent(
             visible = listState.isScrollInProgress && listState.canScrollForward,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = bottomOverlayPadding)
         ) {
             androidx.compose.material3.Surface(
                 shape = androidx.compose.foundation.shape.CircleShape,

@@ -88,7 +88,7 @@ class DashboardViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             try {
-                val userName = userPreferences.getUserName() ?: "鐢ㄦ埛"
+                val userName = userPreferences.getUserName() ?: "用户"
                 val userId = userPreferences.getUserId().takeIf { it > 0 }
 
                 val todayStr = currentMeetingDate().toString()
@@ -175,13 +175,13 @@ class DashboardViewModel @Inject constructor(
 
                 launch {
                     socketManager.voteStartEvent.collect { vote ->
-                        _toastMessage.emit("鏀跺埌鏂版姇绁? ${vote.title}")
+                        _toastMessage.emit("收到新投票：${vote.title}")
                     }
                 }
 
                 launch {
                     socketManager.voteEndEvent.collect { data ->
-                        _toastMessage.emit("鎶曠エ宸茬粨鏉? ${data.title}")
+                        _toastMessage.emit("投票已结束：${data.title}")
                     }
                 }
 

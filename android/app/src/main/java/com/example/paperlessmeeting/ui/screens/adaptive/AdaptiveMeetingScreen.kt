@@ -1,6 +1,4 @@
 package com.example.paperlessmeeting.ui.screens.adaptive
-
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -41,12 +39,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 import com.example.paperlessmeeting.ui.components.generateThemeColor
 import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
 import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
@@ -56,6 +54,7 @@ import com.example.paperlessmeeting.ui.screens.home.HomeUiState
 import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
 import com.example.paperlessmeeting.ui.screens.home.SplitDetailCheckInResult
 import com.example.paperlessmeeting.utils.Resource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -74,7 +73,7 @@ fun AdaptiveMeetingScreen(
     onNavigateToMedia: (() -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
+    val noticeController = LocalAppNoticeController.current
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
     val selectedMeetingId by viewModel.selectedMeetingId.collectAsState()
@@ -106,23 +105,29 @@ fun AdaptiveMeetingScreen(
         try {
             when (val result = viewModel.getMeetingDetailsResult(meetingId)) {
                 is Resource.Success -> {
-                    fullMeeting = result.data
+                    if (selectedMeetingId == meetingId) {
+                        fullMeeting = result.data
+                    }
                 }
                 is Resource.Error -> {
+                    if (selectedMeetingId != meetingId) {
+                        return
+                    }
                     if (result.message == "HTTP_404") {
                         fullMeeting = null
                         viewModel.selectMeeting(null)
-                        Toast.makeText(context, hiddenMessage, Toast.LENGTH_LONG).show()
+                        noticeController.showMessage(
+                            hiddenMessage,
+                            androidx.compose.material3.SnackbarDuration.Long
+                        )
                     } else {
-                        Toast.makeText(
-                            context,
-                            "刷新会议详情失败：${result.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        noticeController.showMessage("刷新会议详情失败：${result.message}")
                     }
                 }
                 Resource.Loading -> Unit
             }
+        } catch (e: CancellationException) {
+            throw e
         } finally {
             isDetailLoading = false
             isDetailRefreshing = false
@@ -143,7 +148,7 @@ fun AdaptiveMeetingScreen(
 
     LaunchedEffect(Unit) {
         viewModel.actionMessage.collectLatest { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            noticeController.showMessage(message)
         }
     }
 
@@ -313,21 +318,16 @@ fun AdaptiveMeetingScreen(
                                                 }
 
                                                 is SplitDetailCheckInResult.Error -> {
-                                                    Toast.makeText(
-                                                        context,
-                                                        result.message,
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
+                                                    noticeController.showMessage(result.message)
                                                 }
 
                                                 is SplitDetailCheckInResult.Hidden -> {
                                                     fullMeeting = null
                                                     viewModel.selectMeeting(null)
-                                                    Toast.makeText(
-                                                        context,
+                                                    noticeController.showMessage(
                                                         result.message,
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
+                                                        androidx.compose.material3.SnackbarDuration.Long
+                                                    )
                                                 }
                                             }
                                         }

@@ -57,7 +57,7 @@ class ReadingProgressManager @Inject constructor(
             val trimmedList = currentList.take(MAX_RECENT_PROGRESS_ITEMS)
             persistProgressList(trimmedList)
 
-            // 鍚屾鍒版湇鍔＄
+            // 同步到服务端
             val userId = userPreferences.getUserId()
             if (userId != -1) {
                 try {
@@ -71,7 +71,7 @@ class ReadingProgressManager @Inject constructor(
                         )
                     )
                 } catch (e: Exception) {
-                    // 缃戠粶澶辫触鏃堕潤榛樺拷鐣ワ紝鏈湴宸蹭繚瀛?
+                    // 网络失败时静默忽略，本地已保存
                     e.printStackTrace()
                 }
             }
@@ -117,7 +117,7 @@ class ReadingProgressManager @Inject constructor(
     }
 
     /**
-     * 浠庢湇鍔＄鎷夊彇褰撳墠鐢ㄦ埛鐨勯槄璇昏繘搴﹀苟鍐欏叆鏈湴
+     * 从服务端拉取当前用户的阅读进度并写入本地
      */
     suspend fun loadFromServer() {
         withContext(Dispatchers.IO) {

@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.ui.platform.LocalContext
 import com.example.paperlessmeeting.ui.components.PdfThumbnail
 import java.io.File
 import androidx.compose.ui.draw.clip
@@ -72,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,9 +79,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import android.widget.Toast
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.components.MeetingStatusBadge
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 import com.example.paperlessmeeting.ui.components.generateThemeColor
 import com.example.paperlessmeeting.ui.components.image.AppImageSlot
 import com.example.paperlessmeeting.ui.components.image.MeetingCoverImage
@@ -104,7 +104,7 @@ fun DetailScreen(
     navController: NavController,
     viewModel: DetailViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
+    val noticeController = LocalAppNoticeController.current
     val uiState by viewModel.uiState.collectAsState()
     val currentVote by viewModel.currentVote.collectAsState()
     val voteResult by viewModel.voteResult.collectAsState()
@@ -130,13 +130,16 @@ fun DetailScreen(
 
     LaunchedEffect(Unit) {
         viewModel.actionMessage.collectLatest { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            noticeController.showMessage(message)
         }
     }
 
     LaunchedEffect(Unit) {
         viewModel.exitDetail.collectLatest { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            noticeController.showMessage(
+                message,
+                androidx.compose.material3.SnackbarDuration.Long
+            )
             navController.popBackStack()
         }
     }

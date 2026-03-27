@@ -13,6 +13,7 @@ import com.example.paperlessmeeting.domain.model.VoteResult
 import com.example.paperlessmeeting.utils.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -138,6 +139,8 @@ class DetailViewModel @Inject constructor(
                 }
                 Resource.Loading -> false
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
             if (hasSuccessContent && !showLoading) {

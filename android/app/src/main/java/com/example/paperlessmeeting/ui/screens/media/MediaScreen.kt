@@ -635,7 +635,7 @@ private fun MediaImagePagerDialog(
             ) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "鍏抽棴",
+                    contentDescription = "关闭",
                     tint = Color.White
                 )
             }

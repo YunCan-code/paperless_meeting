@@ -1,6 +1,5 @@
 ﻿package com.example.paperlessmeeting.ui.screens.settings
 
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -38,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.ThemeMode
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +48,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val noticeController = LocalAppNoticeController.current
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
     var showPasswordSheet by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
@@ -119,7 +120,7 @@ fun SettingsScreen(
                     SettingsItem(Icons.Outlined.SystemUpdate, "\u68c0\u67e5\u66f4\u65b0", "\u5f53\u524d\u7248\u672c ${state.versionName}") {
                         viewModel.checkForUpdate(
                             onNoUpdate = {
-                                Toast.makeText(context, "\u5f53\u524d\u5df2\u662f\u6700\u65b0\u7248\u672c", Toast.LENGTH_SHORT).show()
+                                noticeController.showMessage("当前已是最新版本")
                             },
                             onUpdateAvailable = { update ->
                                 val builder = android.app.AlertDialog.Builder(context)
@@ -132,13 +133,21 @@ fun SettingsScreen(
                                 builder.show()
                             },
                             onError = {
-                                Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                                noticeController.showMessage(it)
                             }
                         )
                     }
                 }
             }
-            item { DeviceInfoSection(deviceInfo = state.deviceInfo, onCopy = viewModel::copyDeviceInfoToClipboard) }
+            item {
+                DeviceInfoSection(
+                    deviceInfo = state.deviceInfo,
+                    onCopy = {
+                        viewModel.copyDeviceInfoToClipboard()
+                        noticeController.showMessage("设备信息已复制")
+                    }
+                )
+            }
         }
 
         if (showPasswordSheet) {
@@ -240,7 +249,6 @@ fun AppearanceSection(
 @Composable
 fun DeviceInfoSection(deviceInfo: DeviceInfo, onCopy: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     SettingsGroup("\u8bbe\u5907\u4fe1\u606f") {
         Column(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -260,10 +268,7 @@ fun DeviceInfoSection(deviceInfo: DeviceInfo, onCopy: () -> Unit) {
                     DeviceInfoRow("MAC\u5730\u5740", deviceInfo.macAddress)
                     DeviceInfoRow("\u5b58\u50a8\u7a7a\u95f4", "${deviceInfo.storageAvailableMB}MB / ${deviceInfo.storageTotalMB}MB")
                     OutlinedButton(
-                        onClick = {
-                            onCopy()
-                            Toast.makeText(context, "\u8bbe\u5907\u4fe1\u606f\u5df2\u590d\u5236", Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = onCopy,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {

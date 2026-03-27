@@ -196,7 +196,7 @@ fun RecentReadingCard(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.Top
                 ) {
-                    // 闁哄秴娲。浠嬪炊閸濆嫮鏆伴柛?2 閻炴稑鐭傞悵顔芥償閿旇偐绀夐梺顒€鐏濋崢銈嗘交濞戞ê顔婇柡澶涚節濞堛垻鎮扮仦鐐婵炴惌鍠栨慨?
+                    // 标题区域固定两行，避免不同文件名长度导致卡片高度跳动
                     Text(
                         text = progress.fileName,
                         style = MaterialTheme.typography.titleSmall,

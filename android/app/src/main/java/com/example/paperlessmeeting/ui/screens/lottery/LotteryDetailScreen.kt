@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.paperlessmeeting.domain.model.LotteryState
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +33,8 @@ fun LotteryDetailScreen(
     onBackClick: () -> Unit,
     viewModel: LotteryViewModel = hiltViewModel()
 ) {
+    val noticeController = LocalAppNoticeController.current
+
     LaunchedEffect(Unit) {
         viewModel.init(meetingId)
     }
@@ -40,22 +43,10 @@ fun LotteryDetailScreen(
     val history by viewModel.history.collectAsState()
     val error by viewModel.error.collectAsState()
 
-    // Error Handling
-    LaunchedEffect(error) {
-        if (error != null) {
-            viewModel.clearError()
-        }
-    }
-
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // Show error in snackbar
     LaunchedEffect(error) {
         error?.let {
-            snackbarHostState.showSnackbar(
-                message = it,
-                duration = SnackbarDuration.Short
-            )
+            noticeController.showMessage(it)
+            viewModel.clearError()
         }
     }
 
@@ -114,8 +105,7 @@ fun LotteryDetailScreen(
                     }
                 }
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        }
     ) { paddingValues ->
         // ⭐ 使用局部变量避免 smart cast 问题
         val currentState = uiState

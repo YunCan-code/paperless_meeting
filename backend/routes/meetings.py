@@ -770,13 +770,13 @@ def _normalize_public_image_url(image_url: Optional[str], base_url: str) -> Opti
 
 
 def _classify_default_source(type_name: str) -> str:
-    if "鍛" in type_name or "渚" in type_name:
+    if "周" in type_name or "例" in type_name:
         return "weekly"
-    if "鎬" in type_name:
+    if "急" in type_name:
         return "urgent"
-    if "璇" in type_name or "瀹" in type_name:
+    if "评" in type_name or "审" in type_name:
         return "review"
-    if "鍚" in type_name:
+    if "启" in type_name:
         return "kickoff"
     return "default"
 

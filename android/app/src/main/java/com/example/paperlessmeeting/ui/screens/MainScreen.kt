@@ -31,8 +31,10 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -56,6 +58,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.paperlessmeeting.ui.components.notice.AppNoticeHost
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
+import com.example.paperlessmeeting.ui.components.notice.rememberAppNoticeController
 import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
 import com.example.paperlessmeeting.ui.navigation.Screen
 import com.example.paperlessmeeting.ui.navigation.clearMainTabTransitionTarget
@@ -90,6 +95,11 @@ fun MainScreen(
 
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
+    val appNoticeHostState = remember { SnackbarHostState() }
+    val appNoticeController = rememberAppNoticeController(
+        hostState = appNoticeHostState,
+        scope = coroutineScope
+    )
     var pendingExit by rememberSaveable { mutableStateOf(false) }
     var showExitPrompt by rememberSaveable { mutableStateOf(false) }
 
@@ -188,14 +198,15 @@ fun MainScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = MAIN_TABS_ROUTE,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
-            ) {
+        CompositionLocalProvider(LocalAppNoticeController provides appNoticeController) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = navController,
+                    startDestination = MAIN_TABS_ROUTE,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.systemBars)
+                ) {
                 composable(MAIN_TABS_ROUTE) {
                     HorizontalPager(
                         state = pagerState,
@@ -365,39 +376,46 @@ fun MainScreen(
                         navController = navController
                     )
                 }
-            }
+                }
 
-            AnimatedVisibility(
-                visible = showExitPrompt &&
-                    currentRoute == MAIN_TABS_ROUTE &&
-                    currentMainTabIndex == 0 &&
-                    !isReaderScreen,
-                enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = 76.dp)
-            ) {
-                ExitPromptPill()
-            }
-
-            AnimatedVisibility(
-                visible = !isReaderScreen,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-            ) {
-                FloatingNavBar(
-                    tabs = tabs,
-                    scrollPosition = navScrollPosition,
-                    onTabClick = { screen ->
-                        val index = tabs.indexOf(screen)
-                        navigateToMainTab(index)
-                    }
+                AppNoticeHost(
+                    hostState = appNoticeHostState,
+                    hasFloatingNav = !isReaderScreen,
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 )
+
+                AnimatedVisibility(
+                    visible = showExitPrompt &&
+                        currentRoute == MAIN_TABS_ROUTE &&
+                        currentMainTabIndex == 0 &&
+                        !isReaderScreen,
+                    enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(bottom = 76.dp)
+                ) {
+                    ExitPromptPill()
+                }
+
+                AnimatedVisibility(
+                    visible = !isReaderScreen,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                ) {
+                    FloatingNavBar(
+                        tabs = tabs,
+                        scrollPosition = navScrollPosition,
+                        onTabClick = { screen ->
+                            val index = tabs.indexOf(screen)
+                            navigateToMainTab(index)
+                        }
+                    )
+                }
             }
         }
     }

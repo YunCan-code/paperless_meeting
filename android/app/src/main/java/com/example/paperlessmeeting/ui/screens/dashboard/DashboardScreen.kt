@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.MeetingStatus
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -76,10 +77,10 @@ fun DashboardScreen(
     }
     
     // Toast Handling
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val noticeController = LocalAppNoticeController.current
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
-            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+            noticeController.showMessage(msg)
         }
     }
 
@@ -308,7 +309,7 @@ fun DashboardContent(
                     pageSpacing = if (isPhone) 12.dp else 16.dp,
                     modifier = Modifier.fillMaxWidth().height(heroCardHeight) 
                 ) { virtualPage ->
-                    // 闂佸搫鍟版繛鈧俊鍓у劋濞碱亪顢欓懞銉ュ晩闂佸搫鍟抽崺鏍ｈ娴滄悂宕熼銏㈠帓闂佹椿浜為崰搴ㄦ偪閸曨剙顕辨慨妯诲墯閸炲绱掓笟鍨仼缂?
+                    // 无限轮播时把虚拟页索引映射回真实会议索引
                     val actualPage = virtualPage % actualCount
                     val meeting = state.activeMeetings[actualPage]
                     com.example.paperlessmeeting.ui.components.MeetingCard(

@@ -1,6 +1,4 @@
 package com.example.paperlessmeeting.ui.screens.checkin
-
-import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -27,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 import com.example.paperlessmeeting.domain.model.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -48,13 +46,13 @@ fun CheckInDashboardScreen(
     viewModel: CheckInDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val noticeController = LocalAppNoticeController.current
     val scrollState = rememberScrollState()
 
     // 全局消息监听
     LaunchedEffect(uiState.actionMessage) {
         uiState.actionMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            noticeController.showMessage(it)
             viewModel.clearMessage()
         }
     }

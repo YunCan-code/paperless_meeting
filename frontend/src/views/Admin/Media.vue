@@ -399,7 +399,7 @@
     >
       <template #header>
         <div class="video-preview-header">
-          <span>{{ videoPreviewItem?.title || '瑙嗛棰勮' }}</span>
+          <span>{{ videoPreviewItem?.title || '视频预览' }}</span>
         </div>
       </template>
       <div class="video-preview-body">
@@ -411,7 +411,7 @@
           controls
           preload="metadata"
         />
-        <div v-else class="video-preview-empty">瑙嗛鏃犳硶棰勮</div>
+        <div v-else class="video-preview-empty">视频无法预览</div>
       </div>
     </el-dialog>
   </div>
@@ -569,7 +569,7 @@ function openImagePreview(item) {
 
 function openVideoPreview(item) {
   if (!item.previewUrl) {
-    ElMessage.warning('瑙嗛鏃犳硶棰勮')
+    ElMessage.warning('视频无法预览')
     return
   }
   videoPreviewItem.value = item
