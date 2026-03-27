@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -79,8 +80,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import android.widget.Toast
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.components.MeetingStatusBadge
+import com.example.paperlessmeeting.ui.components.generateThemeColor
 import com.example.paperlessmeeting.ui.navigation.MAIN_TABS_ROUTE
 import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import kotlinx.coroutines.flow.collectLatest
@@ -352,6 +357,9 @@ fun MeetingDetailContent(
     val heroHeightPx = with(LocalDensity.current) { heroHeight.toPx() }
     val scrollState = rememberScrollState()
     val bgImage = meeting.cardImageUrl ?: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop"
+    val heroAccentColor = remember(meeting.meetingTypeName, meeting.title) {
+        generateThemeColor(meeting.meetingTypeName ?: meeting.title)
+    }
 
     val collapseProgress by remember {
         derivedStateOf { (scrollState.value / heroHeightPx).coerceIn(0f, 1f) }
@@ -506,31 +514,7 @@ fun MeetingDetailContent(
     }
 
     val MaterialsSectionContent: @Composable () -> Unit = {
-        if (showCheckInAction) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionHeader(title = "会议资料")
-                CheckInActionButton(
-                    isCheckedIn = meeting.isCheckedIn,
-                    isSubmitting = isCheckInSubmitting,
-                    onCheckInClick = onCheckInClick,
-                    onCancelCheckInClick = onCancelCheckInClick
-                )
-            }
-        } else {
-            SectionHeader(title = "会议资料")
-        }
-        if (showCheckInAction && meeting.isCheckedIn && !meeting.checkInTime.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "签到时间：${formatCheckInTime(meeting.checkInTime)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        SectionHeader(title = "会议资料")
         Spacer(modifier = Modifier.height(12.dp))
 
         if (meeting.showMediaLink) {
@@ -644,10 +628,9 @@ fun MeetingDetailContent(
                         alpha = 1f - collapseProgress
                     }
             ) {
-                AsyncImage(
-                    model = bgImage,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                MeetingHeroBackground(
+                    imageUrl = bgImage,
+                    accentColor = heroAccentColor,
                     modifier = Modifier.fillMaxSize()
                 )
                 Box(
@@ -751,6 +734,15 @@ fun MeetingDetailContent(
                         Column(modifier = Modifier.weight(0.3f)) {
                             InfoSectionContent()
                             Spacer(modifier = Modifier.height(32.dp))
+                            if (showCheckInAction) {
+                                CheckInSectionCard(
+                                    meeting = meeting,
+                                    isCheckInSubmitting = isCheckInSubmitting,
+                                    onCheckInClick = onCheckInClick,
+                                    onCancelCheckInClick = onCancelCheckInClick
+                                )
+                                Spacer(modifier = Modifier.height(32.dp))
+                            }
                             AgendaSectionContent()
                         }
                         Column(modifier = Modifier.weight(0.7f)) {
@@ -760,6 +752,15 @@ fun MeetingDetailContent(
                 } else {
                     InfoSectionContent()
                     Spacer(modifier = Modifier.height(32.dp))
+                    if (showCheckInAction) {
+                        CheckInSectionCard(
+                            meeting = meeting,
+                            isCheckInSubmitting = isCheckInSubmitting,
+                            onCheckInClick = onCheckInClick,
+                            onCancelCheckInClick = onCancelCheckInClick
+                        )
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
                     AgendaSectionContent()
                     Spacer(modifier = Modifier.height(32.dp))
                     MaterialsSectionContent()
@@ -805,6 +806,136 @@ fun SectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary,
         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
     )
+}
+
+@Composable
+private fun MeetingHeroBackground(
+    imageUrl: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val imageRequest = remember(context, imageUrl) {
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .crossfade(true)
+            .build()
+    }
+    val painter = rememberAsyncImagePainter(model = imageRequest)
+    val painterState = painter.state
+
+    Box(modifier = modifier) {
+        HeroFallbackArt(
+            accentColor = accentColor,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        if (painterState is AsyncImagePainter.State.Success) {
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        if (painterState is AsyncImagePainter.State.Loading) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(28.dp),
+                color = Color.White.copy(alpha = 0.9f),
+                strokeWidth = 2.5.dp
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroFallbackArt(
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.background(
+            Brush.linearGradient(
+                colors = listOf(
+                    accentColor.copy(alpha = 0.95f),
+                    accentColor.copy(alpha = 0.55f),
+                    Color(0xFF0F172A)
+                )
+            )
+        )
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(180.dp)
+                .align(Alignment.TopEnd)
+                .padding(top = 20.dp, end = 20.dp),
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.08f)
+        ) {}
+        Surface(
+            modifier = Modifier
+                .size(120.dp)
+                .align(Alignment.BottomStart)
+                .padding(start = 32.dp, bottom = 28.dp),
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.06f)
+        ) {}
+    }
+}
+
+@Composable
+private fun CheckInSectionCard(
+    meeting: Meeting,
+    isCheckInSubmitting: Boolean,
+    onCheckInClick: () -> Unit,
+    onCancelCheckInClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = "会议签到",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = if (meeting.isCheckedIn) {
+                    "你已完成本次会议签到，隐藏会议仍可继续查看。"
+                } else {
+                    "签到后，即使会议后续被隐藏，你仍可继续查看本次会议。"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (meeting.isCheckedIn && !meeting.checkInTime.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "签到时间：${formatCheckInTime(meeting.checkInTime)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            CheckInActionButton(
+                isCheckedIn = meeting.isCheckedIn,
+                isSubmitting = isCheckInSubmitting,
+                onCheckInClick = onCheckInClick,
+                onCancelCheckInClick = onCancelCheckInClick
+            )
+        }
+    }
 }
 
 @Composable

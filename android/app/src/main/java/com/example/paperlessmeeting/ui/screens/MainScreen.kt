@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -60,6 +61,7 @@ import com.example.paperlessmeeting.ui.navigation.Screen
 import com.example.paperlessmeeting.ui.navigation.clearMainTabTransitionTarget
 import com.example.paperlessmeeting.ui.navigation.mainTabTransitionTarget
 import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
+import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -75,6 +77,7 @@ fun MainScreen(
     onExitApp: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    val sharedMeetingViewModel: HomeViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -223,9 +226,11 @@ fun MainScreen(
                             1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                                 meetingTypeName = "ALL",
                                 navController = navController,
+                                isActive = currentRoute == MAIN_TABS_ROUTE && currentMainTabIndex == 1,
                                 onNavigateToMedia = {
                                     navigateToMainTab(2)
-                                }
+                                },
+                                viewModel = sharedMeetingViewModel
                             )
 
                             2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
@@ -259,9 +264,11 @@ fun MainScreen(
                         meetingTypeName = "ALL",
                         navController = navController,
                         initialMeetingId = meetingId,
+                        isActive = true,
                         onNavigateToMedia = {
                             navigateToMainTab(2)
-                        }
+                        },
+                        viewModel = sharedMeetingViewModel
                     )
                 }
 
@@ -277,9 +284,11 @@ fun MainScreen(
                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = typeName,
                         navController = navController,
+                        isActive = true,
                         onNavigateToMedia = {
                             navigateToMainTab(2)
-                        }
+                        },
+                        viewModel = sharedMeetingViewModel
                     )
                 }
 

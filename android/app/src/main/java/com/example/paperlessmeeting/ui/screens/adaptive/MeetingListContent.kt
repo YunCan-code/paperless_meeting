@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.ui.components.MeetingCard
+import com.example.paperlessmeeting.utils.currentMeetingDate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -55,7 +56,7 @@ fun MeetingListContent(
                     val cleanStart = meeting.startTime.replace(" ", "T")
                     val dateStr = cleanStart.take(10)
                     val date = LocalDate.parse(dateStr)
-                    val today = LocalDate.now()
+                    val today = currentMeetingDate()
                     
                     when {
                         date.isEqual(today) -> "今天"
@@ -73,7 +74,7 @@ fun MeetingListContent(
     // Calculate initial scroll index
     val initialScrollIndex = remember(groupedMeetings) {
         var index = 0
-        val today = LocalDate.now()
+        val today = currentMeetingDate()
         var targetIndex = 0
         
         for ((_, list) in groupedMeetings) {

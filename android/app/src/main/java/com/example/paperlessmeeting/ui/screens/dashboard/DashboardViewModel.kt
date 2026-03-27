@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.utils.currentMeetingDate
+import com.example.paperlessmeeting.utils.currentMeetingDateTime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,7 +91,7 @@ class DashboardViewModel @Inject constructor(
                 val userName = userPreferences.getUserName() ?: "鐢ㄦ埛"
                 val userId = userPreferences.getUserId().takeIf { it > 0 }
 
-                val todayStr = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).toString()
+                val todayStr = currentMeetingDate().toString()
                 val todayMeetings = repository.getMeetings(
                     limit = 100,
                     startDate = todayStr,
@@ -98,7 +100,7 @@ class DashboardViewModel @Inject constructor(
                     userId = userId
                 )
 
-                val now = java.time.LocalDateTime.now()
+                val now = currentMeetingDateTime()
                 val activeListWithTimes = todayMeetings.mapNotNull { meeting ->
                     try {
                         val isoTime = meeting.startTime.replace(" ", "T")

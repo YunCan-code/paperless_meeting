@@ -3,6 +3,7 @@ package com.example.paperlessmeeting.ui.components
 import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
@@ -97,12 +100,40 @@ fun MeetingCard(
                     .build()
             }
 
-            AsyncImage(
-                model = imageRequest,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            val painter = rememberAsyncImagePainter(model = imageRequest)
+            val painterState = painter.state
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                typeColor.copy(alpha = 0.96f),
+                                typeColor.copy(alpha = 0.65f),
+                                Color(0xFF0F172A)
+                            )
+                        )
+                    )
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 16.dp, end = 16.dp)
+                        .size(88.dp),
+                    shape = CircleShape,
+                    color = Color.White.copy(alpha = 0.07f)
+                ) {}
+            }
+
+            if (painterState is AsyncImagePainter.State.Success) {
+                Image(
+                    painter = painter,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             // 2. Dark Gradient Overlay (for text readability)
             Box(

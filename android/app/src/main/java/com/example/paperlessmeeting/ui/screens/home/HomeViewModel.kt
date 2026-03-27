@@ -3,12 +3,18 @@ package com.example.paperlessmeeting.ui.screens.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
+import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.utils.Resource
+import com.example.paperlessmeeting.utils.currentMeetingDate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -18,7 +24,7 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val appSettingsState: AppSettingsState,
-    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    private val userPreferences: UserPreferences,
     private val socketManager: SocketManager
 ) : ViewModel() {
 
@@ -29,6 +35,10 @@ class HomeViewModel @Inject constructor(
 
     private val _selectedMeetingId = MutableStateFlow<Int?>(null)
     val selectedMeetingId: StateFlow<Int?> = _selectedMeetingId.asStateFlow()
+    private val _isCheckInSubmitting = MutableStateFlow(false)
+    val isCheckInSubmitting: StateFlow<Boolean> = _isCheckInSubmitting.asStateFlow()
+    private val _actionMessage = MutableSharedFlow<String>()
+    val actionMessage: SharedFlow<String> = _actionMessage.asSharedFlow()
 
     fun selectMeeting(id: Int?) {
         _selectedMeetingId.value = id
@@ -50,7 +60,7 @@ class HomeViewModel @Inject constructor(
      * 会议排序：今天 -> 未来 -> 历史
      */
     private fun sortMeetingsWithTodayFirst(meetings: List<Meeting>): List<Meeting> {
-        val today = java.time.LocalDate.now()
+        val today = currentMeetingDate()
         
         val (todayMeetings, otherMeetings) = meetings.partition { meeting ->
             try {
@@ -161,18 +171,105 @@ class HomeViewModel @Inject constructor(
     suspend fun getMeetingDetails(id: Int): Meeting? {
         val userId = userPreferences.getUserId().takeIf { it > 0 }
         return when (val result = repository.getMeetingById(id, userId)) {
-            is com.example.paperlessmeeting.utils.Resource.Success -> result.data
+            is Resource.Success -> result.data
             else -> null
         }
+    }
+
+    suspend fun checkInMeeting(id: Int): SplitDetailCheckInResult {
+        val userId = userPreferences.getUserId().takeIf { it > 0 }
+            ?: return SplitDetailCheckInResult.Error("未登录，无法签到")
+        if (_isCheckInSubmitting.value) {
+            return SplitDetailCheckInResult.Error("正在处理签到，请稍候")
+        }
+
+        return try {
+            _isCheckInSubmitting.value = true
+            repository.checkIn(userId, id)
+            emitActionMessage("签到成功")
+            refreshMeetingsSilently()
+            when (val result = repository.getMeetingById(id, userId)) {
+                is Resource.Success -> SplitDetailCheckInResult.Updated(result.data)
+                is Resource.Error -> SplitDetailCheckInResult.Error(result.message ?: "签到后刷新失败")
+                else -> SplitDetailCheckInResult.Error("签到后刷新失败")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            SplitDetailCheckInResult.Error("签到失败：${e.message ?: "未知错误"}")
+        } finally {
+            _isCheckInSubmitting.value = false
+        }
+    }
+
+    suspend fun cancelCheckIn(meeting: Meeting): SplitDetailCheckInResult {
+        val userId = userPreferences.getUserId().takeIf { it > 0 }
+            ?: return SplitDetailCheckInResult.Error("未登录，无法取消签到")
+        val checkInId = meeting.checkInId
+            ?: return SplitDetailCheckInResult.Error("当前会议没有签到记录")
+        if (_isCheckInSubmitting.value) {
+            return SplitDetailCheckInResult.Error("正在处理签到，请稍候")
+        }
+
+        return try {
+            _isCheckInSubmitting.value = true
+            repository.cancelCheckIn(checkInId, userId)
+            refreshMeetingsSilently()
+            when (val result = repository.getMeetingById(meeting.id, userId)) {
+                is Resource.Success -> {
+                    emitActionMessage("已取消签到")
+                    SplitDetailCheckInResult.Updated(result.data)
+                }
+                is Resource.Error -> {
+                    if (result.message == "HTTP_404") {
+                        SplitDetailCheckInResult.Hidden("取消签到后，该会议已不可见")
+                    } else {
+                        SplitDetailCheckInResult.Error("取消签到后刷新失败：${result.message}")
+                    }
+                }
+                else -> SplitDetailCheckInResult.Error("取消签到后刷新失败")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            SplitDetailCheckInResult.Error("取消签到失败：${e.message ?: "未知错误"}")
+        } finally {
+            _isCheckInSubmitting.value = false
+        }
+    }
+
+    fun refreshOnVisible() {
+        loadMeetings()
     }
 
     private fun observeSocketEvents() {
         socketManager.connect(appSettingsState.getSocketBaseUrl())
         viewModelScope.launch {
             socketManager.meetingChangedEvent.collectLatest {
-                loadMeetings()
+                refreshMeetingsSilently()
             }
         }
+    }
+
+    private suspend fun refreshMeetingsSilently() {
+        try {
+            val userId = userPreferences.getUserId().takeIf { it > 0 }
+            val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "desc", userId = userId)
+            allMeetings.clear()
+            allMeetings.addAll(meetings.distinctBy { it.id })
+            hasMoreData = meetings.size >= pageSize
+            _uiState.value = HomeUiState.Success(
+                meetings = sortMeetingsWithTodayFirst(allMeetings),
+                isLoadingMore = false,
+                hasMoreData = hasMoreData
+            )
+        } catch (e: Exception) {
+            if (_uiState.value !is HomeUiState.Success) {
+                _uiState.value = HomeUiState.Error(e.message ?: "Unknown Error")
+            }
+        }
+    }
+
+    private suspend fun emitActionMessage(message: String) {
+        _actionMessage.emit(message)
     }
 }
 
@@ -184,4 +281,10 @@ sealed class HomeUiState {
         val hasMoreData: Boolean = true
     ) : HomeUiState()
     data class Error(val message: String) : HomeUiState()
+}
+
+sealed interface SplitDetailCheckInResult {
+    data class Updated(val meeting: Meeting) : SplitDetailCheckInResult
+    data class Hidden(val message: String) : SplitDetailCheckInResult
+    data class Error(val message: String) : SplitDetailCheckInResult
 }
