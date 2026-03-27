@@ -79,6 +79,7 @@ class MeetingBase(SQLModel):
     status: str = Field(default="scheduled") # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
     show_media_link: bool = Field(default=False) # 是否在安卓端资料旁显示媒体页入口 # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
 
+    cover_image: Optional[str] = None
     android_visibility_mode: str = Field(default="inherit")
     android_visibility_hide_after_hours: Optional[int] = None
 

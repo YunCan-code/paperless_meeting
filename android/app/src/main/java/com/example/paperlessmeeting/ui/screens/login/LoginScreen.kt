@@ -29,6 +29,7 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val posterConfig by viewModel.posterConfig.collectAsState()
     var query by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -65,7 +66,12 @@ fun LoginScreen(
                     .fillMaxHeight()
             ) {
                 AppAsyncImage(
-                    model = remember { MeetingImageResolver.loginPosterModel() },
+                    model = remember(posterConfig.posterUrl, posterConfig.posterVersion) {
+                        MeetingImageResolver.loginPosterModel(
+                            posterUrl = posterConfig.posterUrl,
+                            posterVersion = posterConfig.posterVersion
+                        )
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
                 // Overlay

@@ -9,6 +9,7 @@ import retrofit2.HttpException
 
 interface MeetingRepository {
     suspend fun login(request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse
+    suspend fun getSettings(): Map<String, String>
     suspend fun getMeetings(
         skip: Int = 0, 
         limit: Int = 20,
@@ -48,6 +49,10 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun login(request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse {
         return api.login(request)
+    }
+
+    override suspend fun getSettings(): Map<String, String> {
+        return api.getSettings()
     }
 
     override suspend fun getMeetings(

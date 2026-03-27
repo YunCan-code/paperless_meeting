@@ -20,6 +20,9 @@ interface ApiService {
         @retrofit2.http.Query("user_id") userId: Int? = null
     ): Meeting
 
+    @GET("settings/")
+    suspend fun getSettings(): Map<String, String>
+
     @retrofit2.http.Streaming
     @GET
     suspend fun downloadFile(@retrofit2.http.Url url: String): okhttp3.ResponseBody

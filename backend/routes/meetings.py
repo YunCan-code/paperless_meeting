@@ -49,6 +49,7 @@ class MeetingContactInput(BaseModel):
 class MeetingCreateInput(BaseModel):
     title: str
     meeting_type_id: Optional[int] = None
+    cover_image: Optional[str] = None
     start_time: datetime
     end_time: Optional[datetime] = None
     location: Optional[str] = None
@@ -66,6 +67,7 @@ class MeetingCreateInput(BaseModel):
 class MeetingUpdateInput(BaseModel):
     title: Optional[str] = None
     meeting_type_id: Optional[int] = None
+    cover_image: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     location: Optional[str] = None
@@ -106,10 +108,15 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # 文件上传安全限制
 ALLOWED_EXTENSIONS = {'.pdf'}  # 仅允许 PDF 文件（与前端一致）
 MAX_UPLOAD_SIZE = 200 * 1024 * 1024  # 200MB
+MEETING_COVER_UPLOAD_DIR = UPLOAD_DIR / "meeting_covers"
+MEETING_COVER_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+MAX_IMAGE_UPLOAD_SIZE = 5 * 1024 * 1024
 
 MEETING_BASE_FIELDS = {
     "title",
     "meeting_type_id",
+    "cover_image",
     "start_time",
     "end_time",
     "location",
@@ -351,6 +358,24 @@ def _meeting_occurs_today_in_shanghai(meeting: Meeting) -> bool:
         start_time = start_time.astimezone(SHANGHAI_TZ)
     return start_time.date() == datetime.now(SHANGHAI_TZ).date()
 
+
+def _validate_image_upload(file: UploadFile) -> tuple[bytes, str, str]:
+    original_filename = file.filename or "cover"
+    safe_original = os.path.basename(original_filename).replace("..", "")
+    extension = Path(safe_original).suffix.lower()
+
+    if extension not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="仅支持 JPG、PNG、WebP 格式图片")
+
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="上传文件不能为空")
+    if len(content) > MAX_IMAGE_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="图片大小不能超过 5MB")
+
+    stem = Path(safe_original).stem or "cover"
+    return content, extension, stem
+
 @router.post("/", response_model=Meeting)
 def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(get_session)):
     """
@@ -400,6 +425,23 @@ def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(ge
         print(f"[Socket.IO] failed to broadcast meeting_changed: {e}")
     
     return meeting
+
+
+@router.post("/upload_cover")
+def upload_cover(file: UploadFile = File(...)):
+    content, extension, stem = _validate_image_upload(file)
+    version = str(int(datetime.now().timestamp()))
+    safe_stem = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in stem).strip("_") or "cover"
+    filename = f"{safe_stem}_{version}{extension}"
+    file_path = MEETING_COVER_UPLOAD_DIR / filename
+
+    with open(file_path, "wb") as output:
+        output.write(content)
+
+    return {
+        "url": f"/static/meeting_covers/{filename}",
+        "version": version
+    }
 
 
 @router.get("/stats")
@@ -523,6 +565,7 @@ class MeetingCardResponse(BaseModel):
     id: int
     title: str
     meeting_type_id: Optional[int] = None
+    cover_image: Optional[str] = None
     start_time: datetime
     end_time: Optional[datetime] = None
     location: Optional[str] = None
@@ -532,6 +575,7 @@ class MeetingCardResponse(BaseModel):
     created_at: datetime
     card_image_url: Optional[str] = None
     card_image_thumb_url: Optional[str] = None
+    card_image_source: Optional[str] = None
     meeting_type_name: Optional[str] = None
     attachments: List[AttachmentRead] = []
     agenda_items: List[AgendaItemOutput] = []
@@ -683,10 +727,58 @@ def build_thumbnail_url(image_url: Optional[str], base_url: str) -> Optional[str
     if source is not None:
         thumb_relative = _build_thumbnail_for_local_file(source)
         if thumb_relative is not None:
-            return f"{base_url}static/{thumb_relative.as_posix()}"
+            thumb_path = UPLOAD_DIR / thumb_relative
+            return _append_version_query(
+                f"{base_url}static/{thumb_relative.as_posix()}",
+                _file_version_token(thumb_path)
+            )
         return image_url
 
     return _optimize_unsplash_url(image_url)
+
+
+def _append_version_query(url: Optional[str], version: Optional[str]) -> Optional[str]:
+    if not url or not version:
+        return url
+
+    parsed = urlparse(url)
+    query = parse_qsl(parsed.query, keep_blank_values=True)
+    filtered = [(key, value) for key, value in query if key.lower() != "v"]
+    filtered.append(("v", version))
+    return urlunparse(parsed._replace(query=urlencode(filtered)))
+
+
+def _file_version_token(path: Path) -> Optional[str]:
+    try:
+        return str(int(path.stat().st_mtime))
+    except OSError:
+        return None
+
+
+def _public_static_url(relative_path: str, base_url: str, source_path: Optional[Path] = None) -> str:
+    url = f"{base_url.rstrip('/')}{relative_path}"
+    return _append_version_query(url, _file_version_token(source_path) if source_path else None)
+
+
+def _normalize_public_image_url(image_url: Optional[str], base_url: str) -> Optional[str]:
+    if not image_url:
+        return None
+    if image_url.startswith("/static/"):
+        source = _resolve_local_source_path(image_url)
+        return _public_static_url(image_url, base_url, source)
+    return image_url
+
+
+def _classify_default_source(type_name: str) -> str:
+    if "鍛" in type_name or "渚" in type_name:
+        return "weekly"
+    if "鎬" in type_name:
+        return "urgent"
+    if "璇" in type_name or "瀹" in type_name:
+        return "review"
+    if "鍚" in type_name:
+        return "kickoff"
+    return "default"
 
 def get_images_in_dir_cached(directory: Path) -> List[str]:
     """Cached directory listing to reduce Disk I/O (60s TTL)"""
@@ -719,9 +811,33 @@ def get_random_image_from_dir(directory: Path, base_url: str) -> Optional[str]:
     selected = random.choice(images)
     try:
         rel_path = directory.relative_to(UPLOAD_DIR)
-        return f"{base_url}static/{rel_path.as_posix()}/{selected}"
+        selected_path = directory / selected
+        return _public_static_url(f"/static/{rel_path.as_posix()}/{selected}", base_url, selected_path)
     except ValueError:
         return None
+
+
+def _resolve_meeting_cover(meeting: Meeting, meeting_type: Optional[MeetingType], base_url: str) -> tuple[Optional[str], Optional[str]]:
+    if meeting.cover_image:
+        return _normalize_public_image_url(meeting.cover_image, base_url), "meeting"
+
+    if meeting_type and meeting_type.cover_image:
+        return _normalize_public_image_url(meeting_type.cover_image, base_url), "meeting_type"
+
+    type_name = meeting_type.name if meeting_type else "default"
+    bg_root = UPLOAD_DIR / "meeting_backgrounds"
+
+    type_folder = bg_root / type_name
+    type_url = get_random_image_from_dir(type_folder, base_url)
+    if type_url:
+        return type_url, "type_directory"
+
+    common_url = get_random_image_from_dir(bg_root / "common", base_url)
+    if common_url:
+        return common_url, "common_directory"
+
+    default_key = _classify_default_source(type_name)
+    return DEFAULT_IMAGES[default_key], "default"
 
 @router.get("/", response_model=List[MeetingCardResponse])
 def read_meetings(
@@ -804,6 +920,7 @@ def read_meetings(
             id=m.id,
             title=m.title,
             meeting_type_id=m.meeting_type_id,
+            cover_image=m.cover_image,
             start_time=m.start_time,
             end_time=m.end_time,
             location=m.location,
@@ -863,8 +980,10 @@ def read_meetings(
         
 
         
+        final_url, image_source = _resolve_meeting_cover(m, m_type, base_url)
         resp.card_image_url = final_url
         resp.card_image_thumb_url = build_thumbnail_url(final_url, base_url)
+        resp.card_image_source = image_source
         resp.meeting_type_name = m_type.name if m_type else "普通会议"
         results.append(resp)
         
@@ -900,6 +1019,7 @@ def read_meeting(
         id=meeting.id,
         title=meeting.title,
         meeting_type_id=meeting.meeting_type_id,
+        cover_image=meeting.cover_image,
         start_time=meeting.start_time,
         end_time=meeting.end_time,
         location=meeting.location,
@@ -957,8 +1077,10 @@ def read_meeting(
             else:
                 final_url = DEFAULT_IMAGES["default"]
 
+    final_url, image_source = _resolve_meeting_cover(meeting, m_type, base_url)
     resp.card_image_url = final_url
     resp.card_image_thumb_url = build_thumbnail_url(final_url, base_url)
+    resp.card_image_source = image_source
     
     # 填充与会者角色列表
     attendee_links = session.exec(select(MeetingAttendeeLink).where(MeetingAttendeeLink.meeting_id == meeting_id)).all()

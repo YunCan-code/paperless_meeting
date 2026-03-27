@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
@@ -84,19 +85,32 @@ data class AppImageModel(
 
 object MeetingImageResolver {
 
-    fun loginPosterModel(): AppImageModel {
+    fun loginPosterModel(
+        posterUrl: String? = null,
+        posterVersion: String? = null
+    ): AppImageModel {
+        val resolvedUrl = posterUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let { appendVersionParam(it, posterVersion) }
         return AppImageModel(
-            data = R.drawable.login_poster,
-            memoryCacheKey = "login-poster:local",
+            data = resolvedUrl ?: R.drawable.login_poster,
+            diskCacheKey = resolvedUrl?.let { "login-poster:$it" },
+            memoryCacheKey = resolvedUrl?.let { "login-poster:$it" } ?: "login-poster:local",
             fallbackResId = R.drawable.login_poster,
             contentScale = ContentScale.Crop,
-            crossfadeEnabled = false,
-            crossfadeMillis = 0,
-            precision = Precision.EXACT,
+            crossfadeEnabled = resolvedUrl != null,
+            crossfadeMillis = if (resolvedUrl != null) 220 else 0,
+            precision = if (resolvedUrl != null) Precision.INEXACT else Precision.EXACT,
             scale = Scale.FILL,
             fallback = AppImageFallback.Poster,
             description = "Login poster"
         )
+    }
+
+    private fun appendVersionParam(url: String, version: String?): String {
+        if (version.isNullOrBlank()) return url
+        val separator = if (url.contains("?")) "&" else "?"
+        return "$url${separator}v=$version"
     }
 
     fun resolve(meeting: Meeting, slot: AppImageSlot): AppImageModel {
@@ -271,7 +285,7 @@ fun AppAsyncImage(
                 .size(Size(widthPx, heightPx))
                 .apply {
                     if (model.crossfadeEnabled) {
-                        crossfade(true)
+                        crossfade(model.crossfadeMillis)
                     }
                 }
                 .build()
@@ -284,7 +298,14 @@ fun AppAsyncImage(
         }
 
         fallbackContent(state)
-        if (model.data != null || model.fallbackResId != null) {
+        if (state == AppAsyncImageState.Error && model.fallbackResId != null) {
+            Image(
+                painter = painterResource(id = model.fallbackResId),
+                contentDescription = model.description,
+                contentScale = model.contentScale,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (model.data != null || model.fallbackResId != null) {
             Image(
                 painter = painter,
                 contentDescription = model.description,

@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LoginRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,14 +11,49 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class LoginPosterConfig(
+    val posterUrl: String? = null,
+    val posterVersion: String? = null
+)
+
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState = _uiState.asStateFlow()
+
+    private val _posterConfig = MutableStateFlow(LoginPosterConfig())
+    val posterConfig = _posterConfig.asStateFlow()
+
+    init {
+        loadLoginPoster()
+    }
+
+    private fun loadLoginPoster() {
+        viewModelScope.launch {
+            runCatching { repository.getSettings() }
+                .onSuccess { settings ->
+                    val rawUrl = settings["android_login_poster_url"]?.trim().orEmpty()
+                    val resolvedUrl = when {
+                        rawUrl.isBlank() -> null
+                        rawUrl.startsWith("http://") || rawUrl.startsWith("https://") -> rawUrl
+                        rawUrl.startsWith("/") -> "${appSettingsState.getSocketBaseUrl().trimEnd('/')}$rawUrl"
+                        else -> rawUrl
+                    }
+                    _posterConfig.value = LoginPosterConfig(
+                        posterUrl = resolvedUrl,
+                        posterVersion = settings["android_login_poster_version"]?.trim()?.takeIf { it.isNotEmpty() }
+                    )
+                }
+                .onFailure {
+                    _posterConfig.value = LoginPosterConfig()
+                }
+        }
+    }
 
     fun login(query: String) {
         if (query.isBlank()) {
@@ -39,10 +75,11 @@ class LoginViewModel @Inject constructor(
                 response.email?.let { userPreferences.saveUserEmail(it) }
                 _uiState.value = LoginUiState.Success(response.name)
             } catch (e: Exception) {
-                // Parse error message if possible
-                val msg = if (e.message?.contains("300") == true) "存在重名，请使用手机号" 
-                          else if (e.message?.contains("404") == true) "用户不存在"
-                          else "登录失败: ${e.message}"
+                val msg = when {
+                    e.message?.contains("300") == true -> "存在重名，请使用手机号"
+                    e.message?.contains("404") == true -> "用户不存在"
+                    else -> "登录失败: ${e.message}"
+                }
                 _uiState.value = LoginUiState.Error(msg)
             }
         }
