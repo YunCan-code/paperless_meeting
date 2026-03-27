@@ -12,7 +12,7 @@
 
         <div class="title-group">
           <h1 class="page-title">系统设置</h1>
-          <p class="page-subtitle">配置系统全局参数、安卓登录海报与会议显示规则</p>
+          <p class="page-subtitle">按 Web 端与 Android 端分区管理系统设置项</p>
         </div>
       </div>
     </div>
@@ -20,6 +20,11 @@
     <div class="settings-content">
       <el-row :gutter="24">
         <el-col :span="16" :xs="24">
+          <div class="section-block">
+            <div class="section-title">Web 端设置</div>
+            <div class="section-subtitle">影响 Web 管理端和系统全局规则</div>
+          </div>
+
           <el-card shadow="hover" class="setting-card">
             <template #header>
               <div class="card-header">
@@ -45,7 +50,45 @@
             </el-form>
           </el-card>
 
-          <el-card shadow="hover" class="setting-card" style="margin-top: 24px;">
+          <el-card shadow="hover" class="setting-card card-spacing">
+            <template #header>
+              <div class="card-header">
+                <div class="header-icon bg-orange-50 text-orange-500">
+                  <el-icon><Hide /></el-icon>
+                </div>
+                <div class="header-title">
+                  <h3>会议可见性（安全）</h3>
+                  <p>控制历史会议在终端设备上的保留时间</p>
+                </div>
+              </div>
+            </template>
+
+            <el-form label-position="top" class="setting-form">
+              <el-form-item label="会议可见时限（小时）">
+                <el-input-number
+                  v-model="settings.meeting_visibility_hide_after_hours"
+                  :min="0"
+                  :max="8760"
+                  controls-position="right"
+                  style="width: 100%;"
+                />
+                <div class="form-help">
+                  <el-icon class="help-icon"><InfoFilled /></el-icon>
+                  设置会议在开始后多少小时自动对普通终端隐藏。
+                  <br />
+                  <span class="highlight">设置为 0 表示永不隐藏。</span>
+                  建议设置为 72（3 天）或 168（1 周）。
+                </div>
+              </el-form-item>
+            </el-form>
+          </el-card>
+
+          <div class="section-block section-block-android">
+            <div class="section-title">Android 端设置</div>
+            <div class="section-subtitle">仅影响安卓平板端展示与登录体验</div>
+          </div>
+
+          <el-card shadow="hover" class="setting-card card-spacing">
             <template #header>
               <div class="card-header">
                 <div class="header-icon bg-cyan-50 text-cyan-500">
@@ -95,46 +138,13 @@
               </div>
             </div>
           </el-card>
-
-          <el-card shadow="hover" class="setting-card" style="margin-top: 24px;">
-            <template #header>
-              <div class="card-header">
-                <div class="header-icon bg-orange-50 text-orange-500">
-                  <el-icon><Hide /></el-icon>
-                </div>
-                <div class="header-title">
-                  <h3>会议可见性（安全）</h3>
-                  <p>控制历史会议在终端设备上的保留时间</p>
-                </div>
-              </div>
-            </template>
-
-            <el-form label-position="top" class="setting-form">
-              <el-form-item label="会议可见时限（小时）">
-                <el-input-number
-                  v-model="settings.meeting_visibility_hide_after_hours"
-                  :min="0"
-                  :max="8760"
-                  controls-position="right"
-                  style="width: 100%;"
-                />
-                <div class="form-help">
-                  <el-icon class="help-icon"><InfoFilled /></el-icon>
-                  设置会议在开始后多少小时自动对普通终端隐藏。
-                  <br />
-                  <span class="highlight">设置为 0 表示永不隐藏。</span>
-                  建议设置为 72（3 天）或 168（1 周）。
-                </div>
-              </el-form-item>
-            </el-form>
-          </el-card>
         </el-col>
 
         <el-col :span="8" :xs="24">
           <el-card shadow="never" class="action-card">
             <div class="action-summary">
               <h4>保存更改</h4>
-              <p>所有变更保存后会立即生效，安卓端登录海报会通过版本号自动刷新缓存。</p>
+              <p>所有变更保存后会立即生效，Android 登录页海报会通过版本号自动刷新缓存。</p>
             </div>
             <el-button type="primary" size="large" @click="saveSettings" :loading="saving" style="width: 100%;">
               保存所有设置
@@ -253,11 +263,36 @@ onMounted(fetchSettings)
 .page-title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-main); line-height: 1.2; }
 .page-subtitle { margin: 4px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.4; }
 
+.section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px;
+  margin-bottom: 16px;
+}
+.section-block-android {
+  margin-top: 28px;
+}
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 .setting-card {
   border-radius: 12px;
   border: 1px solid var(--border-color);
   background: var(--card-bg);
   overflow: visible;
+}
+.card-spacing {
+  margin-top: 24px;
 }
 
 .card-header {
