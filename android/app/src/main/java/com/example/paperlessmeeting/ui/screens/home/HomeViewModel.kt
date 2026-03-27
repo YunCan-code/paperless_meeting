@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,24 +29,21 @@ class HomeViewModel @Inject constructor(
     private val socketManager: SocketManager
 ) : ViewModel() {
 
-    val staticBaseUrl: String get() = appSettingsState.getStaticBaseUrl()
+    val staticBaseUrl: String
+        get() = appSettingsState.getStaticBaseUrl()
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val _selectedMeetingId = MutableStateFlow<Int?>(null)
     val selectedMeetingId: StateFlow<Int?> = _selectedMeetingId.asStateFlow()
+
     private val _isCheckInSubmitting = MutableStateFlow(false)
     val isCheckInSubmitting: StateFlow<Boolean> = _isCheckInSubmitting.asStateFlow()
+
     private val _actionMessage = MutableSharedFlow<String>()
     val actionMessage: SharedFlow<String> = _actionMessage.asSharedFlow()
 
-    fun selectMeeting(id: Int?) {
-        _selectedMeetingId.value = id
-    }
-    
-    // Pagination state
-    private var currentPage = 0
     private val pageSize = 20
     private var hasMoreData = true
     private var isLoadingMore = false
@@ -56,109 +54,85 @@ class HomeViewModel @Inject constructor(
         observeSocketEvents()
     }
 
-    /**
-     * 会议排序：今天 -> 未来 -> 历史
-     */
-    private fun sortMeetingsWithTodayFirst(meetings: List<Meeting>): List<Meeting> {
-        val today = currentMeetingDate()
-        
-        val (todayMeetings, otherMeetings) = meetings.partition { meeting ->
-            try {
-                val dateStr = meeting.startTime.substringBefore(" ")
-                val meetingDate = java.time.LocalDate.parse(dateStr)
-                meetingDate == today
-            } catch (e: Exception) { false }
-        }
-        
-        val (futureMeetings, pastMeetings) = otherMeetings.partition { meeting ->
-            try {
-                val dateStr = meeting.startTime.substringBefore(" ")
-                val meetingDate = java.time.LocalDate.parse(dateStr)
-                meetingDate.isAfter(today)
-            } catch (e: Exception) { false }
-        }
-        
-        // 今日(时间升序) + 未来(日期升序) + 历史(日期降序)
-        return todayMeetings.sortedBy { it.startTime } +
-               futureMeetings.sortedBy { it.startTime } +
-               pastMeetings.sortedByDescending { it.startTime }
+    fun selectMeeting(id: Int?) {
+        _selectedMeetingId.value = id
     }
 
-    /**
-     * 初始加载或刷新
-     */
+    private fun sortMeetingsWithTodayFirst(meetings: List<Meeting>): List<Meeting> {
+        val today = currentMeetingDate()
+
+        val (todayMeetings, otherMeetings) = meetings.partition { meeting ->
+            meeting.localDateOrNull() == today
+        }
+        val (futureMeetings, pastMeetings) = otherMeetings.partition { meeting ->
+            val date = meeting.localDateOrNull()
+            date != null && date.isAfter(today)
+        }
+
+        return todayMeetings.sortedBy { it.startTime } +
+            futureMeetings.sortedBy { it.startTime } +
+            pastMeetings.sortedByDescending { it.startTime }
+    }
+
     fun loadMeetings() {
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
-            currentPage = 0
             hasMoreData = true
             allMeetings.clear()
-            
+
             try {
-                val userId = userPreferences.getUserId().takeIf { it > 0 }
-                // Use sort=desc to get most recent meetings first (today/future will be at the top)
-                val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "desc", userId = userId)
-                // Prevention against duplicate keys (crash cause)
+                val meetings = repository.getMeetings(
+                    skip = 0,
+                    limit = pageSize,
+                    sort = "desc",
+                    userId = currentUserIdOrNull()
+                )
                 allMeetings.addAll(meetings.distinctBy { it.id })
                 hasMoreData = meetings.size >= pageSize
-                _uiState.value = HomeUiState.Success(
-                    meetings = sortMeetingsWithTodayFirst(allMeetings),
-                    isLoadingMore = false,
-                    hasMoreData = hasMoreData
-                )
+                publishSuccess()
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.message ?: "Unknown Error")
             }
         }
     }
 
-    /**
-     * 加载更多 (下一页)
-     */
     fun loadMore() {
         if (isLoadingMore || !hasMoreData) return
-        
+
         viewModelScope.launch {
             isLoadingMore = true
             val currentState = _uiState.value
             if (currentState is HomeUiState.Success) {
                 _uiState.value = currentState.copy(isLoadingMore = true)
             }
-            
+
             try {
-                val skip = allMeetings.size
-                val userId = userPreferences.getUserId().takeIf { it > 0 }
-                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize, sort = "desc", userId = userId)
-                
+                val newMeetings = repository.getMeetings(
+                    skip = allMeetings.size,
+                    limit = pageSize,
+                    sort = "desc",
+                    userId = currentUserIdOrNull()
+                )
+
                 if (newMeetings.isEmpty()) {
                     hasMoreData = false
-                    // Don't create new list reference, just update flags
                     if (currentState is HomeUiState.Success) {
                         _uiState.value = currentState.copy(
-                            isLoadingMore = false, 
+                            isLoadingMore = false,
                             hasMoreData = false
                         )
                     }
                 } else {
-                    // Filter out duplicates that might already exist in the list
-                    val uniqueNewMeetings = newMeetings.filter { newM -> 
-                        allMeetings.none { existing -> existing.id == newM.id } 
+                    val uniqueNewMeetings = newMeetings.filter { newMeeting ->
+                        allMeetings.none { existing -> existing.id == newMeeting.id }
                     }
-                    
                     if (uniqueNewMeetings.isNotEmpty()) {
                         allMeetings.addAll(uniqueNewMeetings)
                     }
-                    // Updating hasMoreData based on raw response size to keep pagination logic correct
                     hasMoreData = newMeetings.size >= pageSize
-                    
-                    _uiState.value = HomeUiState.Success(
-                        meetings = sortMeetingsWithTodayFirst(allMeetings),
-                        isLoadingMore = false,
-                        hasMoreData = hasMoreData
-                    )
+                    publishSuccess()
                 }
-            } catch (e: Exception) {
-                // Don't override success state on load more error
+            } catch (_: Exception) {
                 if (_uiState.value is HomeUiState.Success) {
                     _uiState.value = (_uiState.value as HomeUiState.Success).copy(isLoadingMore = false)
                 }
@@ -169,23 +143,31 @@ class HomeViewModel @Inject constructor(
     }
 
     suspend fun getMeetingDetails(id: Int): Meeting? {
-        val userId = userPreferences.getUserId().takeIf { it > 0 }
-        return when (val result = repository.getMeetingById(id, userId)) {
+        return when (val result = repository.getMeetingById(id, currentUserIdOrNull())) {
             is Resource.Success -> result.data
             else -> null
         }
     }
 
     suspend fun getMeetingDetailsResult(id: Int): Resource<Meeting> {
-        val userId = userPreferences.getUserId().takeIf { it > 0 }
-        return repository.getMeetingById(id, userId)
+        return repository.getMeetingById(id, currentUserIdOrNull())
+    }
+
+    fun shouldShowCheckInHint(meetingId: Int): Boolean {
+        val userId = currentUserIdOrNull() ?: return false
+        return !userPreferences.hasSeenCheckInHint(userId, meetingId)
+    }
+
+    fun markCheckInHintSeen(meetingId: Int) {
+        val userId = currentUserIdOrNull() ?: return
+        userPreferences.markCheckInHintSeen(userId, meetingId)
     }
 
     suspend fun checkInMeeting(id: Int): SplitDetailCheckInResult {
-        val userId = userPreferences.getUserId().takeIf { it > 0 }
+        val userId = currentUserIdOrNull()
             ?: return SplitDetailCheckInResult.Error("未登录，无法签到")
         if (_isCheckInSubmitting.value) {
-            return SplitDetailCheckInResult.Error("正在处理签到，请稍候")
+            return SplitDetailCheckInResult.Error("正在处理签到，请稍后")
         }
 
         return try {
@@ -195,7 +177,7 @@ class HomeViewModel @Inject constructor(
             when (val result = repository.getMeetingById(id, userId)) {
                 is Resource.Success -> SplitDetailCheckInResult.Updated(result.data)
                 is Resource.Error -> SplitDetailCheckInResult.Error(result.message ?: "签到后刷新失败")
-                else -> SplitDetailCheckInResult.Error("签到后刷新失败")
+                Resource.Loading -> SplitDetailCheckInResult.Error("签到后刷新失败")
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -206,12 +188,12 @@ class HomeViewModel @Inject constructor(
     }
 
     suspend fun cancelCheckIn(meeting: Meeting): SplitDetailCheckInResult {
-        val userId = userPreferences.getUserId().takeIf { it > 0 }
+        val userId = currentUserIdOrNull()
             ?: return SplitDetailCheckInResult.Error("未登录，无法取消签到")
         val checkInId = meeting.checkInId
             ?: return SplitDetailCheckInResult.Error("当前会议没有签到记录")
         if (_isCheckInSubmitting.value) {
-            return SplitDetailCheckInResult.Error("正在处理签到，请稍候")
+            return SplitDetailCheckInResult.Error("正在处理签到，请稍后")
         }
 
         return try {
@@ -227,7 +209,7 @@ class HomeViewModel @Inject constructor(
                         SplitDetailCheckInResult.Error("取消签到后刷新失败：${result.message}")
                     }
                 }
-                else -> SplitDetailCheckInResult.Error("取消签到后刷新失败")
+                Resource.Loading -> SplitDetailCheckInResult.Error("取消签到后刷新失败")
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -239,9 +221,7 @@ class HomeViewModel @Inject constructor(
 
     fun refreshOnVisible() {
         if (_uiState.value is HomeUiState.Success) {
-            viewModelScope.launch {
-                refreshMeetingsSilently()
-            }
+            viewModelScope.launch { refreshMeetingsSilently() }
         } else {
             loadMeetings()
         }
@@ -258,16 +238,16 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun refreshMeetingsSilently() {
         try {
-            val userId = userPreferences.getUserId().takeIf { it > 0 }
-            val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "desc", userId = userId)
+            val meetings = repository.getMeetings(
+                skip = 0,
+                limit = pageSize,
+                sort = "desc",
+                userId = currentUserIdOrNull()
+            )
             allMeetings.clear()
             allMeetings.addAll(meetings.distinctBy { it.id })
             hasMoreData = meetings.size >= pageSize
-            _uiState.value = HomeUiState.Success(
-                meetings = sortMeetingsWithTodayFirst(allMeetings),
-                isLoadingMore = false,
-                hasMoreData = hasMoreData
-            )
+            publishSuccess()
         } catch (e: Exception) {
             if (_uiState.value !is HomeUiState.Success) {
                 _uiState.value = HomeUiState.Error(e.message ?: "Unknown Error")
@@ -275,18 +255,34 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun emitActionMessage(message: String) {
-        _actionMessage.emit(message)
+    private fun currentUserIdOrNull(): Int? = userPreferences.getUserId().takeIf { it > 0 }
+
+    private fun publishSuccess() {
+        _uiState.value = HomeUiState.Success(
+            meetings = sortMeetingsWithTodayFirst(allMeetings),
+            isLoadingMore = false,
+            hasMoreData = hasMoreData
+        )
+    }
+
+    private fun Meeting.localDateOrNull(): LocalDate? {
+        return try {
+            LocalDate.parse(startTime.substringBefore(" "))
+        } catch (_: Exception) {
+            null
+        }
     }
 }
 
 sealed class HomeUiState {
     object Loading : HomeUiState()
+
     data class Success(
         val meetings: List<Meeting>,
         val isLoadingMore: Boolean = false,
         val hasMoreData: Boolean = true
     ) : HomeUiState()
+
     data class Error(val message: String) : HomeUiState()
 }
 
