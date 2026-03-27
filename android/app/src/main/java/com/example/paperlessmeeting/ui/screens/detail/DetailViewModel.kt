@@ -31,6 +31,9 @@ class DetailViewModel @Inject constructor(
     private val appSettingsState: AppSettingsState,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+    companion object {
+        private const val GLOBAL_VISIBILITY_SETTING_KEY = "meeting_visibility_hide_after_hours"
+    }
 
     private val meetingId: String? = savedStateHandle["meetingId"]
 
@@ -231,7 +234,11 @@ class DetailViewModel @Inject constructor(
             launch {
                 socketManager.meetingChangedEvent.collectLatest { data ->
                     val id = meetingId?.toIntOrNull() ?: return@collectLatest
-                    if (data.meeting_id == id) {
+                    val isGlobalVisibilityRefresh =
+                        data.action == "settings_updated" &&
+                            data.setting_key == GLOBAL_VISIBILITY_SETTING_KEY
+
+                    if (data.meeting_id == id || isGlobalVisibilityRefresh) {
                         loadMeeting()
                     }
                 }

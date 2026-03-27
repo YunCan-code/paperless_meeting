@@ -316,5 +316,6 @@ data class MeetingChangedData(
     val meeting_id: Int? = null,
     val attachment_id: Int? = null,
     val title: String? = null,
-    val start_time: String? = null
+    val start_time: String? = null,
+    val setting_key: String? = null
 )
