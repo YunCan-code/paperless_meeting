@@ -6,6 +6,7 @@ import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LoginRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -35,23 +36,24 @@ class LoginViewModel @Inject constructor(
 
     private fun loadLoginPoster() {
         viewModelScope.launch {
-            runCatching { repository.getSettings() }
-                .onSuccess { settings ->
-                    val rawUrl = settings["android_login_poster_url"]?.trim().orEmpty()
-                    val resolvedUrl = when {
-                        rawUrl.isBlank() -> null
-                        rawUrl.startsWith("http://") || rawUrl.startsWith("https://") -> rawUrl
-                        rawUrl.startsWith("/") -> "${appSettingsState.getSocketBaseUrl().trimEnd('/')}$rawUrl"
-                        else -> rawUrl
-                    }
-                    _posterConfig.value = LoginPosterConfig(
-                        posterUrl = resolvedUrl,
-                        posterVersion = settings["android_login_poster_version"]?.trim()?.takeIf { it.isNotEmpty() }
-                    )
+            try {
+                val settings = repository.getSettings()
+                val rawUrl = settings["android_login_poster_url"]?.trim().orEmpty()
+                val resolvedUrl = when {
+                    rawUrl.isBlank() -> null
+                    rawUrl.startsWith("http://") || rawUrl.startsWith("https://") -> rawUrl
+                    rawUrl.startsWith("/") -> "${appSettingsState.getSocketBaseUrl().trimEnd('/')}$rawUrl"
+                    else -> rawUrl
                 }
-                .onFailure {
-                    _posterConfig.value = LoginPosterConfig()
-                }
+                _posterConfig.value = LoginPosterConfig(
+                    posterUrl = resolvedUrl,
+                    posterVersion = settings["android_login_poster_version"]?.trim()?.takeIf { it.isNotEmpty() }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _posterConfig.value = LoginPosterConfig()
+            }
         }
     }
 

@@ -23,6 +23,33 @@ ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 
+def _resolve_login_poster_path(url: str | None) -> Path | None:
+    if not url or not url.startswith("/static/settings/"):
+        return None
+    filename = os.path.basename(url.replace("/static/settings/", "", 1))
+    if not filename:
+        return None
+    return SETTINGS_UPLOAD_DIR / filename
+
+
+def _delete_file_if_exists(path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        if path.exists() and path.is_file():
+            path.unlink()
+    except OSError:
+        pass
+
+
+def _cleanup_login_poster_files(active_url: str | None) -> None:
+    active_name = _resolve_login_poster_path(active_url).name if active_url else None
+    for file in SETTINGS_UPLOAD_DIR.glob("android_login_poster_*"):
+        if active_name and file.name == active_name:
+            continue
+        _delete_file_if_exists(file)
+
+
 def _upsert_setting(session: Session, key: str, value: str) -> None:
     setting = session.get(SystemSetting, key)
     if setting is None:
@@ -58,6 +85,7 @@ def get_settings(session: Session = Depends(get_session)):
 @router.post("/")
 def update_settings(settings: Dict[str, str], session: Session = Depends(get_session)):
     visibility_setting_changed = False
+    previous_poster_url = (session.get(SystemSetting, ANDROID_LOGIN_POSTER_URL_KEY) or SystemSetting(key="", value="")).value or None
 
     for key, value in settings.items():
         value_str = "" if value is None else str(value)
@@ -75,6 +103,11 @@ def update_settings(settings: Dict[str, str], session: Session = Depends(get_ses
         session.add(setting)
 
     session.commit()
+    current_poster_url = (session.get(SystemSetting, ANDROID_LOGIN_POSTER_URL_KEY) or SystemSetting(key="", value="")).value or None
+
+    if previous_poster_url != current_poster_url:
+        _delete_file_if_exists(_resolve_login_poster_path(previous_poster_url))
+        _cleanup_login_poster_files(current_poster_url)
 
     if visibility_setting_changed:
         try:
@@ -99,13 +132,6 @@ def upload_login_poster(
     filename = f"android_login_poster_{version}{extension}"
     file_path = SETTINGS_UPLOAD_DIR / filename
 
-    for old_file in SETTINGS_UPLOAD_DIR.glob("android_login_poster_*"):
-        if old_file.name != filename and old_file.is_file():
-            try:
-                old_file.unlink()
-            except OSError:
-                pass
-
     with open(file_path, "wb") as output:
         output.write(content)
 
@@ -113,6 +139,7 @@ def upload_login_poster(
     _upsert_setting(session, ANDROID_LOGIN_POSTER_URL_KEY, poster_url)
     _upsert_setting(session, ANDROID_LOGIN_POSTER_VERSION_KEY, version)
     session.commit()
+    _cleanup_login_poster_files(poster_url)
 
     return {
         "url": poster_url,

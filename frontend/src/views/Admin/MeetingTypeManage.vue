@@ -105,21 +105,29 @@
         </el-form-item>
 
         <el-form-item label="封面设置" v-if="form.is_fixed_image">
-          <el-upload
-            class="cover-uploader"
-            action="/api/meeting_types/upload_cover"
-            :show-file-list="false"
-            :on-success="handleCoverSuccess"
-            :before-upload="beforeCoverUpload"
-          >
-            <img v-if="form.cover_image" :src="form.cover_image" class="cover-image" />
-            <el-icon v-else class="cover-uploader-icon"><Plus /></el-icon>
-            <template #tip>
-              <div class="el-upload__tip">
-                建议尺寸 800x400，支持 JPG/PNG，小于 2MB
-              </div>
-            </template>
-          </el-upload>
+          <div class="type-cover-panel">
+            <div class="type-cover-preview">
+              <img v-if="form.cover_image" :src="form.cover_image" class="cover-image" />
+              <el-icon v-else class="cover-uploader-icon"><Plus /></el-icon>
+            </div>
+            <div class="type-cover-actions">
+              <el-upload
+                action="/api/meeting_types/upload_cover"
+                :show-file-list="false"
+                :on-success="handleCoverSuccess"
+                :on-error="handleCoverError"
+                :before-upload="beforeCoverUpload"
+              >
+                <el-button type="primary" plain>
+                  {{ form.cover_image ? '替换封面' : '上传封面' }}
+                </el-button>
+              </el-upload>
+              <el-button v-if="form.cover_image" plain @click="clearCover">清空封面</el-button>
+            </div>
+            <div class="el-upload__tip">
+              推荐尺寸 1600 x 900，支持 JPG / PNG / WebP，文件大小不超过 5MB
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="描述说明">
@@ -162,13 +170,12 @@ import {
 // 获取侧边栏状态
 const { isCollapse, toggleSidebar } = useSidebar()
 
-// ... (以下所有原有的 script 逻辑保持完全不变) ...
 const types = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref(null)
-const form = ref({ name: '', description: '' })
+const form = ref({ name: '', description: '', is_fixed_image: false, cover_image: '' })
 const isEdit = computed(() => editingId.value !== null)
 
 // HSL Color Generator: Generates a unique HSL color for any string
@@ -238,27 +245,44 @@ const openDialog = (item = null) => {
 }
 
 const handleCoverSuccess = (res) => {
-  form.value.cover_image = res.url
+  form.value.cover_image = res?.url || ''
   ElMessage.success('封面上传成功')
 }
 
+const handleCoverError = () => {
+  ElMessage.error('封面上传失败，请稍后重试')
+}
+
 const beforeCoverUpload = (rawFile) => {
-  if (rawFile.size / 1024 / 1024 > 2) {
-    ElMessage.error('图片大小不能超过 2MB!')
+  const isSupported = ['image/jpeg', 'image/png', 'image/webp'].includes(rawFile.type)
+  if (!isSupported) {
+    ElMessage.error('仅支持 JPG、PNG、WebP 格式')
+    return false
+  }
+  if (rawFile.size / 1024 / 1024 > 5) {
+    ElMessage.error('图片大小不能超过 5MB')
     return false
   }
   return true
+}
+
+const clearCover = () => {
+  form.value.cover_image = ''
 }
 
 const handleSave = async () => {
   if (!form.value.name.trim()) return ElMessage.warning('类型名称不能为空')
   saving.value = true
   try {
+    const payload = {
+      ...form.value,
+      cover_image: form.value.is_fixed_image ? (form.value.cover_image || null) : null
+    }
     if (isEdit.value) {
-      await request.put(`/meeting_types/${editingId.value}`, form.value)
+      await request.put(`/meeting_types/${editingId.value}`, payload)
       ElMessage.success('更新成功')
     } else {
-      await request.post('/meeting_types/', form.value)
+      await request.post('/meeting_types/', payload)
       ElMessage.success('添加成功')
     }
     dialogVisible.value = false
@@ -351,7 +375,6 @@ onMounted(fetchTypes)
   line-height: 1.4;
 }
 
-/* ... 以下所有其他样式保持不变 ... */
 .header-right {
   display: flex;
   align-items: center;
@@ -493,17 +516,24 @@ onMounted(fetchTypes)
   gap: 12px;
 }
 
-.cover-uploader .el-upload {
+.type-cover-preview {
   border: 1px dashed var(--border-color);
   border-radius: 8px;
-  cursor: pointer;
   position: relative;
   overflow: hidden;
   transition: var(--el-transition-duration-fast);
+  background: var(--bg-main);
 }
 
-.cover-uploader .el-upload:hover {
-  border-color: var(--el-color-primary);
+.type-cover-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.type-cover-actions :deep(.el-upload) {
+  display: inline-flex;
 }
 
 .cover-uploader-icon {

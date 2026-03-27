@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.paperlessmeeting.data.local.ReadingProgress
 import com.example.paperlessmeeting.data.repository.DocumentThumbnailRepository
+import kotlinx.coroutines.CancellationException
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -270,16 +271,28 @@ fun PdfThumbnail(
     val context = LocalContext.current
     val repository = remember(context) { DocumentThumbnailRepository.getInstance(context) }
     var requestedSize by remember { mutableStateOf(IntSize.Zero) }
-    val targetWidthPx = requestedSize.width.coerceAtLeast(150)
+    val targetWidthPx = requestedSize.width.takeIf { it > 0 }
     val thumbnailState by produceState<PdfThumbnailUiState>(
         initialValue = PdfThumbnailUiState.Loading,
         key1 = filePath,
         key2 = targetWidthPx,
         key3 = repository
     ) {
-        value = repository.getPdfCover(filePath, targetWidthPx)?.let {
-            PdfThumbnailUiState.Success(it)
-        } ?: PdfThumbnailUiState.Error
+        val resolvedWidth = targetWidthPx
+        if (resolvedWidth == null) {
+            value = PdfThumbnailUiState.Loading
+            return@produceState
+        }
+
+        value = try {
+            repository.getPdfCover(filePath, resolvedWidth)?.let {
+                PdfThumbnailUiState.Success(it)
+            } ?: PdfThumbnailUiState.Error
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            PdfThumbnailUiState.Error
+        }
     }
 
     if (thumbnailState is PdfThumbnailUiState.Success) {

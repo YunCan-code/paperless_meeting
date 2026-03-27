@@ -112,6 +112,7 @@ MEETING_COVER_UPLOAD_DIR = UPLOAD_DIR / "meeting_covers"
 MEETING_COVER_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_IMAGE_UPLOAD_SIZE = 5 * 1024 * 1024
+STALE_MEETING_COVER_TTL_SECONDS = 24 * 60 * 60
 
 MEETING_BASE_FIELDS = {
     "title",
@@ -376,6 +377,55 @@ def _validate_image_upload(file: UploadFile) -> tuple[bytes, str, str]:
     stem = Path(safe_original).stem or "cover"
     return content, extension, stem
 
+
+def _normalize_optional_image_url(image_url: Optional[str]) -> Optional[str]:
+    normalized = (image_url or "").strip()
+    return normalized or None
+
+
+def _delete_meeting_cover_if_unused(
+    session: Session,
+    image_url: Optional[str],
+    exclude_meeting_id: Optional[int] = None
+) -> None:
+    if not image_url:
+        return
+
+    statement = select(Meeting).where(Meeting.cover_image == image_url)
+    if exclude_meeting_id is not None:
+        statement = statement.where(Meeting.id != exclude_meeting_id)
+    if session.exec(statement).first() is not None:
+        return
+
+    source = _resolve_local_source_path(image_url)
+    try:
+        if source and source.exists() and source.is_file():
+            source.unlink()
+    except OSError:
+        pass
+
+
+def _cleanup_stale_meeting_covers(session: Session, keep_urls: set[str] | None = None) -> None:
+    keep = keep_urls or set()
+    referenced = {
+        cover for cover in session.exec(select(Meeting.cover_image)).all()
+        if cover
+    }
+    cutoff = datetime.now().timestamp() - STALE_MEETING_COVER_TTL_SECONDS
+
+    for file in MEETING_COVER_UPLOAD_DIR.glob("*"):
+        if not file.is_file():
+            continue
+        cover_url = f"/static/meeting_covers/{file.name}"
+        if cover_url in keep or cover_url in referenced:
+            continue
+        try:
+            if file.stat().st_mtime >= cutoff:
+                continue
+            file.unlink()
+        except OSError:
+            pass
+
 @router.post("/", response_model=Meeting)
 def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(get_session)):
     """
@@ -387,6 +437,7 @@ def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(ge
         if key in MEETING_BASE_FIELDS
     }
     payload = _apply_android_visibility_defaults(payload)
+    payload["cover_image"] = _normalize_optional_image_url(payload.get("cover_image"))
     payload["agenda"] = _serialize_agenda_items(meeting_in.agenda_items, meeting_in.agenda)
     user_entries, manual_entries = _split_attendees_payload(
         attendee_entries=meeting_in.attendee_entries,
@@ -428,7 +479,7 @@ def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(ge
 
 
 @router.post("/upload_cover")
-def upload_cover(file: UploadFile = File(...)):
+def upload_cover(file: UploadFile = File(...), session: Session = Depends(get_session)):
     content, extension, stem = _validate_image_upload(file)
     version = str(int(datetime.now().timestamp()))
     safe_stem = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in stem).strip("_") or "cover"
@@ -438,8 +489,11 @@ def upload_cover(file: UploadFile = File(...)):
     with open(file_path, "wb") as output:
         output.write(content)
 
+    cover_url = f"/static/meeting_covers/{filename}"
+    _cleanup_stale_meeting_covers(session, keep_urls={cover_url})
+
     return {
-        "url": f"/static/meeting_covers/{filename}",
+        "url": cover_url,
         "version": version
     }
 
@@ -821,7 +875,7 @@ def _resolve_meeting_cover(meeting: Meeting, meeting_type: Optional[MeetingType]
     if meeting.cover_image:
         return _normalize_public_image_url(meeting.cover_image, base_url), "meeting"
 
-    if meeting_type and meeting_type.cover_image:
+    if meeting_type and meeting_type.is_fixed_image and meeting_type.cover_image:
         return _normalize_public_image_url(meeting_type.cover_image, base_url), "meeting_type"
 
     type_name = meeting_type.name if meeting_type else "default"
@@ -912,8 +966,6 @@ def read_meetings(
     base_url = str(request.base_url) # http://.../ with trailing slash usually
     if not base_url.endswith("/"): base_url += "/"
     
-    bg_root = UPLOAD_DIR / "meeting_backgrounds"
-    
     for m in meetings:
         checkin = checkin_map.get(m.id)
         resp = MeetingCardResponse(
@@ -940,46 +992,6 @@ def read_meetings(
             is_today_meeting=_meeting_occurs_today_in_shanghai(m)
         )
         m_type = all_types.get(m.meeting_type_id)
-        
-        final_url = None
-        
-        # 1. Fixed Configuration
-        if m_type and m_type.is_fixed_image and m_type.cover_image:
-             raw_url = m_type.cover_image
-             if raw_url and raw_url.startswith("/"):
-                final_url = f"{base_url.rstrip('/')}{raw_url}"
-             else:
-                final_url = raw_url
-        
-        # 2. Random Strategy (Folder based > Common > Fallback)
-        else:
-            type_name = m_type.name if m_type else "default"
-            
-            # A. Try Type Specific Folder
-            # Sanitize minimal bad chars? OS usually handles unicode.
-            type_folder = bg_root / type_name
-            final_url = get_random_image_from_dir(type_folder, base_url)
-            
-            # B. Try Common Folder
-            if not final_url:
-                common_folder = bg_root / "common"
-                final_url = get_random_image_from_dir(common_folder, base_url)
-            
-            # C. Fallback to Hardcoded Unsplash
-            if not final_url:
-                if "周" in type_name or "例" in type_name:
-                    final_url = DEFAULT_IMAGES["weekly"]
-                elif "急" in type_name:
-                    final_url = DEFAULT_IMAGES["urgent"]
-                elif "评" in type_name or "审" in type_name:
-                    final_url = DEFAULT_IMAGES["review"]
-                elif "启" in type_name:
-                    final_url = DEFAULT_IMAGES["kickoff"]
-                else:
-                    final_url = DEFAULT_IMAGES["default"]
-        
-
-        
         final_url, image_source = _resolve_meeting_cover(m, m_type, base_url)
         resp.card_image_url = final_url
         resp.card_image_thumb_url = build_thumbnail_url(final_url, base_url)
@@ -1043,40 +1055,8 @@ def read_meeting(
     resp.meeting_type_name = m_type.name if m_type else "普通会议"
     
     # 图片逻辑复用 (简化版)
-    # TODO: Refactor into helper function
     base_url = str(request.base_url)
     if not base_url.endswith("/"): base_url += "/"
-    bg_root = UPLOAD_DIR / "meeting_backgrounds"
-    final_url = None
-
-    if m_type and m_type.is_fixed_image and m_type.cover_image:
-         raw_url = m_type.cover_image
-         if raw_url and raw_url.startswith("/"):
-            final_url = f"{base_url.rstrip('/')}{raw_url}"
-         else:
-            final_url = raw_url
-    else:
-        type_name = m_type.name if m_type else "default"
-        type_folder = bg_root / type_name
-        final_url = get_random_image_from_dir(type_folder, base_url)
-        
-        if not final_url:
-            common_folder = bg_root / "common"
-            final_url = get_random_image_from_dir(common_folder, base_url)
-        
-        if not final_url:
-            # Fallback map
-            if "周" in type_name or "例" in type_name:
-                final_url = DEFAULT_IMAGES["weekly"]
-            elif "急" in type_name:
-                final_url = DEFAULT_IMAGES["urgent"]
-            elif "评" in type_name or "审" in type_name:
-                final_url = DEFAULT_IMAGES["review"]
-            elif "启" in type_name:
-                final_url = DEFAULT_IMAGES["kickoff"]
-            else:
-                final_url = DEFAULT_IMAGES["default"]
-
     final_url, image_source = _resolve_meeting_cover(meeting, m_type, base_url)
     resp.card_image_url = final_url
     resp.card_image_thumb_url = build_thumbnail_url(final_url, base_url)
@@ -1113,11 +1093,14 @@ def update_meeting(
     db_meeting = session.get(Meeting, meeting_id)
     if not db_meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    previous_cover = db_meeting.cover_image
         
     meeting_data = meeting_update.model_dump(
         exclude_unset=True,
         exclude={"attendees_roles", "attendee_entries", "agenda_items", "meeting_contacts"}
     )
+    if "cover_image" in meeting_data:
+        meeting_data["cover_image"] = _normalize_optional_image_url(meeting_data.get("cover_image"))
     if "android_visibility_mode" in meeting_data or "android_visibility_hide_after_hours" in meeting_data:
         existing_mode = db_meeting.android_visibility_mode or "inherit"
         existing_hours = db_meeting.android_visibility_hide_after_hours
@@ -1162,6 +1145,9 @@ def update_meeting(
             
     session.commit()
     session.refresh(db_meeting)
+    if previous_cover != db_meeting.cover_image:
+        _delete_meeting_cover_if_unused(session, previous_cover, exclude_meeting_id=meeting_id)
+    _cleanup_stale_meeting_covers(session, keep_urls={db_meeting.cover_image} if db_meeting.cover_image else set())
 
     try:
         sio.start_background_task(
@@ -1184,6 +1170,7 @@ def delete_meeting(meeting_id: int, session: Session = Depends(get_session)):
     meeting = session.get(Meeting, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    previous_cover = meeting.cover_image
     
     # 删除关联的物理文件
     for attachment in meeting.attachments:
@@ -1201,6 +1188,8 @@ def delete_meeting(meeting_id: int, session: Session = Depends(get_session)):
 
     session.delete(meeting)
     session.commit()
+    _delete_meeting_cover_if_unused(session, previous_cover, exclude_meeting_id=meeting_id)
+    _cleanup_stale_meeting_covers(session)
     return {"ok": True}
 
 import os

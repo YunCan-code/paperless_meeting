@@ -624,7 +624,6 @@ onUnmounted(() => {
   min-width: 240px;
   transition: all 0.3s ease;
 }
-...
 .countdown-value {
   font-size: 42px; /* Reduced from 56px */
   font-weight: 700;
