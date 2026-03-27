@@ -1,5 +1,6 @@
 package com.example.paperlessmeeting.ui.screens.adaptive
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +49,11 @@ import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import com.example.paperlessmeeting.ui.screens.detail.MeetingDetailContent
 import com.example.paperlessmeeting.ui.screens.adaptive.MeetingListContent
 import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
+
+private val DetailPaneShape = androidx.compose.foundation.shape.RoundedCornerShape(
+    topStart = 26.dp,
+    bottomStart = 26.dp
+)
 
 @Composable
 fun AdaptiveMeetingScreen(
@@ -87,13 +94,18 @@ fun AdaptiveMeetingScreen(
     }
 
     var fullMeeting by remember { mutableStateOf<Meeting?>(null) }
+    var isDetailLoading by remember { mutableStateOf(false) }
     
     // Fetch full details when ID changes
-    LaunchedEffect(selectedMeetingId) {
+    LaunchedEffect(selectedMeetingId, allMeetings) {
         if (selectedMeetingId != null) {
+            fullMeeting = null
+            isDetailLoading = true
             fullMeeting = viewModel.getMeetingDetails(selectedMeetingId!!)
+            isDetailLoading = false
         } else {
             fullMeeting = null
+            isDetailLoading = false
         }
     }
 
@@ -113,6 +125,10 @@ fun AdaptiveMeetingScreen(
 
     BoxWithConstraints {
         val isTablet = maxWidth > 600.dp
+
+        BackHandler(enabled = isTablet && selectedMeetingId != null) {
+            viewModel.selectMeeting(null)
+        }
         
         if (!isTablet) {
             var hasForwardedInitialMeeting by rememberSaveable(initialMeetingId) {
@@ -184,21 +200,23 @@ fun AdaptiveMeetingScreen(
                 // Right Pane: Detail
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
+                    shape = DetailPaneShape,
+                    tonalElevation = 1.dp
                 ) {
-                    // Logic: Show Full Details if loaded, else show List Data (partial), else Empty
-                    val displayMeeting = fullMeeting ?: selectedMeeting
-                    
-                    if (displayMeeting != null) {
+                    if (selectedMeetingId != null && isDetailLoading) {
+                        LoadingDetailView()
+                    } else if (fullMeeting != null) {
                         androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
                             MeetingDetailContent(
-                                meeting = displayMeeting,
+                                meeting = fullMeeting!!,
                                 staticBaseUrl = viewModel.staticBaseUrl,
                                 onAttachmentClick = { url, name ->
                                      val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
                                      val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
                                      navController.navigate("reader?url=$encodedUrl&name=$encodedName")
                                 },
+                                showCheckInAction = false,
                                 onMediaClick = {
                                     if (onNavigateToMedia != null) {
                                         onNavigateToMedia()
@@ -335,6 +353,23 @@ fun EmptyDetailView() {
         
         Text(
             text = "请从左侧列表选择一项以查看详情",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun LoadingDetailView() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator()
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "正在加载会议详情",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

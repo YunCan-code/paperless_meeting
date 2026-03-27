@@ -104,6 +104,18 @@ def _ensure_compatible_meeting_schema():
             else:
                 statements.append("ALTER TABLE meeting ADD COLUMN show_media_link BOOLEAN DEFAULT FALSE")
 
+        if "android_visibility_mode" not in existing_columns:
+            if "sqlite" in DATABASE_URL:
+                statements.append("ALTER TABLE meeting ADD COLUMN android_visibility_mode TEXT DEFAULT 'inherit'")
+            else:
+                statements.append("ALTER TABLE meeting ADD COLUMN android_visibility_mode VARCHAR DEFAULT 'inherit'")
+
+        if "android_visibility_hide_after_hours" not in existing_columns:
+            if "sqlite" in DATABASE_URL:
+                statements.append("ALTER TABLE meeting ADD COLUMN android_visibility_hide_after_hours INTEGER")
+            else:
+                statements.append("ALTER TABLE meeting ADD COLUMN android_visibility_hide_after_hours INTEGER")
+
         if not statements:
             return
 

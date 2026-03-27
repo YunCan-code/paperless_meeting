@@ -87,13 +87,15 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val userName = userPreferences.getUserName() ?: "鐢ㄦ埛"
+                val userId = userPreferences.getUserId().takeIf { it > 0 }
 
                 val todayStr = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).toString()
                 val todayMeetings = repository.getMeetings(
                     limit = 100,
                     startDate = todayStr,
                     endDate = todayStr,
-                    sort = "asc"
+                    sort = "asc",
+                    userId = userId
                 )
 
                 val now = java.time.LocalDateTime.now()
@@ -200,4 +202,3 @@ class DashboardViewModel @Inject constructor(
         }
     }
 }
-

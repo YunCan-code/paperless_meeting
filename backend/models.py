@@ -79,6 +79,9 @@ class MeetingBase(SQLModel):
     status: str = Field(default="scheduled") # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
     show_media_link: bool = Field(default=False) # 是否在安卓端资料旁显示媒体页入口 # 会议状态: scheduled(计划中), active(进行中), finished(已结束)
 
+    android_visibility_mode: str = Field(default="inherit")
+    android_visibility_hide_after_hours: Optional[int] = None
+
 class Meeting(MeetingBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.now) # 创建时间
@@ -95,6 +98,8 @@ class MeetingRead(MeetingBase):
     manual_attendees: Optional[str] = None
     meeting_contacts: Optional[str] = None
     show_media_link: bool = False
+    android_visibility_mode: str = "inherit"
+    android_visibility_hide_after_hours: Optional[int] = None
 
 # 备忘录/后续事项模型
 class NoteBase(SQLModel):

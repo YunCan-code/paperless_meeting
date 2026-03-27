@@ -68,7 +68,17 @@ data class Meeting(
     val attachments: List<Attachment>? = emptyList(),
     val attendees: List<Attendee>? = emptyList(),
     @com.google.gson.annotations.SerializedName("show_media_link")
-    val showMediaLink: Boolean = false
+    val showMediaLink: Boolean = false,
+    @com.google.gson.annotations.SerializedName("android_visibility_mode")
+    val androidVisibilityMode: String = "inherit",
+    @com.google.gson.annotations.SerializedName("android_visibility_hide_after_hours")
+    val androidVisibilityHideAfterHours: Int? = null,
+    @com.google.gson.annotations.SerializedName("is_checked_in")
+    val isCheckedIn: Boolean = false,
+    @com.google.gson.annotations.SerializedName("checkin_id")
+    val checkInId: Int? = null,
+    @com.google.gson.annotations.SerializedName("check_in_time")
+    val checkInTime: String? = null
 ) {
     // Helper to map backend status string to UI Enum
     // Or calculate dynamically if backend status is missing

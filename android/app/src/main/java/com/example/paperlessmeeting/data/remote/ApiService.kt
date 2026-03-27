@@ -10,11 +10,15 @@ interface ApiService {
         @retrofit2.http.Query("limit") limit: Int = 20,
         @retrofit2.http.Query("sort") sort: String? = "desc",
         @retrofit2.http.Query("start_date") startDate: String? = null,
-        @retrofit2.http.Query("end_date") endDate: String? = null
+        @retrofit2.http.Query("end_date") endDate: String? = null,
+        @retrofit2.http.Query("user_id") userId: Int? = null
     ): List<Meeting>
 
     @GET("meetings/{id}")
-    suspend fun getMeeting(@retrofit2.http.Path("id") id: Int): Meeting
+    suspend fun getMeeting(
+        @retrofit2.http.Path("id") id: Int,
+        @retrofit2.http.Query("user_id") userId: Int? = null
+    ): Meeting
 
     @retrofit2.http.Streaming
     @GET
@@ -127,7 +131,10 @@ interface ApiService {
     suspend fun makeupCheckIn(@retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.MakeupRequest): com.example.paperlessmeeting.domain.model.CheckInResponse
 
     @retrofit2.http.DELETE("checkin/{checkinId}")
-    suspend fun cancelCheckIn(@retrofit2.http.Path("checkinId") checkinId: Int): Map<String, String>
+    suspend fun cancelCheckIn(
+        @retrofit2.http.Path("checkinId") checkinId: Int,
+        @retrofit2.http.Query("user_id") userId: Int
+    ): Map<String, String>
 
     @GET("checkin/today/{userId}")
     suspend fun getTodayStatus(@retrofit2.http.Path("userId") userId: Int): com.example.paperlessmeeting.domain.model.TodayStatusResponse

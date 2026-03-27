@@ -14,8 +14,11 @@ import kotlinx.coroutines.flow.collectLatest
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,6 +38,12 @@ class DetailViewModel @Inject constructor(
     
     private val _uiState = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
+    private val _actionMessage = MutableSharedFlow<String>()
+    val actionMessage: SharedFlow<String> = _actionMessage.asSharedFlow()
+    private val _exitDetail = MutableSharedFlow<String>()
+    val exitDetail: SharedFlow<String> = _exitDetail.asSharedFlow()
+    private val _isCheckInSubmitting = MutableStateFlow(false)
+    val isCheckInSubmitting: StateFlow<Boolean> = _isCheckInSubmitting.asStateFlow()
 
     // Voting State
     private val _currentVote = MutableStateFlow<Vote?>(null)
@@ -55,6 +64,8 @@ class DetailViewModel @Inject constructor(
         checkActiveVote()
     }
 
+    private fun currentUserIdOrNull(): Int? = userPreferences.getUserId().takeIf { it > 0 }
+
     private fun loadMeeting() {
         viewModelScope.launch {
             try {
@@ -63,7 +74,7 @@ class DetailViewModel @Inject constructor(
                     _uiState.value = DetailUiState.Error("Invalid Meeting ID")
                     return@launch
                 }
-                val result = repository.getMeetingById(id)
+                val result = repository.getMeetingById(id, currentUserIdOrNull())
                 if (result is com.example.paperlessmeeting.utils.Resource.Success) {
                     _uiState.value = DetailUiState.Success(result.data)
                     
@@ -71,12 +82,92 @@ class DetailViewModel @Inject constructor(
                     socketManager.connect(appSettingsState.getSocketBaseUrl())
                     socketManager.joinMeeting(id)
                 } else if (result is com.example.paperlessmeeting.utils.Resource.Error) {
-                    _uiState.value = DetailUiState.Error(result.message)
+                    _uiState.value = DetailUiState.Error(
+                        if (result.message == "HTTP_404") "当前会议暂不可见" else result.message
+                    )
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 _uiState.value = DetailUiState.Error("Error: ${e.message}")
             }
+        }
+    }
+
+    fun checkIn() {
+        val id = meetingId?.toIntOrNull() ?: return
+        val userId = currentUserIdOrNull()
+        if (userId == null) {
+            viewModelScope.launch { _actionMessage.emit("未登录，无法签到") }
+            return
+        }
+        if (_isCheckInSubmitting.value) return
+
+        viewModelScope.launch {
+            try {
+                _isCheckInSubmitting.value = true
+                repository.checkIn(userId, id)
+                _actionMessage.emit("签到成功")
+                refreshMeetingStateAfterCheckIn()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _actionMessage.emit("签到失败：${e.message ?: "未知错误"}")
+            } finally {
+                _isCheckInSubmitting.value = false
+            }
+        }
+    }
+
+    fun cancelCheckIn() {
+        val currentMeeting = (_uiState.value as? DetailUiState.Success)?.meeting ?: return
+        val checkInId = currentMeeting.checkInId ?: return
+        val userId = currentUserIdOrNull()
+        if (userId == null) {
+            viewModelScope.launch { _actionMessage.emit("未登录，无法取消签到") }
+            return
+        }
+        if (_isCheckInSubmitting.value) return
+
+        viewModelScope.launch {
+            try {
+                _isCheckInSubmitting.value = true
+                repository.cancelCheckIn(checkInId, userId)
+                val result = repository.getMeetingById(currentMeeting.id, userId)
+                when (result) {
+                    is com.example.paperlessmeeting.utils.Resource.Success -> {
+                        _uiState.value = DetailUiState.Success(result.data)
+                        _actionMessage.emit("已取消签到")
+                    }
+                    is com.example.paperlessmeeting.utils.Resource.Error -> {
+                        if (result.message == "HTTP_404") {
+                            _exitDetail.emit("取消签到后，该会议已被隐藏，已返回上一页")
+                        } else {
+                            _actionMessage.emit("取消签到后刷新失败：${result.message}")
+                            loadMeeting()
+                        }
+                    }
+                    else -> Unit
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _actionMessage.emit("取消签到失败：${e.message ?: "未知错误"}")
+            } finally {
+                _isCheckInSubmitting.value = false
+            }
+        }
+    }
+
+    private suspend fun refreshMeetingStateAfterCheckIn() {
+        val id = meetingId?.toIntOrNull() ?: return
+        when (val result = repository.getMeetingById(id, currentUserIdOrNull())) {
+            is com.example.paperlessmeeting.utils.Resource.Success -> {
+                _uiState.value = DetailUiState.Success(result.data)
+            }
+            is com.example.paperlessmeeting.utils.Resource.Error -> {
+                _uiState.value = DetailUiState.Error(
+                    if (result.message == "HTTP_404") "当前会议暂不可见" else result.message
+                )
+            }
+            else -> Unit
         }
     }
 

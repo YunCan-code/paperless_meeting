@@ -2,8 +2,10 @@ package com.example.paperlessmeeting.data.repository
 
 import com.example.paperlessmeeting.data.remote.ApiService
 import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.domain.model.CheckInResponse
 import javax.inject.Inject
 import javax.inject.Singleton
+import retrofit2.HttpException
 
 interface MeetingRepository {
     suspend fun login(request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse
@@ -12,9 +14,10 @@ interface MeetingRepository {
         limit: Int = 20,
         sort: String? = "desc",
         startDate: String? = null,
-        endDate: String? = null
+        endDate: String? = null,
+        userId: Int? = null
     ): List<Meeting>
-    suspend fun getMeetingById(id: Int): com.example.paperlessmeeting.utils.Resource<Meeting>
+    suspend fun getMeetingById(id: Int, userId: Int? = null): com.example.paperlessmeeting.utils.Resource<Meeting>
     suspend fun downloadFile(url: String, destFile: java.io.File): Boolean
     suspend fun downloadFileWithProgress(
         url: String, 
@@ -34,6 +37,8 @@ interface MeetingRepository {
     suspend fun getLotteryHistory(meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse?
     suspend fun getVoteHistory(userId: Int, skip: Int = 0, limit: Int = 20): List<com.example.paperlessmeeting.domain.model.Vote>
     suspend fun getUserLotteryHistory(userId: Int): List<com.example.paperlessmeeting.domain.model.LotteryHistoryResponse>
+    suspend fun checkIn(userId: Int, meetingId: Int): CheckInResponse
+    suspend fun cancelCheckIn(checkinId: Int, userId: Int)
 }
 
 @Singleton
@@ -50,15 +55,19 @@ class MeetingRepositoryImpl @Inject constructor(
         limit: Int,
         sort: String?,
         startDate: String?,
-        endDate: String?
+        endDate: String?,
+        userId: Int?
     ): List<Meeting> {
-        return api.getMeetings(skip, limit, sort, startDate, endDate)
+        return api.getMeetings(skip, limit, sort, startDate, endDate, userId)
     }
 
-    override suspend fun getMeetingById(id: Int): com.example.paperlessmeeting.utils.Resource<Meeting> {
+    override suspend fun getMeetingById(id: Int, userId: Int?): com.example.paperlessmeeting.utils.Resource<Meeting> {
         return try {
-            val meeting = api.getMeeting(id)
+            val meeting = api.getMeeting(id, userId)
             com.example.paperlessmeeting.utils.Resource.Success(meeting)
+        } catch (e: HttpException) {
+            e.printStackTrace()
+            com.example.paperlessmeeting.utils.Resource.Error("HTTP_${e.code()}")
         } catch (e: Exception) {
             e.printStackTrace()
             com.example.paperlessmeeting.utils.Resource.Error(e.message ?: "Unknown Error")
@@ -204,5 +213,13 @@ class MeetingRepositoryImpl @Inject constructor(
             e.printStackTrace()
             emptyList()
         }
+    }
+
+    override suspend fun checkIn(userId: Int, meetingId: Int): CheckInResponse {
+        return api.checkIn(com.example.paperlessmeeting.domain.model.CheckInRequest(userId = userId, meetingId = meetingId))
+    }
+
+    override suspend fun cancelCheckIn(checkinId: Int, userId: Int) {
+        api.cancelCheckIn(checkinId, userId)
     }
 }

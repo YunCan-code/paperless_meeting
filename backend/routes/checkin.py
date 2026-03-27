@@ -98,11 +98,13 @@ def makeup_check_in(req: MakeupRequest, session: Session = Depends(get_session))
 
 
 @router.delete("/{checkin_id}")
-def cancel_check_in(checkin_id: int, session: Session = Depends(get_session)):
+def cancel_check_in(checkin_id: int, user_id: int, session: Session = Depends(get_session)):
     """取消打卡"""
     checkin = session.get(CheckIn, checkin_id)
     if not checkin:
         raise HTTPException(status_code=404, detail="签到记录不存在")
+    if checkin.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     session.delete(checkin)
     session.commit()
     return {"message": "已取消打卡"}

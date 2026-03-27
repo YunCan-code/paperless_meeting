@@ -3,19 +3,23 @@ package com.example.paperlessmeeting.ui.screens.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
+import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val appSettingsState: AppSettingsState
+    private val appSettingsState: AppSettingsState,
+    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    private val socketManager: SocketManager
 ) : ViewModel() {
 
     val staticBaseUrl: String get() = appSettingsState.getStaticBaseUrl()
@@ -39,6 +43,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadMeetings()
+        observeSocketEvents()
     }
 
     /**
@@ -80,8 +85,9 @@ class HomeViewModel @Inject constructor(
             allMeetings.clear()
             
             try {
+                val userId = userPreferences.getUserId().takeIf { it > 0 }
                 // Use sort=desc to get most recent meetings first (today/future will be at the top)
-                val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "desc")
+                val meetings = repository.getMeetings(skip = 0, limit = pageSize, sort = "desc", userId = userId)
                 // Prevention against duplicate keys (crash cause)
                 allMeetings.addAll(meetings.distinctBy { it.id })
                 hasMoreData = meetings.size >= pageSize
@@ -111,7 +117,8 @@ class HomeViewModel @Inject constructor(
             
             try {
                 val skip = allMeetings.size
-                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize, sort = "desc")
+                val userId = userPreferences.getUserId().takeIf { it > 0 }
+                val newMeetings = repository.getMeetings(skip = skip, limit = pageSize, sort = "desc", userId = userId)
                 
                 if (newMeetings.isEmpty()) {
                     hasMoreData = false
@@ -152,9 +159,19 @@ class HomeViewModel @Inject constructor(
     }
 
     suspend fun getMeetingDetails(id: Int): Meeting? {
-        return when (val result = repository.getMeetingById(id)) {
+        val userId = userPreferences.getUserId().takeIf { it > 0 }
+        return when (val result = repository.getMeetingById(id, userId)) {
             is com.example.paperlessmeeting.utils.Resource.Success -> result.data
             else -> null
+        }
+    }
+
+    private fun observeSocketEvents() {
+        socketManager.connect(appSettingsState.getSocketBaseUrl())
+        viewModelScope.launch {
+            socketManager.meetingChangedEvent.collectLatest {
+                loadMeetings()
+            }
         }
     }
 }

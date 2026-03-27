@@ -9,7 +9,19 @@ from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import json
 
 from database import get_session
-from models import Meeting, MeetingType, Attachment, AttachmentRead, Vote, VoteOption, UserVote, MeetingAttendeeLink, User
+from models import (
+    Meeting,
+    MeetingType,
+    Attachment,
+    AttachmentRead,
+    Vote,
+    VoteOption,
+    UserVote,
+    MeetingAttendeeLink,
+    User,
+    CheckIn,
+    SystemSetting,
+)
 from socket_manager import sio, broadcast_meeting_changed
 
 from pydantic import BaseModel
@@ -47,6 +59,8 @@ class MeetingCreateInput(BaseModel):
     agenda_items: Optional[List[AgendaItemInput]] = None
     meeting_contacts: Optional[List[MeetingContactInput]] = None
     show_media_link: bool = False
+    android_visibility_mode: str = "inherit"
+    android_visibility_hide_after_hours: Optional[int] = None
 
 class MeetingUpdateInput(BaseModel):
     title: Optional[str] = None
@@ -62,6 +76,8 @@ class MeetingUpdateInput(BaseModel):
     agenda_items: Optional[List[AgendaItemInput]] = None
     meeting_contacts: Optional[List[MeetingContactInput]] = None
     show_media_link: Optional[bool] = None
+    android_visibility_mode: Optional[str] = None
+    android_visibility_hide_after_hours: Optional[int] = None
 
 class AgendaItemOutput(BaseModel):
     content: str
@@ -100,6 +116,8 @@ MEETING_BASE_FIELDS = {
     "agenda",
     "status",
     "show_media_link",
+    "android_visibility_mode",
+    "android_visibility_hide_after_hours",
 }
 
 def _parse_datetime_value(value):
@@ -234,6 +252,97 @@ def _parse_manual_attendees(raw_value: Optional[str]) -> List[AttendeeOutput]:
         if isinstance(item, dict) and str(item.get("name") or "").strip()
     ]
 
+VALID_ANDROID_VISIBILITY_MODES = {"inherit", "custom_hours", "hidden", "always_show"}
+
+def _normalize_android_visibility_mode(mode: Optional[str]) -> str:
+    normalized = (mode or "inherit").strip().lower()
+    if normalized not in VALID_ANDROID_VISIBILITY_MODES:
+        raise HTTPException(status_code=400, detail="Invalid android_visibility_mode")
+    return normalized
+
+def _normalize_android_visibility_hours(hours: Optional[int]) -> Optional[int]:
+    if hours is None:
+        return None
+    if hours < 0:
+        raise HTTPException(status_code=400, detail="android_visibility_hide_after_hours cannot be negative")
+    return hours
+
+def _apply_android_visibility_defaults(payload: dict) -> dict:
+    if "android_visibility_mode" in payload:
+        payload["android_visibility_mode"] = _normalize_android_visibility_mode(payload.get("android_visibility_mode"))
+    else:
+        payload["android_visibility_mode"] = "inherit"
+
+    if "android_visibility_hide_after_hours" in payload:
+        payload["android_visibility_hide_after_hours"] = _normalize_android_visibility_hours(
+            payload.get("android_visibility_hide_after_hours")
+        )
+    else:
+        payload["android_visibility_hide_after_hours"] = None
+
+    if payload["android_visibility_mode"] == "custom_hours" and payload["android_visibility_hide_after_hours"] is None:
+        payload["android_visibility_hide_after_hours"] = 0
+    elif payload["android_visibility_mode"] != "custom_hours":
+        payload["android_visibility_hide_after_hours"] = None
+
+    return payload
+
+def _get_checkin_map_for_user(meetings: List[Meeting], user_id: Optional[int], session: Session) -> dict[int, CheckIn]:
+    if not user_id or not meetings:
+        return {}
+
+    meeting_ids = [meeting.id for meeting in meetings if meeting.id is not None]
+    if not meeting_ids:
+        return {}
+
+    checkins = session.exec(
+        select(CheckIn).where(
+            CheckIn.user_id == user_id,
+            CheckIn.meeting_id.in_(meeting_ids)
+        )
+    ).all()
+    return {checkin.meeting_id: checkin for checkin in checkins}
+
+def _resolve_effective_visibility_hours(meeting: Meeting, session: Session) -> Optional[int]:
+    mode = (meeting.android_visibility_mode or "inherit").strip().lower()
+
+    if mode == "always_show":
+        return 0
+    if mode == "hidden":
+        return -1
+    if mode == "custom_hours":
+        return meeting.android_visibility_hide_after_hours or 0
+
+    hide_after_hours_setting = session.get(SystemSetting, "meeting_visibility_hide_after_hours")
+    if not hide_after_hours_setting or not hide_after_hours_setting.value:
+        return 0
+
+    try:
+        return int(hide_after_hours_setting.value)
+    except ValueError:
+        return 0
+
+def _is_meeting_visible_for_android(
+    meeting: Meeting,
+    session: Session,
+    force_show_all: bool = False,
+    checkin: Optional[CheckIn] = None
+) -> bool:
+    if force_show_all:
+        return True
+
+    if checkin is not None:
+        return True
+
+    effective_hours = _resolve_effective_visibility_hours(meeting, session)
+    if effective_hours is None or effective_hours == 0:
+        return True
+    if effective_hours < 0:
+        return False
+
+    threshold = datetime.now() - timedelta(hours=effective_hours)
+    return meeting.start_time > threshold
+
 @router.post("/", response_model=Meeting)
 def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(get_session)):
     """
@@ -244,6 +353,7 @@ def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(ge
         for key, value in meeting_in.model_dump().items()
         if key in MEETING_BASE_FIELDS
     }
+    payload = _apply_android_visibility_defaults(payload)
     payload["agenda"] = _serialize_agenda_items(meeting_in.agenda_items, meeting_in.agenda)
     user_entries, manual_entries = _split_attendees_payload(
         attendee_entries=meeting_in.attendee_entries,
@@ -419,6 +529,11 @@ class MeetingCardResponse(BaseModel):
     agenda_items: List[AgendaItemOutput] = []
     meeting_contacts: List[MeetingContactOutput] = []
     show_media_link: bool = False
+    android_visibility_mode: str = "inherit"
+    android_visibility_hide_after_hours: Optional[int] = None
+    is_checked_in: bool = False
+    checkin_id: Optional[int] = None
+    check_in_time: Optional[datetime] = None
 
 # Default Image Pool for Random Strategy (Fallback)
 DEFAULT_IMAGES = {
@@ -608,6 +723,7 @@ def read_meetings(
     sort: Optional[str] = "desc", # asc, desc
     start_date: Optional[str] = None, # YYYY-MM-DD
     end_date: Optional[str] = None, # YYYY-MM-DD
+    user_id: Optional[int] = None,
     force_show_all: bool = False, # Admin flag to ignore visibility timeout
     session: Session = Depends(get_session)
 ):
@@ -653,24 +769,17 @@ def read_meetings(
 
     # [Start] Visibility Timeout Logic - MUST BE BEFORE offset/limit
     # 默认过滤掉超时的会议，除非显式请求 force_show_all
-    if not force_show_all:
-        from models import SystemSetting
-        hide_after_hours_setting = session.get(SystemSetting, "meeting_visibility_hide_after_hours")
-        if hide_after_hours_setting and hide_after_hours_setting.value:
-            try:
-                hours = int(hide_after_hours_setting.value)
-                if hours > 0:
-                     # Calculate threshold time
-                     now = datetime.now()
-                     threshold = now - timedelta(hours=hours)
-                     # Show only meetings where start_time > threshold
-                     query = query.where(Meeting.start_time > threshold)
-            except ValueError:
-                pass
-    # [End] Visibility Timeout Logic
-
-    query = query.offset(skip).limit(limit)
     meetings = session.exec(query).all()
+    checkin_map = _get_checkin_map_for_user(meetings, user_id, session)
+    meetings = [
+        meeting for meeting in meetings
+        if _is_meeting_visible_for_android(
+            meeting,
+            session=session,
+            force_show_all=force_show_all,
+            checkin=checkin_map.get(meeting.id)
+        )
+    ][skip: skip + limit]
     
     results = []
     all_types = {t.id: t for t in session.exec(select(MeetingType)).all()}
@@ -681,6 +790,7 @@ def read_meetings(
     bg_root = UPLOAD_DIR / "meeting_backgrounds"
     
     for m in meetings:
+        checkin = checkin_map.get(m.id)
         resp = MeetingCardResponse(
             id=m.id,
             title=m.title,
@@ -695,7 +805,12 @@ def read_meetings(
             attachments=[AttachmentRead(**attachment.model_dump()) for attachment in (m.attachments or [])],
             agenda_items=[AgendaItemOutput(**item) for item in _normalize_agenda_items(agenda_raw=m.agenda)],
             meeting_contacts=_parse_meeting_contacts(m.meeting_contacts),
-            show_media_link=m.show_media_link
+            show_media_link=m.show_media_link,
+            android_visibility_mode=(m.android_visibility_mode or "inherit"),
+            android_visibility_hide_after_hours=m.android_visibility_hide_after_hours,
+            is_checked_in=checkin is not None,
+            checkin_id=checkin.id if checkin else None,
+            check_in_time=checkin.check_in_time if checkin else None
         )
         m_type = all_types.get(m.meeting_type_id)
         
@@ -752,6 +867,8 @@ class MeetingWithAttachments(MeetingCardResponse):
 def read_meeting(
     meeting_id: int, 
     request: Request,
+    user_id: Optional[int] = None,
+    force_show_all: bool = False,
     session: Session = Depends(get_session)
 ):
     """
@@ -759,6 +876,14 @@ def read_meeting(
     """
     meeting = session.get(Meeting, meeting_id)
     if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    checkin = _get_checkin_map_for_user([meeting], user_id, session).get(meeting_id)
+    if not _is_meeting_visible_for_android(
+        meeting,
+        session=session,
+        force_show_all=force_show_all,
+        checkin=checkin
+    ):
         raise HTTPException(status_code=404, detail="Meeting not found")
 
     resp = MeetingWithAttachments(
@@ -775,7 +900,12 @@ def read_meeting(
         attachments=[AttachmentRead(**attachment.model_dump()) for attachment in (meeting.attachments or [])],
         agenda_items=[AgendaItemOutput(**item) for item in _normalize_agenda_items(agenda_raw=meeting.agenda)],
         meeting_contacts=_parse_meeting_contacts(meeting.meeting_contacts),
-        show_media_link=meeting.show_media_link
+        show_media_link=meeting.show_media_link,
+        android_visibility_mode=(meeting.android_visibility_mode or "inherit"),
+        android_visibility_hide_after_hours=meeting.android_visibility_hide_after_hours,
+        is_checked_in=checkin is not None,
+        checkin_id=checkin.id if checkin else None,
+        check_in_time=checkin.check_in_time if checkin else None
     )
     # 补充 computed fields
     m_type = session.get(MeetingType, meeting.meeting_type_id) if meeting.meeting_type_id else None
@@ -855,6 +985,15 @@ def update_meeting(
         exclude_unset=True,
         exclude={"attendees_roles", "attendee_entries", "agenda_items", "meeting_contacts"}
     )
+    if "android_visibility_mode" in meeting_data or "android_visibility_hide_after_hours" in meeting_data:
+        existing_mode = db_meeting.android_visibility_mode or "inherit"
+        existing_hours = db_meeting.android_visibility_hide_after_hours
+        meeting_data["android_visibility_mode"] = meeting_data.get("android_visibility_mode", existing_mode)
+        meeting_data["android_visibility_hide_after_hours"] = meeting_data.get(
+            "android_visibility_hide_after_hours",
+            existing_hours
+        )
+        meeting_data = _apply_android_visibility_defaults(meeting_data)
     for key, value in meeting_data.items():
         if key in ('start_time', 'end_time') and isinstance(value, str):
              try:
@@ -890,6 +1029,20 @@ def update_meeting(
             
     session.commit()
     session.refresh(db_meeting)
+
+    try:
+        sio.start_background_task(
+            broadcast_meeting_changed,
+            "updated",
+            {
+                "meeting_id": db_meeting.id,
+                "title": db_meeting.title,
+                "start_time": db_meeting.start_time.isoformat() if db_meeting.start_time else None
+            }
+        )
+    except Exception as e:
+        print(f"[Socket.IO] failed to broadcast meeting_changed: {e}")
+
     return db_meeting
 
 @router.delete("/{meeting_id}")

@@ -95,7 +95,12 @@ class CheckInDashboardViewModel @Inject constructor(
     fun cancelCheckIn(checkinId: Int) {
         viewModelScope.launch {
             try {
-                apiService.cancelCheckIn(checkinId)
+                val userId = userPreferences.getUserId()
+                if (userId == -1) {
+                    _uiState.value = _uiState.value.copy(actionMessage = "未登录")
+                    return@launch
+                }
+                apiService.cancelCheckIn(checkinId, userId)
                 _uiState.value = _uiState.value.copy(actionMessage = "已取消打卡")
                 loadAll(showLoading = false)
             } catch (e: Exception) {

@@ -201,6 +201,17 @@
                 <div class="meta-value">{{ currentDetail.location || '线上会议 / 未指定' }}</div>
               </div>
             </div>
+            <div class="meta-card android-visibility-card">
+              <div class="meta-icon bg-blue-50 text-blue-500"><el-icon><CircleCheck /></el-icon></div>
+              <div class="meta-info">
+                <div class="meta-label">安卓端可见性</div>
+                <div class="meta-value">{{ detailAndroidVisibilityDescription.summary }}</div>
+                <div v-if="detailAndroidVisibilityDescription.emphasis" class="android-visibility-emphasis">
+                  {{ detailAndroidVisibilityDescription.emphasis }}
+                </div>
+                <div class="android-visibility-help">{{ detailAndroidVisibilityDescription.detail }}</div>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -491,6 +502,46 @@
                 />
               </el-form-item>
             </div>
+
+            <el-divider class="form-divider" />
+
+            <div class="form-section android-visibility-form-section">
+              <div class="android-visibility-panel android-visibility-panel-inline">
+                <div class="android-visibility-title">安卓端可见性</div>
+                <div class="android-visibility-subtitle">单会议设置优先于全局隐藏时长，仅影响安卓端会议入口显示。</div>
+                <el-select
+                  v-model="form.android_visibility_mode"
+                  class="android-visibility-select"
+                  placeholder="请选择安卓端可见性"
+                >
+                  <el-option
+                    v-for="item in androidVisibilityModeOptions"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+                <div v-if="isCustomAndroidVisibility" class="android-visibility-hours">
+                  <span class="android-visibility-hours-label">隐藏倒计时</span>
+                  <el-input-number
+                    v-model="form.android_visibility_hide_after_hours"
+                    :min="0"
+                    :step="1"
+                    controls-position="right"
+                  />
+                  <span class="android-visibility-hours-unit">小时后不可见，0 表示永不隐藏</span>
+                </div>
+                <div class="android-visibility-summary">
+                  {{ formAndroidVisibilityDescription.summary }}
+                </div>
+                <div v-if="formAndroidVisibilityDescription.emphasis" class="android-visibility-emphasis">
+                  {{ formAndroidVisibilityDescription.emphasis }}
+                </div>
+                <div class="android-visibility-help">
+                  {{ formAndroidVisibilityDescription.detail }}
+                </div>
+              </div>
+            </div>
           </el-form>
         </div>
       
@@ -629,6 +680,8 @@ const allFilesList = computed(() => {
 const submitting = ref(false)
 const isEditMode = ref(false)
 const editingId = ref(null)
+const globalMeetingVisibilityHours = ref(0)
+const GLOBAL_VISIBILITY_ENTRY_LABEL = '可前往 系统设置 > 会议可见性（安全） 修改全局规则'
 
 const form = ref({ 
   title: '', 
@@ -638,7 +691,10 @@ const form = ref({
   location: '',
   attendee_entries: [],
   agendaItems: [],
-  meeting_contacts: []
+  meeting_contacts: [],
+  show_media_link: false,
+  android_visibility_mode: 'inherit',
+  android_visibility_hide_after_hours: null
 })
 const timeEditorVisible = ref(true)
 
@@ -696,8 +752,11 @@ const fetchStats = async () => {
 }
 
 onMounted(async () => {
-  await fetchMeetingTypes()
-  await fetchMeetings()
+  await Promise.all([
+    fetchMeetingTypes(),
+    fetchMeetings(),
+    fetchGlobalVisibilitySettings()
+  ])
   fetchStats()
 })
 
@@ -797,6 +856,82 @@ const parseAgendaItems = (agendaItems = [], agendaJson = '') => {
 
 const detailAgendaItems = computed(() => parseAgendaItems(currentDetail.value?.agenda_items, currentDetail.value?.agenda))
 const detailContacts = computed(() => Array.isArray(currentDetail.value?.meeting_contacts) ? currentDetail.value.meeting_contacts : [])
+const androidVisibilityModeOptions = [
+  { label: '跟随全局规则', value: 'inherit' },
+  { label: '隐藏倒计时', value: 'custom_hours' },
+  { label: '立即隐藏', value: 'hidden' },
+  { label: '始终显示', value: 'always_show' }
+]
+const isCustomAndroidVisibility = computed(() => form.value.android_visibility_mode === 'custom_hours')
+const getAndroidVisibilityModeLabel = (mode) => {
+  const target = androidVisibilityModeOptions.find(item => item.value === mode)
+  return target?.label || '跟随全局规则'
+}
+const formatVisibilityDateTime = (value) => {
+  const date = normalizeDate(value)
+  if (!date) return ''
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${formatClockTime(date)}`
+}
+const getVisibilityDeadline = (startTime, hours) => {
+  const startDate = normalizeDate(startTime)
+  if (!startDate || hours == null || hours < 0) return null
+  return new Date(startDate.getTime() + hours * 60 * 60 * 1000)
+}
+const getAndroidVisibilityDescription = (meeting) => {
+  const mode = meeting?.android_visibility_mode || 'inherit'
+  const startTime = meeting?.start_time ?? meeting?.startTime ?? null
+  const hours = meeting?.android_visibility_hide_after_hours ?? meeting?.androidVisibilityHideAfterHours ?? null
+
+  if (mode === 'custom_hours') {
+    if ((hours ?? 0) === 0) {
+      return {
+        summary: '当前规则：隐藏倒计时已设置为永久可见',
+        emphasis: '',
+        detail: '已设置为永久可见，不会自动隐藏。'
+      }
+    }
+    const deadline = getVisibilityDeadline(startTime, hours)
+    return {
+      summary: `当前规则：会议开始后 ${hours} 小时自动隐藏`,
+      emphasis: deadline ? `安卓端将在 ${formatVisibilityDateTime(deadline)} 后不可见` : '',
+      detail: deadline
+        ? `按会议开始时间 + ${hours} 小时计算。`
+        : '保存有效会议开始时间后，将自动计算隐藏时间。'
+    }
+  }
+
+  if (mode === 'hidden') {
+    return {
+      summary: '当前规则：该会议在安卓端立即隐藏',
+      emphasis: '',
+      detail: '普通用户会立即不可见，已签到用户仍可见。'
+    }
+  }
+
+  if (mode === 'always_show') {
+    return {
+      summary: '当前规则：该会议在安卓端始终显示',
+      emphasis: '',
+      detail: '不受全局隐藏规则影响。'
+    }
+  }
+
+  if (globalMeetingVisibilityHours.value === 0) {
+    return {
+      summary: '当前跟随全局规则：安卓端永久可见',
+      emphasis: '',
+      detail: GLOBAL_VISIBILITY_ENTRY_LABEL
+    }
+  }
+
+  return {
+    summary: `当前跟随全局规则：会议开始后 ${globalMeetingVisibilityHours.value} 小时隐藏`,
+    emphasis: '',
+    detail: GLOBAL_VISIBILITY_ENTRY_LABEL
+  }
+}
+const detailAndroidVisibilityDescription = computed(() => getAndroidVisibilityDescription(currentDetail.value))
+const formAndroidVisibilityDescription = computed(() => getAndroidVisibilityDescription(form.value))
 
 const weekdayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const weekdayShortNames = ['日', '一', '二', '三', '四', '五', '六']
@@ -939,6 +1074,19 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => form.value.android_visibility_mode,
+  (mode) => {
+    if (mode === 'custom_hours') {
+      if (form.value.android_visibility_hide_after_hours == null) {
+        form.value.android_visibility_hide_after_hours = 0
+      }
+      return
+    }
+    form.value.android_visibility_hide_after_hours = null
+  }
+)
+
 const createUserOptionValue = (userId) => `${USER_OPTION_PREFIX}${userId}`
 
 const handleAttendeeInput = (attendee) => {
@@ -991,6 +1139,16 @@ const fetchMeetings = async () => {
 const fetchMeetingTypes = async () => {
   try { meetingTypes.value = await request.get('/meeting_types/') } catch (e) {}
 }
+const fetchGlobalVisibilitySettings = async () => {
+  try {
+    const res = await request.get('/settings/')
+    const rawValue = res?.meeting_visibility_hide_after_hours
+    const parsedValue = Number.parseInt(rawValue, 10)
+    globalMeetingVisibilityHours.value = Number.isNaN(parsedValue) ? 0 : parsedValue
+  } catch (e) {
+    globalMeetingVisibilityHours.value = 0
+  }
+}
 const handleUploadClick = (meeting) => {}
 const handleUploadSuccess = () => { fetchMeetings() }
 
@@ -1031,7 +1189,7 @@ const setAttachmentListFromMeeting = (meeting) => {
 }
 
 const refreshMeetingDetail = async (meetingId) => {
-  const res = await request.get(`/meetings/${meetingId}`)
+  const res = await request.get(`/meetings/${meetingId}`, { params: { force_show_all: true } })
   if (res.attachments) {
     res.attachments.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
   }
@@ -1142,7 +1300,9 @@ const openCreate = () => {
     attendee_entries: [],
     agendaItems: [],
     meeting_contacts: [],
-    show_media_link: false
+    show_media_link: false,
+    android_visibility_mode: 'inherit',
+    android_visibility_hide_after_hours: null
   }
   attachmentList.value = []
   dialogVisible.value = true
@@ -1176,7 +1336,9 @@ const openEdit = () => {
             email: contact.email || ''
           }))
         : [],
-      show_media_link: m.show_media_link || false
+      show_media_link: m.show_media_link || false,
+      android_visibility_mode: m.android_visibility_mode || 'inherit',
+      android_visibility_hide_after_hours: m.android_visibility_hide_after_hours ?? null
   }
   editingId.value = m.id
   isEditMode.value = true
@@ -1231,7 +1393,11 @@ const handleSubmit = async () => {
     attendee_entries: attendeeEntries,
     agenda_items: agendaItems,
     meeting_contacts: meetingContacts,
-    show_media_link: form.value.show_media_link || false
+    show_media_link: form.value.show_media_link || false,
+    android_visibility_mode: form.value.android_visibility_mode || 'inherit',
+    android_visibility_hide_after_hours: form.value.android_visibility_mode === 'custom_hours'
+      ? (form.value.android_visibility_hide_after_hours ?? 0)
+      : null
   }
 
   try {
@@ -1312,6 +1478,8 @@ const downloadFile = (file) => {
 .contact-item { padding: 10px 12px; border-radius: 10px; background: var(--bg-main); }
 .contact-name { font-size: 14px; font-weight: 700; color: var(--text-main); }
 .contact-lines { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
+.android-visibility-card { align-items: flex-start; }
+.android-visibility-card .meta-info { display: flex; flex-direction: column; gap: 4px; }
 
 /* Colors Utility */
 .bg-blue-50 { background-color: #eff6ff; } .text-blue-500 { color: #3b82f6; }
@@ -1742,6 +1910,65 @@ html.dark .modern-meeting-form :deep(.contact-item-modern .el-input__wrapper) {
   color: #8b5cf6;
   font-weight: 500;
 }
+.android-visibility-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(59, 130, 246, 0.03);
+}
+.android-visibility-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.android-visibility-subtitle {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.android-visibility-select { width: 100%; }
+.android-visibility-hours {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.android-visibility-hours-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.android-visibility-hours-unit {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.android-visibility-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.android-visibility-emphasis {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2563eb;
+  line-height: 1.7;
+}
+.android-visibility-help {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #64748b;
+}
+.android-visibility-form-section {
+  padding-bottom: 4px;
+}
+.android-visibility-panel-inline {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%);
+}
 .file-list-container { flex: 1; padding: 16px; overflow-y: auto; }
 .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); gap: 12px; }
 .file-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; transition: all 0.2s; }
@@ -1803,6 +2030,19 @@ html.dark .meta-label {
 }
 html.dark .meta-value {
     color: #e2e8f0;
+}
+html.dark .android-visibility-panel {
+    background: rgba(59, 130, 246, 0.08);
+}
+html.dark .android-visibility-panel-inline {
+    border-color: rgba(96, 165, 250, 0.3);
+    background: linear-gradient(180deg, rgba(30, 64, 175, 0.18) 0%, rgba(30, 41, 59, 0.08) 100%);
+}
+html.dark .android-visibility-help {
+    color: #94a3b8;
+}
+html.dark .android-visibility-emphasis {
+    color: #93c5fd;
 }
 html.dark .contact-item {
     background-color: #1f2937;
