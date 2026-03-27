@@ -48,6 +48,10 @@ class MeetingRepositoryImpl @Inject constructor(
     private val api: ApiService
 ) : MeetingRepository {
 
+    private fun rethrowCancellation(throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+    }
+
     override suspend fun login(request: com.example.paperlessmeeting.domain.model.LoginRequest): com.example.paperlessmeeting.domain.model.LoginResponse {
         return api.login(request)
     }
@@ -94,6 +98,7 @@ class MeetingRepositoryImpl @Inject constructor(
             }
             true
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             false
         }
@@ -132,6 +137,7 @@ class MeetingRepositoryImpl @Inject constructor(
             onProgress(1f) // 确保完成时是100%
             true
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             false
         }
@@ -141,6 +147,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getSyncState(meetingId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             null
         }
@@ -150,6 +157,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.updateSyncState(meetingId, fileId, pageNumber, isSyncing, fileUrl)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             null
         }
@@ -159,6 +167,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getActiveVote(meetingId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             null
         }
@@ -168,6 +177,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getVoteList(meetingId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             emptyList()
         }
@@ -177,6 +187,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getVote(voteId, userId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             null
         }
@@ -187,6 +198,7 @@ class MeetingRepositoryImpl @Inject constructor(
             val request = com.example.paperlessmeeting.domain.model.VoteSubmitRequest(userId, optionIds)
             api.submitVote(voteId, request)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             throw e
         }
@@ -196,6 +208,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getVoteResult(voteId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             null
         }
@@ -205,6 +218,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getLotteryHistory(meetingId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             null
         }
@@ -218,6 +232,7 @@ class MeetingRepositoryImpl @Inject constructor(
         return try {
             api.getUserLotteryHistory(userId)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             e.printStackTrace()
             emptyList()
         }

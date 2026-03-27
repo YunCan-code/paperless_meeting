@@ -7,16 +7,22 @@ import com.example.paperlessmeeting.domain.model.DeviceHeartbeat
 import com.example.paperlessmeeting.domain.model.DeviceOfflineReport
 import com.example.paperlessmeeting.domain.model.DeviceResponse
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 
 class DeviceRepository @Inject constructor(
     private val apiService: ApiService,
     private val appSettingsState: AppSettingsState
 ) {
+    private fun rethrowCancellation(throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
+    }
+
     suspend fun sendHeartbeat(heartbeat: DeviceHeartbeat): Result<DeviceResponse> {
         return try {
             val response = apiService.deviceHeartbeat(heartbeat)
             Result.success(response)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             Result.failure(e)
         }
     }
@@ -26,6 +32,7 @@ class DeviceRepository @Inject constructor(
             val response = apiService.checkAppUpdate()?.let(::resolveAppUpdate)
             Result.success(response)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             Result.failure(e)
         }
     }
@@ -35,6 +42,7 @@ class DeviceRepository @Inject constructor(
             apiService.deviceOffline(DeviceOfflineReport(device_id = deviceId))
             Result.success(Unit)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             Result.failure(e)
         }
     }
@@ -44,6 +52,7 @@ class DeviceRepository @Inject constructor(
             val response = apiService.getDeviceCommands(deviceId)
             Result.success(response)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             Result.failure(e)
         }
     }
@@ -53,6 +62,7 @@ class DeviceRepository @Inject constructor(
             apiService.ackCommand(commandId)
             Result.success(true)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             Result.failure(e)
         }
     }
@@ -62,6 +72,7 @@ class DeviceRepository @Inject constructor(
             val response = apiService.downloadApk(resolveDownloadUrl(url))
             Result.success(response)
         } catch (e: Exception) {
+            rethrowCancellation(e)
             Result.failure(e)
         }
     }

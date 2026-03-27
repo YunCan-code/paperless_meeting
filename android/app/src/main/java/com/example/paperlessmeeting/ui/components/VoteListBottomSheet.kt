@@ -67,7 +67,7 @@ fun VoteListBottomSheet(
                 containerColor = BackgroundLayer,
                 contentColor = PrimaryBlue,
                 indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
+                    TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
                         color = PrimaryBlue
                     )

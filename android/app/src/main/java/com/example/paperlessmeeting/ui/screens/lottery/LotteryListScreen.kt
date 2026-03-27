@@ -12,7 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
@@ -67,7 +67,7 @@ fun LotteryListScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 actions = {
@@ -93,13 +93,13 @@ fun LotteryListScreen(
                 containerColor = SurfaceWhite,
                 contentColor = ActiveGold,
                 indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
+                    TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
                         color = ActiveGold,
                         height = 3.dp
                     )
                 },
-                divider = { Divider(color = Color.Transparent) }
+                divider = { HorizontalDivider(color = Color.Transparent) }
             ) {
                 Tab(
                     selected = selectedTabIndex == 0,
@@ -248,7 +248,7 @@ fun HistoryGroupCard(history: LotteryHistoryResponse, navController: NavControll
                      navController.navigate(Screen.LotteryDetail.createRoute(history.meeting_id, history.meeting_title))
                 }
                 if (round != history.rounds.last()) {
-                    Divider(color = LightBackground, thickness = 1.dp)
+                    HorizontalDivider(color = LightBackground, thickness = 1.dp)
                 }
             }
         }

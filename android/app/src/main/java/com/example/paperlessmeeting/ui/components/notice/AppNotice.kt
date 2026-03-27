@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -83,6 +84,7 @@ fun AppNoticeHost(
     SnackbarHost(
         hostState = hostState,
         modifier = modifier
+            .zIndex(3f)
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(

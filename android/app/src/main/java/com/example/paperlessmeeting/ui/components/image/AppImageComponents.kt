@@ -276,6 +276,7 @@ fun AppAsyncImage(
                 .data(model.data ?: model.fallbackResId)
                 .memoryCacheKey(model.memoryCacheKey)
                 .diskCacheKey(model.diskCacheKey)
+                .placeholderMemoryCacheKey(model.placeholderMemoryCacheKey)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .diskCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)

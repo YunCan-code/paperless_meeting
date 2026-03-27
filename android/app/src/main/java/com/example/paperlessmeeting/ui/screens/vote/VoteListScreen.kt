@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.MoreVert
@@ -73,7 +73,7 @@ fun VoteListScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -99,13 +99,13 @@ fun VoteListScreen(
                 containerColor = SurfaceWhite,
                 contentColor = ActiveBlue,
                 indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
+                    TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
                         color = ActiveBlue,
                         height = 3.dp // Slightly thicker
                     )
                 },
-                divider = { Divider(color = Color.Transparent) } // No divider
+                divider = { HorizontalDivider(color = Color.Transparent) } // No divider
             ) {
                 Tab(
                     selected = selectedTabIndex == 0,

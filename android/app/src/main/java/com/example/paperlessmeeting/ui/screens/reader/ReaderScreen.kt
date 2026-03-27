@@ -152,7 +152,7 @@ fun ReaderScreen(
     
     // Handle Toast
     LaunchedEffect(toastEvent) {
-        toastEvent?.let { msg ->
+        toastEvent?.let {
             // android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             viewModel.consumeToastEvent()
         }
@@ -790,9 +790,9 @@ fun PDFViewerContent(
                         .onDraw { canvas, pageWidth, pageHeight, pageIdx ->
                              // Report page render dimensions for inline annotation overlay
                              if (pageIdx == currentPageState) {
-                                 val matrix = Matrix()
+                                 @Suppress("DEPRECATION")
+                                 val matrix = canvas.matrix
                                  val values = FloatArray(9)
-                                 canvas.getMatrix(matrix)
                                  matrix.getValues(values)
                                  currentOnPageRenderInfo(
                                      values[Matrix.MTRANS_X],
