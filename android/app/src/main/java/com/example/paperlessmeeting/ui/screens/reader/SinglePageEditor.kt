@@ -119,7 +119,8 @@ fun InlineAnnotationOverlay(
     pageOffsetX: Float,
     pageOffsetY: Float,
     onSave: (List<AnnotationStroke>) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onDirtyChange: (Boolean) -> Unit = {}
 ) {
     var strokes by remember(pageIndex) { mutableStateOf(initialStrokes) }
     var currentPath by remember { mutableStateOf<List<Offset>>(emptyList()) }
@@ -131,6 +132,10 @@ fun InlineAnnotationOverlay(
     var highlighterSize by remember { mutableStateOf(HighlighterSize.MEDIUM) }
 
     val canMap = pageRenderWidth > 0f && pageRenderHeight > 0f
+
+    LaunchedEffect(strokes, initialStrokes) {
+        onDirtyChange(strokes != initialStrokes)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
 

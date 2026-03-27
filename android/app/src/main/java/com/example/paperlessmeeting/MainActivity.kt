@@ -79,7 +79,10 @@ class MainActivity : ComponentActivity() {
                 darkTheme = darkTheme,
                 fontScaleFactor = AppSettingsState.fontScaleFactor(fontScaleLevel)
             ) {
-                AppRoot(userPreferences)
+                AppRoot(
+                    userPreferences = userPreferences,
+                    onExitApp = { finish() }
+                )
             }
         }
         
@@ -122,7 +125,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppRoot(userPreferences: com.example.paperlessmeeting.data.local.UserPreferences) {
+fun AppRoot(
+    userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    onExitApp: () -> Unit = {}
+) {
     var isLoggedIn by remember { mutableStateOf(false) }
     var allowPortraitContent by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -140,7 +146,8 @@ fun AppRoot(userPreferences: com.example.paperlessmeeting.data.local.UserPrefere
                         allowPortraitContent = false
                         isLoggedIn = false
                     },
-                    onPortraitExemptionChanged = { allowPortraitContent = it }
+                    onPortraitExemptionChanged = { allowPortraitContent = it },
+                    onExitApp = onExitApp
                 )
             } else {
                 SideEffect {

@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -173,6 +174,8 @@ fun ReaderScreen(
     var currentPage by remember { mutableIntStateOf(initialPage) }
     var totalPages by remember { mutableIntStateOf(0) }
     var isProgrammaticScroll by remember { mutableStateOf(true) } // Prevent scroll fighting
+    var hasPendingAnnotationChanges by remember { mutableStateOf(false) }
+    var showDiscardAnnotationDialog by remember { mutableStateOf(false) }
     val isAnnotationViewportReady by remember(annotPageWidth, annotPageHeight) {
         derivedStateOf { annotPageWidth > 0f && annotPageHeight > 0f }
     }
@@ -219,6 +222,35 @@ fun ReaderScreen(
     // PDF View Reference for capturing state
     var pdfViewRef by remember { mutableStateOf<PDFView?>(null) }
 
+    fun closeThumbnailSheet() {
+        scope.launch {
+            sheetState.hide()
+        }.invokeOnCompletion {
+            showThumbnailSheet = false
+        }
+    }
+
+    fun exitAnnotationMode(forceDiscard: Boolean = false) {
+        if (hasPendingAnnotationChanges && !forceDiscard) {
+            showDiscardAnnotationDialog = true
+            return
+        }
+
+        showDiscardAnnotationDialog = false
+        hasPendingAnnotationChanges = false
+        isAnnotating = false
+        pdfViewRef?.invalidate()
+    }
+
+    fun handleReaderBack() {
+        when {
+            drawerState.isOpen -> scope.launch { drawerState.close() }
+            showThumbnailSheet -> closeThumbnailSheet()
+            isAnnotating -> exitAnnotationMode()
+            else -> navController.popBackStack()
+        }
+    }
+
     // Keep system bars independent from the reader overlay to avoid PDF relayout
     // when the user taps to show or hide in-app controls.
     LaunchedEffect(isAnnotating) {
@@ -248,6 +280,10 @@ fun ReaderScreen(
                 WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
             }
         }
+    }
+
+    BackHandler {
+        handleReaderBack()
     }
 
     // --- UI Structure ---
@@ -335,7 +371,7 @@ fun ReaderScreen(
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                IconButton(onClick = { navController.popBackStack() }) {
+                                IconButton(onClick = ::handleReaderBack) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = chromePalette.panelText.copy(alpha = 0.82f))
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -449,7 +485,7 @@ fun ReaderScreen(
                         // 按钮组
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             // 返回按钮
-                            TextButton(onClick = { navController.popBackStack() }) {
+                            TextButton(onClick = ::handleReaderBack) {
                                 Text("返回", color = chromePalette.panelMutedText)
                             }
 
@@ -544,7 +580,7 @@ fun ReaderScreen(
                                 isPresenterSyncing = isPresenterSyncing,
                                 isFollowing = isFollowing,
                                 isSyncActive = isSyncActive,
-                                onBackClick = { navController.popBackStack() },
+                                onBackClick = ::handleReaderBack,
                                 onPresenterToggle = { viewModel.togglePresenterSync(!isPresenterSyncing) },
                                 onFollowToggle = { viewModel.toggleFollow(!isFollowing) }
                             )
@@ -570,6 +606,8 @@ fun ReaderScreen(
                                 onGridClick = { showThumbnailSheet = true },
                                 onPenClick = {
                                     if (isAnnotationViewportReady) {
+                                        hasPendingAnnotationChanges = false
+                                        showDiscardAnnotationDialog = false
                                         isAnnotating = true
                                         showOverlay = true
                                     } else {
@@ -589,7 +627,7 @@ fun ReaderScreen(
                         // 5. Thumbnails Bottom Sheet
                         if (showThumbnailSheet) {
                             ModalBottomSheet(
-                                onDismissRequest = { showThumbnailSheet = false },
+                                onDismissRequest = { closeThumbnailSheet() },
                                 sheetState = sheetState,
                                 containerColor = chromePalette.sheetContainer
                             ) {
@@ -600,7 +638,7 @@ fun ReaderScreen(
                                    onPageClick = { page ->
                                        isProgrammaticScroll = true
                                        currentPage = page
-                                       scope.launch { sheetState.hide() }.invokeOnCompletion { showThumbnailSheet = false }
+                                       closeThumbnailSheet()
                                    }
                                ) 
                             }
@@ -620,15 +658,15 @@ fun ReaderScreen(
                                 pageOffsetX = annotPageOffsetX,
                                 pageOffsetY = annotPageOffsetY,
                                 onCancel = {
-                                    isAnnotating = false
-                                    pdfViewRef?.invalidate()
+                                    exitAnnotationMode()
                                 },
                                 onSave = { newStrokes ->
                                     viewModel.updatePageAnnotations(currentPage, newStrokes)
                                     viewModel.saveAnnotations(state.file)
-                                    isAnnotating = false
-                                    pdfViewRef?.invalidate()
-                                }
+                                    hasPendingAnnotationChanges = false
+                                    exitAnnotationMode(forceDiscard = true)
+                                },
+                                onDirtyChange = { hasPendingAnnotationChanges = it }
                             )
                         }
                     }
@@ -636,6 +674,24 @@ fun ReaderScreen(
                 else -> {}
             }
         }
+    }
+
+    if (showDiscardAnnotationDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardAnnotationDialog = false },
+            title = { Text("退出标注") },
+            text = { Text("当前标注尚未保存，退出后本页未保存内容将丢失。") },
+            confirmButton = {
+                TextButton(onClick = { exitAnnotationMode(forceDiscard = true) }) {
+                    Text("仍要退出", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardAnnotationDialog = false }) {
+                    Text("继续编辑")
+                }
+            }
+        )
     }
 }
 

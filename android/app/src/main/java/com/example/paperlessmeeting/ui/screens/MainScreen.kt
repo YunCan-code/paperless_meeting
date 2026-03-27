@@ -1,5 +1,6 @@
 package com.example.paperlessmeeting.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -36,8 +37,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,15 +61,18 @@ import com.example.paperlessmeeting.ui.navigation.clearMainTabTransitionTarget
 import com.example.paperlessmeeting.ui.navigation.mainTabTransitionTarget
 import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val MAIN_TAB_ANIMATION_DURATION_MS = 340
+private const val EXIT_PROMPT_DURATION_MS = 2000L
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(
     onLogout: () -> Unit = {},
-    onPortraitExemptionChanged: (Boolean) -> Unit = {}
+    onPortraitExemptionChanged: (Boolean) -> Unit = {},
+    onExitApp: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -80,9 +87,15 @@ fun MainScreen(
 
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
+    var pendingExit by rememberSaveable { mutableStateOf(false) }
+    var showExitPrompt by rememberSaveable { mutableStateOf(false) }
 
     val currentRoute = currentDestination?.route?.substringBefore("?")
     val isReaderScreen = currentRoute == "reader"
+    val currentMainTabIndex = resolveCurrentMainTabIndex(
+        currentRoute = currentRoute,
+        pagerPage = pagerState.currentPage
+    )
     val navScrollPosition = resolveNavBarScrollPosition(
         currentRoute = currentRoute,
         pagerScrollPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
@@ -125,8 +138,47 @@ fun MainScreen(
         animateToMainTab(targetPage)
     }
 
+    LaunchedEffect(showExitPrompt) {
+        if (!showExitPrompt) {
+            return@LaunchedEffect
+        }
+
+        delay(EXIT_PROMPT_DURATION_MS)
+        showExitPrompt = false
+        pendingExit = false
+    }
+
+    LaunchedEffect(currentRoute, currentMainTabIndex) {
+        if (currentRoute == MAIN_TABS_ROUTE && currentMainTabIndex == 0) {
+            return@LaunchedEffect
+        }
+
+        showExitPrompt = false
+        pendingExit = false
+    }
+
     SideEffect {
         onPortraitExemptionChanged(isReaderScreen)
+    }
+
+    BackHandler(enabled = shouldHandleMainTabBack(currentRoute, currentMainTabIndex)) {
+        when {
+            currentMainTabIndex == null -> Unit
+            currentMainTabIndex != 0 -> {
+                showExitPrompt = false
+                pendingExit = false
+                navigateToMainTab(0)
+            }
+            pendingExit -> {
+                showExitPrompt = false
+                pendingExit = false
+                onExitApp()
+            }
+            else -> {
+                pendingExit = true
+                showExitPrompt = true
+            }
+        }
     }
 
     Surface(
@@ -307,6 +359,21 @@ fun MainScreen(
             }
 
             AnimatedVisibility(
+                visible = showExitPrompt &&
+                    currentRoute == MAIN_TABS_ROUTE &&
+                    currentMainTabIndex == 0 &&
+                    !isReaderScreen,
+                enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = 76.dp)
+            ) {
+                ExitPromptPill()
+            }
+
+            AnimatedVisibility(
                 visible = !isReaderScreen,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
@@ -325,6 +392,32 @@ fun MainScreen(
             }
         }
     }
+}
+
+private fun resolveCurrentMainTabIndex(
+    currentRoute: String?,
+    pagerPage: Int
+): Int? {
+    val route = currentRoute ?: return null
+    return when {
+        route == MAIN_TABS_ROUTE -> pagerPage
+        route.startsWith(Screen.Meetings.route) -> 1
+        route.startsWith("meeting_split") -> 1
+        else -> null
+    }
+}
+
+private fun shouldHandleMainTabBack(
+    currentRoute: String?,
+    currentMainTabIndex: Int?
+): Boolean {
+    if (currentMainTabIndex == null) {
+        return false
+    }
+
+    return currentRoute == MAIN_TABS_ROUTE ||
+        currentRoute?.startsWith(Screen.Meetings.route) == true ||
+        currentRoute?.startsWith("meeting_split") == true
 }
 
 private fun resolveNavBarScrollPosition(
@@ -448,5 +541,23 @@ private fun FloatingNavItem(
                 maxLines = 1
             )
         }
+    }
+}
+
+@Composable
+private fun ExitPromptPill() {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+        tonalElevation = 5.dp,
+        shadowElevation = 12.dp
+    ) {
+        Text(
+            text = "再按一次退出程序",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+        )
     }
 }

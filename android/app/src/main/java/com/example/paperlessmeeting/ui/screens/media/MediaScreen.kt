@@ -1,5 +1,6 @@
 package com.example.paperlessmeeting.ui.screens.media
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -100,6 +101,25 @@ fun MediaScreen(
     val isPhone = screenWidthDp < 600
     val hPadding = if (isPhone) 16.dp else 28.dp
     val vPadding = if (isPhone) 16.dp else 24.dp
+
+    BackHandler(
+        enabled = previewImageIndex != null ||
+            previewVideoItem != null ||
+            uiState.currentFolderId != null
+    ) {
+        when {
+            previewImageIndex != null -> {
+                previewImageIndex = null
+                previewImageItems = emptyList()
+            }
+            previewVideoItem != null -> {
+                previewVideoItem = null
+            }
+            uiState.currentFolderId != null -> {
+                viewModel.goToParent()
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(

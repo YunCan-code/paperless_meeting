@@ -109,6 +109,21 @@ class MediaViewModel @Inject constructor(
         loadItems()
     }
 
+    fun goToParent() {
+        val state = _uiState.value
+        if (state.currentFolderId == null) return
+
+        val remainingBreadcrumbs = state.breadcrumbs.dropLast(1)
+        val parentId = remainingBreadcrumbs.lastOrNull()?.id
+        _uiState.update {
+            it.copy(
+                currentFolderId = parentId,
+                breadcrumbs = remainingBreadcrumbs
+            )
+        }
+        loadItems()
+    }
+
     fun goToBreadcrumb(crumb: MediaBreadcrumb) {
         _uiState.update { it.copy(currentFolderId = crumb.id) }
         loadItems()
