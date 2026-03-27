@@ -38,6 +38,7 @@ class UserPreferences @Inject constructor(
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_FONT_SCALE_LEVEL = "font_scale_level"
         private const val KEY_SERVER_HOST = "server_host"
+        private const val KEY_CHECKIN_HINT_SEEN_PREFIX = "checkin_hint_seen"
     }
 
     fun saveUserId(id: Int) {
@@ -130,6 +131,20 @@ class UserPreferences @Inject constructor(
         val apiUrl = com.example.paperlessmeeting.BuildConfig.API_BASE_URL
         val defaultHost = apiUrl.removeSuffix("/api/").removeSuffix("/api").removeSuffix("/")
         return prefs.getString(KEY_SERVER_HOST, defaultHost) ?: defaultHost
+    }
+
+    private fun checkInHintKey(userId: Int, meetingId: Int): String {
+        return "${KEY_CHECKIN_HINT_SEEN_PREFIX}_${userId}_$meetingId"
+    }
+
+    fun hasSeenCheckInHint(userId: Int, meetingId: Int): Boolean {
+        if (userId <= 0 || meetingId <= 0) return true
+        return prefs.getBoolean(checkInHintKey(userId, meetingId), false)
+    }
+
+    fun markCheckInHintSeen(userId: Int, meetingId: Int) {
+        if (userId <= 0 || meetingId <= 0) return
+        prefs.edit().putBoolean(checkInHintKey(userId, meetingId), true).apply()
     }
 
     fun clear() {

@@ -176,6 +176,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    suspend fun getMeetingDetailsResult(id: Int): Resource<Meeting> {
+        val userId = userPreferences.getUserId().takeIf { it > 0 }
+        return repository.getMeetingById(id, userId)
+    }
+
     suspend fun checkInMeeting(id: Int): SplitDetailCheckInResult {
         val userId = userPreferences.getUserId().takeIf { it > 0 }
             ?: return SplitDetailCheckInResult.Error("未登录，无法签到")
@@ -186,7 +191,6 @@ class HomeViewModel @Inject constructor(
         return try {
             _isCheckInSubmitting.value = true
             repository.checkIn(userId, id)
-            emitActionMessage("签到成功")
             refreshMeetingsSilently()
             when (val result = repository.getMeetingById(id, userId)) {
                 is Resource.Success -> SplitDetailCheckInResult.Updated(result.data)
@@ -215,10 +219,7 @@ class HomeViewModel @Inject constructor(
             repository.cancelCheckIn(checkInId, userId)
             refreshMeetingsSilently()
             when (val result = repository.getMeetingById(meeting.id, userId)) {
-                is Resource.Success -> {
-                    emitActionMessage("已取消签到")
-                    SplitDetailCheckInResult.Updated(result.data)
-                }
+                is Resource.Success -> SplitDetailCheckInResult.Updated(result.data)
                 is Resource.Error -> {
                     if (result.message == "HTTP_404") {
                         SplitDetailCheckInResult.Hidden("取消签到后，该会议已不可见")
@@ -237,7 +238,13 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshOnVisible() {
-        loadMeetings()
+        if (_uiState.value is HomeUiState.Success) {
+            viewModelScope.launch {
+                refreshMeetingsSilently()
+            }
+        } else {
+            loadMeetings()
+        }
     }
 
     private fun observeSocketEvents() {

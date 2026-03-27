@@ -78,7 +78,9 @@ data class Meeting(
     @com.google.gson.annotations.SerializedName("checkin_id")
     val checkInId: Int? = null,
     @com.google.gson.annotations.SerializedName("check_in_time")
-    val checkInTime: String? = null
+    val checkInTime: String? = null,
+    @com.google.gson.annotations.SerializedName("is_today_meeting")
+    val isTodayMeeting: Boolean = false
 ) {
     // Helper to map backend status string to UI Enum
     // Or calculate dynamically if backend status is missing

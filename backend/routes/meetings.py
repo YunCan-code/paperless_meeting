@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import json
+from zoneinfo import ZoneInfo
 
 from database import get_session
 from models import (
@@ -253,6 +254,7 @@ def _parse_manual_attendees(raw_value: Optional[str]) -> List[AttendeeOutput]:
     ]
 
 VALID_ANDROID_VISIBILITY_MODES = {"inherit", "custom_hours", "hidden", "always_show"}
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 
 def _normalize_android_visibility_mode(mode: Optional[str]) -> str:
     normalized = (mode or "inherit").strip().lower()
@@ -342,6 +344,12 @@ def _is_meeting_visible_for_android(
 
     threshold = datetime.now() - timedelta(hours=effective_hours)
     return meeting.start_time > threshold
+
+def _meeting_occurs_today_in_shanghai(meeting: Meeting) -> bool:
+    start_time = meeting.start_time
+    if start_time.tzinfo is not None:
+        start_time = start_time.astimezone(SHANGHAI_TZ)
+    return start_time.date() == datetime.now(SHANGHAI_TZ).date()
 
 @router.post("/", response_model=Meeting)
 def create_meeting(meeting_in: MeetingCreateInput, session: Session = Depends(get_session)):
@@ -534,6 +542,7 @@ class MeetingCardResponse(BaseModel):
     is_checked_in: bool = False
     checkin_id: Optional[int] = None
     check_in_time: Optional[datetime] = None
+    is_today_meeting: bool = False
 
 # Default Image Pool for Random Strategy (Fallback)
 DEFAULT_IMAGES = {
@@ -810,7 +819,8 @@ def read_meetings(
             android_visibility_hide_after_hours=m.android_visibility_hide_after_hours,
             is_checked_in=checkin is not None,
             checkin_id=checkin.id if checkin else None,
-            check_in_time=checkin.check_in_time if checkin else None
+            check_in_time=checkin.check_in_time if checkin else None,
+            is_today_meeting=_meeting_occurs_today_in_shanghai(m)
         )
         m_type = all_types.get(m.meeting_type_id)
         
@@ -905,7 +915,8 @@ def read_meeting(
         android_visibility_hide_after_hours=meeting.android_visibility_hide_after_hours,
         is_checked_in=checkin is not None,
         checkin_id=checkin.id if checkin else None,
-        check_in_time=checkin.check_in_time if checkin else None
+        check_in_time=checkin.check_in_time if checkin else None,
+        is_today_meeting=_meeting_occurs_today_in_shanghai(meeting)
     )
     # 补充 computed fields
     m_type = session.get(MeetingType, meeting.meeting_type_id) if meeting.meeting_type_id else None

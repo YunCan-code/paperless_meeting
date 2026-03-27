@@ -4,11 +4,13 @@ from sqlalchemy import and_
 from datetime import datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel
+from zoneinfo import ZoneInfo
 
 from database import get_session
 from models import CheckIn, Meeting
 
 router = APIRouter(prefix="/checkin", tags=["签到"])
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 
 
 class CheckInRequest(BaseModel):
@@ -42,6 +44,13 @@ def check_in(req: CheckInRequest, session: Session = Depends(get_session)):
     meeting = session.get(Meeting, req.meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
+
+    meeting_start = meeting.start_time
+    if meeting_start.tzinfo is not None:
+        meeting_start = meeting_start.astimezone(SHANGHAI_TZ)
+    today_in_shanghai = datetime.now(SHANGHAI_TZ).date()
+    if meeting_start.date() != today_in_shanghai:
+        raise HTTPException(status_code=400, detail="仅今日会议可签到")
 
     # 检查是否已签到
     existing = session.exec(

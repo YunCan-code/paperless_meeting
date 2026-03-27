@@ -21,13 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Close
@@ -39,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
@@ -55,8 +51,6 @@ import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import com.example.paperlessmeeting.ui.screens.detail.MeetingDetailContent
 import com.example.paperlessmeeting.ui.screens.adaptive.MeetingListContent
 import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
-import com.example.paperlessmeeting.ui.screens.home.SplitDetailCheckInResult
-import kotlinx.coroutines.launch
 
 private val DetailPaneShape = androidx.compose.foundation.shape.RoundedCornerShape(
     topStart = 26.dp,
@@ -73,9 +67,7 @@ fun AdaptiveMeetingScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
-    val isCheckInSubmitting by viewModel.isCheckInSubmitting.collectAsState()
     
     // Filter Meetings & Pagination State
     val allMeetings = if (uiState is com.example.paperlessmeeting.ui.screens.home.HomeUiState.Success) {
@@ -119,19 +111,71 @@ fun AdaptiveMeetingScreen(
 
     var fullMeeting by remember { mutableStateOf<Meeting?>(null) }
     var isDetailLoading by remember { mutableStateOf(false) }
-    var showCancelCheckInDialog by rememberSaveable { mutableStateOf(false) }
-    
-    // Fetch full details when ID changes
-    LaunchedEffect(selectedMeetingId, allMeetings) {
-        if (selectedMeetingId != null) {
-            fullMeeting = null
+    var isDetailRefreshing by remember { mutableStateOf(false) }
+
+    suspend fun refreshSelectedMeeting(
+        meetingId: Int,
+        showBlockingLoading: Boolean,
+        hiddenMessage: String = "该会议已不可见"
+    ) {
+        if (showBlockingLoading) {
             isDetailLoading = true
-            fullMeeting = viewModel.getMeetingDetails(selectedMeetingId!!)
-            isDetailLoading = false
         } else {
+            isDetailRefreshing = true
+        }
+
+        try {
+            when (val result = viewModel.getMeetingDetailsResult(meetingId)) {
+                is com.example.paperlessmeeting.utils.Resource.Success -> {
+                    fullMeeting = result.data
+                }
+                is com.example.paperlessmeeting.utils.Resource.Error -> {
+                    if (result.message == "HTTP_404") {
+                        fullMeeting = null
+                        viewModel.selectMeeting(null)
+                        Toast.makeText(context, hiddenMessage, Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "刷新会议详情失败：${result.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                com.example.paperlessmeeting.utils.Resource.Loading -> Unit
+            }
+        } finally {
+            isDetailLoading = false
+            isDetailRefreshing = false
+        }
+    }
+
+    LaunchedEffect(selectedMeetingId) {
+        val meetingId = selectedMeetingId
+        if (meetingId == null) {
             fullMeeting = null
             isDetailLoading = false
+            isDetailRefreshing = false
+            return@LaunchedEffect
         }
+
+        val shouldShowBlockingLoading = fullMeeting?.id != meetingId
+        refreshSelectedMeeting(
+            meetingId = meetingId,
+            showBlockingLoading = shouldShowBlockingLoading
+        )
+    }
+
+    LaunchedEffect(allMeetings) {
+        val meetingId = selectedMeetingId ?: return@LaunchedEffect
+        if (isDetailLoading || fullMeeting?.id != meetingId) {
+            return@LaunchedEffect
+        }
+
+        refreshSelectedMeeting(
+            meetingId = meetingId,
+            showBlockingLoading = false
+        )
     }
 
     // Dynamic Types from Data
@@ -242,27 +286,6 @@ fun AdaptiveMeetingScreen(
                                      val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
                                      navController.navigate("reader?url=$encodedUrl&name=$encodedName")
                                 },
-                                isCheckInSubmitting = isCheckInSubmitting,
-                                onCheckInClick = {
-                                    scope.launch {
-                                        when (val result = viewModel.checkInMeeting(displayMeeting.id)) {
-                                            is SplitDetailCheckInResult.Updated -> {
-                                                fullMeeting = result.meeting
-                                            }
-                                            is SplitDetailCheckInResult.Hidden -> {
-                                                fullMeeting = null
-                                                viewModel.selectMeeting(null)
-                                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                                            }
-                                            is SplitDetailCheckInResult.Error -> {
-                                                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
-                                },
-                                onCancelCheckInClick = {
-                                    showCancelCheckInDialog = true
-                                },
                                 onMediaClick = {
                                     if (onNavigateToMedia != null) {
                                         onNavigateToMedia()
@@ -285,6 +308,14 @@ fun AdaptiveMeetingScreen(
                                     tint = androidx.compose.ui.graphics.Color.White
                                 )
                             }
+
+                            if (isDetailRefreshing) {
+                                SplitDetailRefreshingBadge(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 72.dp, end = 24.dp)
+                                )
+                            }
                         }
                     } else {
                         EmptyDetailView()
@@ -292,52 +323,6 @@ fun AdaptiveMeetingScreen(
                 }
             }
         }
-    }
-
-    if (showCancelCheckInDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!isCheckInSubmitting) {
-                    showCancelCheckInDialog = false
-                }
-            },
-            title = { Text("取消签到") },
-            text = { Text("取消签到后，若会议已被隐藏，你将立即失去查看权限。是否继续？") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val currentMeeting = fullMeeting ?: return@Button
-                        showCancelCheckInDialog = false
-                        scope.launch {
-                            when (val result = viewModel.cancelCheckIn(currentMeeting)) {
-                                is SplitDetailCheckInResult.Updated -> {
-                                    fullMeeting = result.meeting
-                                }
-                                is SplitDetailCheckInResult.Hidden -> {
-                                    fullMeeting = null
-                                    viewModel.selectMeeting(null)
-                                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                                }
-                                is SplitDetailCheckInResult.Error -> {
-                                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
-                    enabled = !isCheckInSubmitting
-                ) {
-                    Text("确认取消")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { showCancelCheckInDialog = false },
-                    enabled = !isCheckInSubmitting
-                ) {
-                    Text("保留签到")
-                }
-            }
-        )
     }
 }
 
@@ -403,6 +388,33 @@ fun FilterChipsBar(
                     selected = selectedType == typeName,
                     borderColor = if (selectedType == typeName) color else androidx.compose.ui.graphics.Color.Transparent
                 )
+            )
+        }
+    }
+}
+
+@Composable
+private fun SplitDetailRefreshingBadge(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp
+            )
+            Text(
+                text = "正在刷新",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
