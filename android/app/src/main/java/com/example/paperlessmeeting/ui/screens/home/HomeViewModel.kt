@@ -176,7 +176,7 @@ class HomeViewModel @Inject constructor(
             refreshMeetingsSilently()
             when (val result = repository.getMeetingById(id, userId)) {
                 is Resource.Success -> SplitDetailCheckInResult.Updated(result.data)
-                is Resource.Error -> SplitDetailCheckInResult.Error(result.message ?: "签到后刷新失败")
+                is Resource.Error -> SplitDetailCheckInResult.Error(result.message)
                 Resource.Loading -> SplitDetailCheckInResult.Error("签到后刷新失败")
             }
         } catch (e: Exception) {

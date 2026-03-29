@@ -201,8 +201,6 @@ fun AdaptiveMeetingScreen(
         allMeetings.filter { it.meetingTypeName == selectedTypeFilter }
     }
 
-    val selectedMeeting = allMeetings.find { it.id == selectedMeetingId }
-
     BoxWithConstraints {
         val isTablet = maxWidth > 600.dp
 
@@ -263,7 +261,6 @@ fun AdaptiveMeetingScreen(
                         MeetingListContent(
                             meetings = filteredMeetings,
                             onMeetingClick = { meetingId -> viewModel.selectMeeting(meetingId) },
-                            selectedId = selectedMeetingId ?: selectedMeeting?.id,
                             isLoadingMore = isLoadingMore,
                             hasMoreData = hasMoreData,
                             onLoadMore = { viewModel.loadMore() }

@@ -95,7 +95,7 @@ class LotteryViewModel @Inject constructor(
                     println("[Lottery] 🎉 YOU WON! Triggering winner announcement.")
                     _winnerAnnouncement.tryEmit(
                         WinnerAnnouncementData(
-                            roundTitle = state.current_title!!,
+                            roundTitle = state.current_title,
                             userName = userName
                         )
                     )
@@ -122,13 +122,16 @@ class LotteryViewModel @Inject constructor(
                         if (participantsArray != null) {
                             for (i in 0 until participantsArray.length()) {
                                 val p = participantsArray.getJSONObject(i)
+                                val sid = p.optString("sid").takeIf { it.isNotBlank() }
+                                val avatar = p.optString("avatar").takeIf { it.isNotBlank() }
+                                val department = p.optString("department").takeIf { it.isNotBlank() }
                                 participantsList.add(
                                     com.example.paperlessmeeting.domain.model.LotteryParticipant(
                                         id = p.opt("id") ?: 0,
                                         name = p.optString("name", ""),
-                                        sid = p.optString("sid", null),
-                                        avatar = p.optString("avatar", null),
-                                        department = p.optString("department", null)
+                                        sid = sid,
+                                        avatar = avatar,
+                                        department = department
                                     )
                                 )
                             }

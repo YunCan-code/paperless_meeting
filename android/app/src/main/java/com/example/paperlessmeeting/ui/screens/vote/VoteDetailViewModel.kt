@@ -55,7 +55,7 @@ class VoteDetailViewModel @Inject constructor(
 
         // Listen for vote end
         viewModelScope.launch {
-             socketManager.voteEndEvent.collect { endInfo ->
+             socketManager.voteEndEvent.collect {
                  val currentVote = _uiState.value.vote
                  // The event payload might be just ID or object, check usage
                  // Assuming endInfo matches current vote

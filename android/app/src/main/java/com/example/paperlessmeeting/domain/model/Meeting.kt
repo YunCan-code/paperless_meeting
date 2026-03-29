@@ -101,7 +101,6 @@ data class Meeting(
             // Fix: Handle potential time formats. For now assume ISO-like string from standard JSON.
             // Simple string compare is risky but let's try strict parsing.
             // Simplified logic: If we cant parse, return Draft.
-            val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
             // Note: If backend sends "2023-12-19 13:00:00", replace space with T
             val cleanStart = startTime.replace(" ", "T")
             val start = java.time.LocalDateTime.parse(cleanStart)

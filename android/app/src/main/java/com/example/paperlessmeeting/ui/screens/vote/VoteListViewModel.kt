@@ -37,7 +37,7 @@ class VoteListViewModel @Inject constructor(
 
     private fun observeSocketEvents() {
         viewModelScope.launch {
-            socketManager.voteStartEvent.collect { vote ->
+            socketManager.voteStartEvent.collect {
                 // Refresh list when new vote starts
                 loadData()
             }

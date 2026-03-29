@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.filter
 fun MeetingListContent(
     meetings: List<Meeting>,
     onMeetingClick: (Int) -> Unit,
-    selectedId: Int? = null,
     isLoadingMore: Boolean = false,
     hasMoreData: Boolean = true,
     onLoadMore: () -> Unit = {}

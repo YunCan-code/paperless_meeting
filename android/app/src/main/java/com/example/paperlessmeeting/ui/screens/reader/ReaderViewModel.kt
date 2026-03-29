@@ -111,7 +111,6 @@ class ReaderViewModel @Inject constructor(
                     // 使用带进度的下载，支持自动重试
                     val maxRetries = 3
                     var success = false
-                    var lastError: String? = null
 
                     for (attempt in 1..maxRetries) {
                         _uiState.value = ReaderUiState.Downloading(0f, fileName)
@@ -124,8 +123,12 @@ class ReaderViewModel @Inject constructor(
 
                         // 下载失败，准备重试
                         if (attempt < maxRetries) {
-                            lastError = "下载失败，正在重试 ($attempt/$maxRetries)..."
-                            _uiState.value = ReaderUiState.Error(lastError, false, url, fileName)
+                            _uiState.value = ReaderUiState.Error(
+                                "下载失败，正在重试 ($attempt/$maxRetries)...",
+                                false,
+                                url,
+                                fileName
+                            )
                             kotlinx.coroutines.delay(2000) // 等待2秒后重试
                             // 删除可能的不完整文件
                             if (file.exists()) file.delete()

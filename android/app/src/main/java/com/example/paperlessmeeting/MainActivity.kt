@@ -59,7 +59,6 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject lateinit var userPreferences: com.example.paperlessmeeting.data.local.UserPreferences
     @Inject lateinit var appSettingsState: AppSettingsState
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,7 +79,6 @@ class MainActivity : ComponentActivity() {
                 fontScaleFactor = AppSettingsState.fontScaleFactor(fontScaleLevel)
             ) {
                 AppRoot(
-                    userPreferences = userPreferences,
                     onExitApp = { finish() }
                 )
             }
@@ -126,7 +124,6 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppRoot(
-    userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
     onExitApp: () -> Unit = {}
 ) {
     var isLoggedIn by remember { mutableStateOf(false) }

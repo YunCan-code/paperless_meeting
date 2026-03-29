@@ -311,11 +311,11 @@ fun formatTimeRange(start: String, end: String?): String {
 
 @Composable
 fun MeetingStatusBadge(status: MeetingStatus, modifier: Modifier = Modifier) {
-    val (bgColor, textColor) = when (status) {
-        MeetingStatus.Ongoing -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
-        MeetingStatus.Upcoming -> Color(0xFFE3F2FD) to Color(0xFF1565C0)
-        MeetingStatus.Finished -> Color(0xFFEEEEEE) to Color(0xFF757575)
-        MeetingStatus.Draft -> Color(0xFFFFF3E0) to Color(0xFFEF6C00)
+    val textColor = when (status) {
+        MeetingStatus.Ongoing -> Color(0xFF2E7D32)
+        MeetingStatus.Upcoming -> Color(0xFF1565C0)
+        MeetingStatus.Finished -> Color(0xFF757575)
+        MeetingStatus.Draft -> Color(0xFFEF6C00)
     }
 
     // Use a lighter/glassy look for the dark background

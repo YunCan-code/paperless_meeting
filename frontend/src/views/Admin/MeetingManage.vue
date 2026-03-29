@@ -134,12 +134,34 @@
               </div>
             </div>
 
-            <div class="meta-card">
+            <div class="meta-card meta-card-cover-source">
               <div class="meta-icon bg-cyan-50 text-cyan-500"><el-icon><PictureFilled /></el-icon></div>
               <div class="meta-info">
-                <div class="meta-label">当前封面来源</div>
-                <div class="meta-value">{{ getCoverSourceLabel(currentDetail.card_image_source) }}</div>
+                <div class="meta-headline">
+                  <div>
+                    <div class="meta-label">当前封面来源</div>
+                    <div class="meta-value">{{ getCoverSourceLabel(currentDetail.card_image_source) }}</div>
+                  </div>
+                  <el-button
+                    class="detail-cover-toggle"
+                    link
+                    type="primary"
+                    @click="detailCoverCollapsed = !detailCoverCollapsed"
+                  >
+                    {{ detailCoverCollapsed ? '展开封面' : '收起封面' }}
+                  </el-button>
+                </div>
                 <div class="android-visibility-help">会议专属封面优先级最高；清空后会回退到类型封面或系统默认图。</div>
+                <div v-if="!detailCoverCollapsed" class="detail-cover-inline" :class="{ empty: !detailCoverUrl }">
+                  <img v-if="detailCoverUrl" :src="detailCoverUrl" alt="会议封面" />
+                  <div v-else class="detail-cover-placeholder">
+                    <el-icon><PictureFilled /></el-icon>
+                    <span>当前会议暂无可展示封面</span>
+                  </div>
+                  <div v-if="detailCoverUrl" class="detail-cover-overlay">
+                    <span class="detail-cover-badge">{{ getCoverSourceLabel(currentDetail.card_image_source) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -724,8 +746,10 @@ const allFilesList = computed(() => {
 
 // Forms & States
 const submitting = ref(false)
+const coverSubmitting = ref(false)
 const isEditMode = ref(false)
 const editingId = ref(null)
+const detailCoverCollapsed = ref(true)
 const globalMeetingVisibilityHours = ref(0)
 const GLOBAL_VISIBILITY_ENTRY_LABEL = '可前往 系统设置 > 会议可见性（安全） 修改全局规则'
 
@@ -903,6 +927,7 @@ const parseAgendaItems = (agendaItems = [], agendaJson = '') => {
 
 const detailAgendaItems = computed(() => parseAgendaItems(currentDetail.value?.agenda_items, currentDetail.value?.agenda))
 const detailContacts = computed(() => Array.isArray(currentDetail.value?.meeting_contacts) ? currentDetail.value.meeting_contacts : [])
+const detailCoverUrl = computed(() => currentDetail.value?.card_image_url || '')
 const androidVisibilityModeOptions = [
   { label: '跟随全局规则', value: 'inherit' },
   { label: '隐藏倒计时', value: 'custom_hours' },
@@ -1240,6 +1265,7 @@ const refreshMeetingDetail = async (meetingId) => {
   if (res.attachments) {
     res.attachments.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
   }
+  detailCoverCollapsed.value = true
   currentDetail.value = res
   return res
 }
@@ -1259,7 +1285,16 @@ const beforeMeetingCoverUpload = (rawFile) => {
 
 const handleMeetingCoverUploadSuccess = (res) => {
   form.value.cover_image = res.url || ''
-  ElMessage.success('会议封面上传成功')
+  if (!form.value.cover_image) {
+    ElMessage.error('会议封面上传结果无效')
+    return
+  }
+
+  if (isEditMode.value && editingId.value) {
+    persistMeetingCoverChange(form.value.cover_image, '会议封面已更新')
+  } else {
+    ElMessage.success('会议封面上传成功，保存后生效')
+  }
 }
 
 const handleMeetingCoverUploadError = () => {
@@ -1268,6 +1303,28 @@ const handleMeetingCoverUploadError = () => {
 
 const clearMeetingCover = () => {
   form.value.cover_image = ''
+  if (isEditMode.value && editingId.value) {
+    persistMeetingCoverChange(null, '会议封面已清空')
+  }
+}
+
+const persistMeetingCoverChange = async (coverImage, successMessage) => {
+  if (!isEditMode.value || !editingId.value || coverSubmitting.value) return
+
+  try {
+    coverSubmitting.value = true
+    await request.put(`/meetings/${editingId.value}`, {
+      cover_image: coverImage || null
+    })
+    await refreshMeetingDetail(editingId.value)
+    await fetchMeetings()
+    ElMessage.success(successMessage)
+  } catch (e) {
+    console.error('Persist meeting cover error:', e)
+    ElMessage.error('会议封面保存失败，请点击“保存修改”重试')
+  } finally {
+    coverSubmitting.value = false
+  }
 }
 
 const getCoverSourceLabel = (source) => {
@@ -1556,6 +1613,65 @@ const downloadFile = (file) => {
 
 /* 详情样式优化 */
 .detail-header-section { margin-bottom: 24px; }
+.meta-headline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.detail-cover-toggle {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.detail-cover-inline {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
+  box-shadow: 0 18px 40px -28px rgba(15, 23, 42, 0.45);
+}
+.detail-cover-inline img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.detail-cover-inline.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.detail-cover-overlay {
+  position: absolute;
+  inset: auto 14px 14px auto;
+}
+.detail-cover-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.detail-cover-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  text-align: center;
+  padding: 20px;
+}
+.detail-cover-placeholder .el-icon {
+  font-size: 36px;
+}
 .detail-main-title { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3; }
 .detail-meta-list { display: flex; flex-direction: column; gap: 12px; }
 .meta-card { display: flex; align-items: center; padding: 12px 16px; background-color: #ffffff; border: 1px solid #f1f5f9; border-radius: 12px; transition: all 0.2s; }
@@ -2166,6 +2282,17 @@ html.dark .meta-card:hover {
 }
 html.dark .detail-main-title {
     color: #f1f5f9;
+}
+html.dark .detail-cover-inline {
+    border-color: rgba(59, 130, 246, 0.32);
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.96) 100%);
+}
+html.dark .detail-cover-placeholder {
+    color: #cbd5e1;
+}
+html.dark .detail-cover-badge {
+    background: rgba(15, 23, 42, 0.82);
+    color: #e2e8f0;
 }
 html.dark .meta-label {
     color: #a0aec0;
