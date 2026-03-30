@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 # 导入数据库初始化函数和路由模块
 from database import create_db_and_tables
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
 
 # 创建 FastAPI 应用实例
 app = FastAPI(title="Paperless Meeting System", lifespan=lifespan)
+BACKEND_ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -85,6 +87,7 @@ app.add_middleware(
 # 挂载静态文件目录
 # 用于让平版端可以通过 URL (如 http://ip:8000/static/file.pdf) 访问上传的文件
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
+app.mount("/app-assets", StaticFiles(directory=str(BACKEND_ASSETS_DIR)), name="app-assets")
 
 # 注册 API 路由器
 app.include_router(users.router)

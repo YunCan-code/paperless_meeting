@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import json
+import hashlib
 from zoneinfo import ZoneInfo
 
 from database import get_session
@@ -611,7 +612,6 @@ def get_meeting_stats(session: Session = Depends(get_session)):
         "storage_growth": round(storage_growth, 1)
     }
 
-import random
 import os
 
 # Enhanced Response Model
@@ -642,17 +642,18 @@ class MeetingCardResponse(BaseModel):
     check_in_time: Optional[datetime] = None
     is_today_meeting: bool = False
 
-# Default Image Pool for Random Strategy (Fallback)
+APP_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+
+# 默认会议图改为后端本地静态资源，确保 Web / Android 命中同一套可控图片
 DEFAULT_IMAGES = {
-    "weekly": "https://images.unsplash.com/photo-1431540015161-0bf868a2d407?q=80&w=2070&auto=format&fit=crop",
-    "urgent": "https://images.unsplash.com/photo-1516387938699-a93567ec168e?q=80&w=2071&auto=format&fit=crop",
-    "review": "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070&auto=format&fit=crop",
-    "kickoff": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=2070&auto=format&fit=crop",
-    "default": "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
+    "weekly": "/app-assets/meeting_defaults/weekly.png",
+    "urgent": "/app-assets/meeting_defaults/urgent.png",
+    "review": "/app-assets/meeting_defaults/review.png",
+    "kickoff": "/app-assets/meeting_defaults/kickoff.png",
+    "default": "/app-assets/meeting_defaults/default.png",
 }
 
 from cachetools import TTLCache
-import os
 
 # 带 TTL 的缓存：最多缓存 32 个目录，60 秒后自动失效
 _image_dir_cache = TTLCache(maxsize=32, ttl=60)
@@ -788,6 +789,10 @@ def build_thumbnail_url(image_url: Optional[str], base_url: str) -> Optional[str
             )
         return image_url
 
+    asset_source = _resolve_app_asset_path(image_url)
+    if asset_source is not None:
+        return _public_static_url(image_url, base_url, asset_source)
+
     return _optimize_unsplash_url(image_url)
 
 
@@ -820,7 +825,33 @@ def _normalize_public_image_url(image_url: Optional[str], base_url: str) -> Opti
     if image_url.startswith("/static/"):
         source = _resolve_local_source_path(image_url)
         return _public_static_url(image_url, base_url, source)
+    if image_url.startswith("/app-assets/"):
+        source = _resolve_app_asset_path(image_url)
+        return _public_static_url(image_url, base_url, source)
     return image_url
+
+
+def _resolve_app_asset_path(image_url: str) -> Optional[Path]:
+    parsed = urlparse(image_url)
+    path = parsed.path or image_url
+    if not path.startswith("/app-assets/"):
+        return None
+
+    rel = path.replace("/app-assets/", "", 1)
+    rel_path = Path(rel)
+    if any(part == ".." for part in rel_path.parts):
+        return None
+
+    try:
+        source = (APP_ASSETS_DIR / rel_path).resolve()
+        asset_root = APP_ASSETS_DIR.resolve()
+        if asset_root not in source.parents and source != asset_root:
+            return None
+        if not source.is_file():
+            return None
+        return source
+    except Exception:
+        return None
 
 
 def _classify_default_source(type_name: str) -> str:
@@ -849,20 +880,26 @@ def get_images_in_dir_cached(directory: Path) -> List[str]:
                 f for f in os.listdir(directory)
                 if os.path.isfile(directory / f) and os.path.splitext(f)[1].lower() in valid_extensions
             ]
+            result.sort()
         except OSError:
             result = []
 
     _image_dir_cache[cache_key] = result
     return result
 
-def get_random_image_from_dir(directory: Path, base_url: str) -> Optional[str]:
-    """Helper to pick random image with caching"""
+def _stable_image_index(seed: str, total: int) -> int:
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=False) % total
+
+
+def get_stable_image_from_dir(directory: Path, base_url: str, seed: str) -> Optional[str]:
+    """Pick a stable image for the same meeting instead of re-randomizing every request."""
     images = get_images_in_dir_cached(directory)
-    
+
     if not images:
         return None
-        
-    selected = random.choice(images)
+
+    selected = images[_stable_image_index(seed, len(images))]
     try:
         rel_path = directory.relative_to(UPLOAD_DIR)
         selected_path = directory / selected
@@ -880,18 +917,20 @@ def _resolve_meeting_cover(meeting: Meeting, meeting_type: Optional[MeetingType]
 
     type_name = meeting_type.name if meeting_type else "default"
     bg_root = UPLOAD_DIR / "meeting_backgrounds"
+    stable_seed = f"{meeting.id}:{meeting.meeting_type_id}:{meeting.start_time.isoformat()}:{type_name}"
 
     type_folder = bg_root / type_name
-    type_url = get_random_image_from_dir(type_folder, base_url)
+    type_url = get_stable_image_from_dir(type_folder, base_url, stable_seed)
     if type_url:
         return type_url, "type_directory"
 
-    common_url = get_random_image_from_dir(bg_root / "common", base_url)
+    common_url = get_stable_image_from_dir(bg_root / "common", base_url, stable_seed)
     if common_url:
         return common_url, "common_directory"
 
     default_key = _classify_default_source(type_name)
-    return DEFAULT_IMAGES[default_key], "default"
+    default_path = DEFAULT_IMAGES[default_key]
+    return _normalize_public_image_url(default_path, base_url), "default"
 
 @router.get("/", response_model=List[MeetingCardResponse])
 def read_meetings(

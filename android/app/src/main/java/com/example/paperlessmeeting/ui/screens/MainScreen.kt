@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -49,7 +51,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp as lerpColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,10 +73,14 @@ import com.example.paperlessmeeting.ui.navigation.mainTabTransitionTarget
 import com.example.paperlessmeeting.ui.navigation.requestMainTabTransition
 import com.example.paperlessmeeting.ui.screens.home.HomeViewModel
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val MAIN_TAB_ANIMATION_DURATION_MS = 340
+private val MainTabAnimationEasing = CubicBezierEasing(0.24f, 0.94f, 0.32f, 1f)
+private const val MAIN_TAB_ANIMATION_DURATION_MS = 420
 private const val EXIT_PROMPT_DURATION_MS = 2000L
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -124,7 +133,7 @@ fun MainScreen(
                 page = targetPage,
                 animationSpec = tween(
                     durationMillis = MAIN_TAB_ANIMATION_DURATION_MS,
-                    easing = FastOutSlowInEasing
+                    easing = MainTabAnimationEasing
                 )
             )
         }
@@ -213,39 +222,56 @@ fun MainScreen(
                         beyondBoundsPageCount = 1,
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
-                        when (page) {
-                            0 -> com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen(
-                                onMeetingClick = { meetingId ->
-                                    navController.navigate("meetings?meetingId=$meetingId")
-                                },
-                                onReadingClick = { url, name, pageNum ->
-                                    val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
-                                    val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-                                    navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$pageNum")
-                                },
-                                onVoteClick = {
-                                    navController.navigate(Screen.VoteList.route)
-                                },
-                                onLotteryClick = {
-                                    navController.navigate(Screen.LotteryList.route)
+                        val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
+                        val distanceFromCenter = abs(pageOffset)
+                        val pageAlpha = 0.9f + ((1f - distanceFromCenter) * 0.1f)
+                        val pageScale = 0.985f + ((1f - distanceFromCenter) * 0.015f)
+                        val pageTranslationX = with(LocalDensity.current) { 28.dp.toPx() } * pageOffset
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    alpha = pageAlpha
+                                    scaleX = pageScale
+                                    scaleY = pageScale
+                                    translationX = pageTranslationX
                                 }
-                            )
+                        ) {
+                            when (page) {
+                                0 -> com.example.paperlessmeeting.ui.screens.dashboard.DashboardScreen(
+                                    onMeetingClick = { meetingId ->
+                                        navController.navigate("meetings?meetingId=$meetingId")
+                                    },
+                                    onReadingClick = { url, name, pageNum ->
+                                        val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
+                                        val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
+                                        navController.navigate("reader?url=$encodedUrl&name=$encodedName&page=$pageNum")
+                                    },
+                                    onVoteClick = {
+                                        navController.navigate(Screen.VoteList.route)
+                                    },
+                                    onLotteryClick = {
+                                        navController.navigate(Screen.LotteryList.route)
+                                    }
+                                )
 
-                            1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
-                                meetingTypeName = "ALL",
-                                navController = navController,
-                                isActive = currentRoute == MAIN_TABS_ROUTE && currentMainTabIndex == 1,
-                                onNavigateToMedia = {
-                                    navigateToMainTab(2)
-                                },
-                                viewModel = sharedMeetingViewModel
-                            )
+                                1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
+                                    meetingTypeName = "ALL",
+                                    navController = navController,
+                                    isActive = currentRoute == MAIN_TABS_ROUTE && currentMainTabIndex == 1,
+                                    onNavigateToMedia = {
+                                        navigateToMainTab(2)
+                                    },
+                                    viewModel = sharedMeetingViewModel
+                                )
 
-                            2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
+                                2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
 
-                            3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
-                                onLogout = onLogout
-                            )
+                                3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
+                                    onLogout = onLogout
+                                )
+                            }
                         }
                     }
                 }
@@ -468,6 +494,33 @@ private fun FloatingNavBar(
     val isPhone = LocalConfiguration.current.screenWidthDp < 600
     val navPillShape = RoundedCornerShape(50)
 
+    val itemWidth = if (isPhone) 78.dp else 92.dp
+    val itemHeight = if (isPhone) 52.dp else 56.dp
+    val horizontalPadding = if (isPhone) 8.dp else 12.dp
+    val verticalPadding = 4.dp
+    val itemSpacing = if (isPhone) 4.dp else 16.dp
+    val tabFrames = remember(tabs.size) {
+        MutableList(tabs.size) { NavItemFrame.Zero }
+    }
+    val clampedScrollPosition = scrollPosition.coerceIn(0f, tabs.lastIndex.toFloat())
+    val leftIndex = floor(clampedScrollPosition).toInt()
+    val rightIndex = ceil(clampedScrollPosition).toInt().coerceAtMost(tabs.lastIndex)
+    val positionFraction = clampedScrollPosition - leftIndex
+    val leftFrame = tabFrames.getOrNull(leftIndex) ?: NavItemFrame.Zero
+    val rightFrame = tabFrames.getOrNull(rightIndex) ?: leftFrame
+    val indicatorOffsetPx = lerpFloat(leftFrame.left, rightFrame.left, positionFraction)
+    val indicatorWidthPx = lerpFloat(leftFrame.width, rightFrame.width, positionFraction)
+    val density = LocalDensity.current
+    val fallbackIndicatorOffsetPx = with(density) {
+        (horizontalPadding + (itemWidth + itemSpacing) * clampedScrollPosition).roundToPx().toFloat()
+    }
+    val fallbackIndicatorWidthPx = with(density) { itemWidth.roundToPx().toFloat() }
+    val resolvedIndicatorOffsetPx =
+        if (leftFrame == NavItemFrame.Zero && rightFrame == NavItemFrame.Zero) fallbackIndicatorOffsetPx else indicatorOffsetPx
+    val resolvedIndicatorWidth = with(density) {
+        (if (indicatorWidthPx == 0f) fallbackIndicatorWidthPx else indicatorWidthPx).toDp()
+    }
+
     Surface(
         shape = navPillShape,
         shadowElevation = 4.dp,
@@ -475,24 +528,46 @@ private fun FloatingNavBar(
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.padding(bottom = if (isPhone) 8.dp else 16.dp)
     ) {
-        Row(
+        Box(
             modifier = Modifier.padding(
-                horizontal = if (isPhone) 8.dp else 12.dp,
-                vertical = 4.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(if (isPhone) 4.dp else 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                horizontal = horizontalPadding,
+                vertical = verticalPadding
+            )
         ) {
-            tabs.forEachIndexed { index, screen ->
-                val selectionFraction = (1f - abs(scrollPosition - index)).coerceIn(0f, 1f)
-                FloatingNavItem(
-                    icon = screen.icon,
-                    label = screen.title,
-                    selectionFraction = selectionFraction,
-                    onClick = { onTabClick(screen) },
-                    isPhone = isPhone,
-                    shape = navPillShape
-                )
+            Box(
+                modifier = Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(x = resolvedIndicatorOffsetPx.roundToInt(), y = 0) }
+                    .width(resolvedIndicatorWidth)
+                    .height(itemHeight)
+                    .graphicsLayer {
+                        alpha = 0.98f
+                        scaleX = 0.992f
+                        scaleY = 0.992f
+                    }
+                    .clip(navPillShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEachIndexed { index, screen ->
+                    val selectionFraction = (1f - abs(scrollPosition - index)).coerceIn(0f, 1f)
+                    FloatingNavItem(
+                        icon = screen.icon,
+                        label = screen.title,
+                        selectionFraction = selectionFraction,
+                        onClick = { onTabClick(screen) },
+                        isPhone = isPhone,
+                        shape = navPillShape,
+                        itemWidth = itemWidth,
+                        itemHeight = itemHeight,
+                        onPositioned = { left, width ->
+                            tabFrames[index] = NavItemFrame(left = left, width = width)
+                        }
+                    )
+                }
             }
         }
     }
@@ -505,17 +580,15 @@ private fun FloatingNavItem(
     selectionFraction: Float,
     onClick: () -> Unit,
     isPhone: Boolean = false,
-    shape: RoundedCornerShape = RoundedCornerShape(50)
+    shape: RoundedCornerShape = RoundedCornerShape(50),
+    itemWidth: androidx.compose.ui.unit.Dp,
+    itemHeight: androidx.compose.ui.unit.Dp,
+    onPositioned: (left: Float, width: Float) -> Unit
 ) {
-    val capsuleAlpha = selectionFraction
-    val capsuleScale = 0.96f + 0.04f * selectionFraction
-
     val selectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
     val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
     val contentColor = lerpColor(unselectedColor, selectedColor, selectionFraction)
 
-    val itemWidth = if (isPhone) 78.dp else 92.dp
-    val itemHeight = if (isPhone) 52.dp else 56.dp
     val horizontalPadding = if (isPhone) 10.dp else 12.dp
     val verticalPadding = 7.dp
 
@@ -523,6 +596,9 @@ private fun FloatingNavItem(
         modifier = Modifier
             .width(itemWidth)
             .height(itemHeight)
+            .onGloballyPositioned { coordinates ->
+                onPositioned(coordinates.positionInParent().x, coordinates.size.width.toFloat())
+            }
             .clip(shape)
             .clickable(
                 indication = null,
@@ -530,18 +606,6 @@ private fun FloatingNavItem(
             ) { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = capsuleAlpha
-                    scaleX = capsuleScale
-                    scaleY = capsuleScale
-                }
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-        )
-
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(
@@ -565,6 +629,19 @@ private fun FloatingNavItem(
             )
         }
     }
+}
+
+private data class NavItemFrame(
+    val left: Float,
+    val width: Float
+) {
+    companion object {
+        val Zero = NavItemFrame(left = 0f, width = 0f)
+    }
+}
+
+private fun lerpFloat(start: Float, end: Float, fraction: Float): Float {
+    return start + ((end - start) * fraction)
 }
 
 @Composable
