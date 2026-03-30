@@ -9,7 +9,7 @@ from pathlib import Path
 
 # 导入数据库初始化函数和路由模块
 from database import create_db_and_tables
-from routes import users, meetings, auth, meeting_types, notes, devices, app_updates, system_settings, sync, vote, lottery, reading_progress, checkin, dashboard, media
+from routes import users, meetings, auth, meeting_types, notes, devices, app_updates, system_settings, sync, vote, lottery, reading_progress, checkin, dashboard, media, cover_center
 from socket_manager import sio, socket_app
 
 from fastapi import Request
@@ -121,6 +121,7 @@ app.include_router(reading_progress.router)
 app.include_router(checkin.router)
 app.include_router(dashboard.router)
 app.include_router(media.router)
+app.include_router(cover_center.router)
 
 # 挂载 Socket.IO (WebSocket 端点位于 /socket.io/)
 app.mount("/socket.io", socket_app)

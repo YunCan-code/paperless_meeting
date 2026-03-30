@@ -21,6 +21,9 @@
       </div>
       
       <div class="header-right">
+        <el-button plain size="large" @click="router.push('/admin/toolbox/covers')">
+          封面中心
+        </el-button>
         <el-button type="primary" size="large" @click="openDialog()" class="add-btn">
           <el-icon class="el-icon--left"><Plus /></el-icon>
           新建类型
@@ -102,6 +105,9 @@
             <el-radio :label="false" border>系统随机分配</el-radio>
             <el-radio :label="true" border>固定封面图片</el-radio>
           </el-radio-group>
+          <div class="el-upload__tip" style="margin-top: 8px;">
+            如果要统一维护类型随机池、公共随机池和登录海报，建议前往封面中心操作。
+          </div>
         </el-form-item>
 
         <el-form-item label="封面设置" v-if="form.is_fixed_image">
@@ -155,6 +161,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 引入 sidebar 逻辑
@@ -169,6 +176,7 @@ import {
 
 // 获取侧边栏状态
 const { isCollapse, toggleSidebar } = useSidebar()
+const router = useRouter()
 
 const types = ref([])
 const loading = ref(false)

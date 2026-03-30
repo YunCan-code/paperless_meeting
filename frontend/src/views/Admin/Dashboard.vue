@@ -22,7 +22,7 @@
 
         <el-menu
           router
-          :default-active="$route.path"
+          :default-active="activeMenuPath"
           class="custom-menu"
           :collapse="isCollapse"
           :collapse-transition="false"
@@ -82,15 +82,23 @@
 import { Calendar, User, List, Monitor, Fold, Expand, Setting, Cellphone, MoonNight, Sunrise, PieChart, MagicStick, VideoCamera } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import { useTheme } from '@/composables/useTheme'
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 
 // 使用全局侧边栏状态，与子页面共享
 const { isCollapse, toggleSidebar: toggleCollapse } = useSidebar()
+const route = useRoute()
 
 // 使用主题切换
 const { isDark, toggleDark } = useTheme()
 
 const isMobile = ref(false)
+const activeMenuPath = computed(() => {
+  if (route.path.startsWith('/admin/toolbox/')) {
+    return '/admin/toolbox'
+  }
+  return route.path
+})
 
 const checkMobile = () => {
   const mobile = window.innerWidth <= 768

@@ -12,7 +12,7 @@
 
         <div class="title-group">
           <h1 class="page-title">系统设置</h1>
-          <p class="page-subtitle">按 Web 端与 Android 端分区管理系统设置项</p>
+          <p class="page-subtitle">管理 Web 端默认参数与全局安全规则</p>
         </div>
       </div>
     </div>
@@ -83,68 +83,13 @@
             </el-form>
           </el-card>
 
-          <div class="section-block section-block-android">
-            <div class="section-title">Android 端设置</div>
-            <div class="section-subtitle">仅影响安卓平板端展示与登录体验</div>
-          </div>
-
-          <el-card shadow="hover" class="setting-card card-spacing">
-            <template #header>
-              <div class="card-header">
-                <div class="header-icon bg-cyan-50 text-cyan-500">
-                  <el-icon><PictureFilled /></el-icon>
-                </div>
-                <div class="header-title">
-                  <h3>Android 登录页海报</h3>
-                  <p>用于安卓平板横屏登录页左侧展示，支持上传、替换和清空</p>
-                </div>
-              </div>
-            </template>
-
-            <div class="poster-panel">
-              <div class="poster-preview" :class="{ empty: !posterPreviewUrl }">
-                <img v-if="posterPreviewUrl" :src="posterPreviewUrl" alt="Android 登录页海报预览" />
-                <div v-else class="poster-placeholder">
-                  <el-icon><PictureFilled /></el-icon>
-                  <span>当前未设置登录海报，安卓端将回退到本地默认图</span>
-                </div>
-              </div>
-
-              <div class="poster-actions">
-                <el-upload
-                  action="/api/settings/upload_login_poster"
-                  :show-file-list="false"
-                  :before-upload="beforePosterUpload"
-                  :on-success="handlePosterUploadSuccess"
-                  :on-error="handlePosterUploadError"
-                >
-                  <el-button type="primary">
-                    {{ posterPreviewUrl ? '替换海报' : '上传海报' }}
-                  </el-button>
-                </el-upload>
-                <el-button v-if="posterPreviewUrl" plain @click="clearPoster">清空海报</el-button>
-              </div>
-
-              <div class="poster-hints">
-                <div class="hint-title">推荐规格</div>
-                <ul class="hint-list">
-                  <li>推荐尺寸：`1920 x 1080`</li>
-                  <li>最低建议：`1280 x 720`</li>
-                  <li>推荐比例：`16:9`</li>
-                  <li>支持格式：`JPG / PNG / WebP`</li>
-                  <li>文件大小建议：`<= 5MB`</li>
-                  <li>说明：图片会用于安卓平板横屏登录页左侧展示，建议使用横版高清图，避免文字过密和主体被裁切。</li>
-                </ul>
-              </div>
-            </div>
-          </el-card>
         </el-col>
 
         <el-col :span="8" :xs="24">
           <el-card shadow="never" class="action-card">
             <div class="action-summary">
               <h4>保存更改</h4>
-              <p>所有变更保存后会立即生效，Android 登录页海报会通过版本号自动刷新缓存。</p>
+              <p>所有变更保存后会立即生效，新的默认地点和可见性规则会直接应用到系统中。</p>
             </div>
             <el-button type="primary" size="large" @click="saveSettings" :loading="saving" style="width: 100%;">
               保存所有设置
@@ -157,9 +102,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Expand, Fold, Hide, InfoFilled, Location, PictureFilled } from '@element-plus/icons-vue'
+import { Expand, Fold, Hide, InfoFilled, Location } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { useSidebar } from '@/composables/useSidebar'
 
@@ -168,17 +113,7 @@ const saving = ref(false)
 
 const settings = ref({
   default_meeting_location: '',
-  meeting_visibility_hide_after_hours: 0,
-  android_login_poster_url: '',
-  android_login_poster_version: ''
-})
-
-const posterPreviewUrl = computed(() => {
-  const url = settings.value.android_login_poster_url
-  const version = settings.value.android_login_poster_version
-  if (!url) return ''
-  if (!version) return url
-  return `${url}${url.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`
+  meeting_visibility_hide_after_hours: 0
 })
 
 const fetchSettings = async () => {
@@ -188,39 +123,9 @@ const fetchSettings = async () => {
     settings.value.meeting_visibility_hide_after_hours = res.meeting_visibility_hide_after_hours
       ? Number.parseInt(res.meeting_visibility_hide_after_hours, 10)
       : 0
-    settings.value.android_login_poster_url = res.android_login_poster_url || ''
-    settings.value.android_login_poster_version = res.android_login_poster_version || ''
   } catch (error) {
     ElMessage.error('加载设置失败')
   }
-}
-
-const beforePosterUpload = (rawFile) => {
-  const isSupported = ['image/jpeg', 'image/png', 'image/webp'].includes(rawFile.type)
-  if (!isSupported) {
-    ElMessage.error('仅支持 JPG、PNG、WebP 格式')
-    return false
-  }
-  if (rawFile.size / 1024 / 1024 > 5) {
-    ElMessage.error('图片大小不能超过 5MB')
-    return false
-  }
-  return true
-}
-
-const handlePosterUploadSuccess = (res) => {
-  settings.value.android_login_poster_url = res.url || ''
-  settings.value.android_login_poster_version = res.version || ''
-  ElMessage.success('登录海报上传成功')
-}
-
-const handlePosterUploadError = () => {
-  ElMessage.error('登录海报上传失败')
-}
-
-const clearPoster = () => {
-  settings.value.android_login_poster_url = ''
-  settings.value.android_login_poster_version = ''
 }
 
 const saveSettings = async () => {
@@ -228,9 +133,7 @@ const saveSettings = async () => {
     saving.value = true
     await request.post('/settings/', {
       default_meeting_location: settings.value.default_meeting_location,
-      meeting_visibility_hide_after_hours: String(settings.value.meeting_visibility_hide_after_hours ?? 0),
-      android_login_poster_url: settings.value.android_login_poster_url || '',
-      android_login_poster_version: settings.value.android_login_poster_version || ''
+      meeting_visibility_hide_after_hours: String(settings.value.meeting_visibility_hide_after_hours ?? 0)
     })
 
     localStorage.setItem('defaultMeetingLocation', settings.value.default_meeting_location)
@@ -269,9 +172,6 @@ onMounted(fetchSettings)
   gap: 4px;
   padding: 0 4px;
   margin-bottom: 16px;
-}
-.section-block-android {
-  margin-top: 28px;
 }
 .section-title {
   font-size: 18px;

@@ -10,12 +10,12 @@
         <el-divider direction="vertical" class="header-divider" />
         <div class="title-group">
           <h1 class="page-title">快捷功能</h1>
-          <p class="page-subtitle">常用会议互动工具集合</p>
+          <p class="page-subtitle">常用会议互动与封面管理入口集合</p>
         </div>
       </div>
     </div>
 
-    <el-row :gutter="20">
+    <el-row :gutter="20" class="toolbox-grid">
       <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="tool in tools" :key="tool.id">
         <el-card 
           class="tool-card" 
@@ -98,7 +98,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   DataAnalysis, Trophy, CircleCheck, Notebook,
-  ArrowRight, MagicStick, Timer, Fold, Expand
+  ArrowRight, MagicStick, Timer, Fold, Expand, PictureFilled
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
 import request from '@/utils/request'
@@ -136,6 +136,14 @@ const tools = [
     color: '#8b5cf6'    // violet-500
   },
   {
+    id: 'cover-center',
+    title: '封面中心',
+    desc: '统一管理默认封面、类型封面与登录海报',
+    icon: 'PictureFilled',
+    bgColor: '#ecfeff',
+    color: '#0891b2'
+  },
+  {
     id: 'signin',
     title: '签到',
     desc: '功能未完成，敬请期待',
@@ -168,6 +176,8 @@ const currentMeeting = computed(() => {
 const handleToolClick = (tool) => {
   if (tool.id === 'followup') {
     router.push('/admin/followup')
+  } else if (tool.id === 'cover-center') {
+    router.push('/admin/toolbox/covers')
   } else if (tool.id === 'vote' || tool.id === 'lottery') {
     activeToolId.value = tool.id
     openMeetingSelect()
@@ -256,13 +266,21 @@ const formatDate = (str) => {
   line-height: 1.4;
 }
 
+.toolbox-grid {
+  row-gap: 20px;
+}
+
+.toolbox-grid > :deep(.el-col) {
+  display: flex;
+}
+
 .tool-card {
   border: none;
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-bottom: 20px;
   height: 100%;
+  width: 100%;
   position: relative;
   overflow: hidden;
   background-color: var(--card-bg);

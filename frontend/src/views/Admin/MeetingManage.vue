@@ -559,16 +559,21 @@
                     </el-upload>
                     <el-button v-if="form.cover_image" plain @click="clearMeetingCover">清空封面</el-button>
                   </div>
-                  <div class="meeting-cover-hints">
-                    <div>推荐尺寸：1600 x 900</div>
-                    <div>最低建议：1200 x 675</div>
-                    <div>推荐比例：16:9</div>
-                    <div>支持格式：JPG / PNG / WebP</div>
-                    <div>文件大小建议：&lt;= 5MB</div>
-                    <div>说明：该图片优先级高于会议类型封面，将同时用于安卓会议卡片和详情 Banner。</div>
+                    <div class="meeting-cover-hints">
+                      <div>推荐尺寸：1600 x 900</div>
+                      <div>最低建议：1200 x 675</div>
+                      <div>推荐比例：16:9</div>
+                      <div>支持格式：JPG / PNG / WebP</div>
+                      <div>文件大小建议：&lt;= 5MB</div>
+                      <div>说明：该图片优先级高于会议类型封面，将同时用于安卓会议卡片和详情 Banner。</div>
+                    </div>
+                    <div class="meeting-cover-shortcut">
+                      <el-button text type="primary" @click="router.push('/admin/toolbox/covers')">
+                        去封面中心管理默认封面与类型封面
+                      </el-button>
+                    </div>
                   </div>
-                </div>
-              </el-form-item>
+                </el-form-item>
             </div>
 
             <el-divider class="form-divider" />
@@ -700,6 +705,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -714,6 +720,7 @@ import TodayMeetings from './components/TodayMeetings.vue'
 import MeetingHistory from './components/MeetingHistory.vue'
 
 const { isCollapse, toggleSidebar } = useSidebar()
+const router = useRouter()
 
 const meetings = ref([])
 const meetingTypes = ref([])
@@ -2126,6 +2133,10 @@ html.dark .modern-meeting-form :deep(.contact-item-modern .el-input__wrapper) {
   font-size: 13px;
   line-height: 1.6;
   color: #64748b;
+}
+.meeting-cover-shortcut {
+  display: flex;
+  justify-content: flex-start;
 }
 
 /* Media Link Toggle */

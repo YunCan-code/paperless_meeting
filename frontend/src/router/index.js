@@ -52,6 +52,11 @@ const router = createRouter({
                     path: 'toolbox',
                     name: 'toolbox',
                     component: () => import('../views/Admin/Toolbox.vue')
+                },
+                {
+                    path: 'toolbox/covers',
+                    name: 'cover-center',
+                    component: () => import('../views/Admin/CoverCenter.vue')
                 }
             ]
         },
