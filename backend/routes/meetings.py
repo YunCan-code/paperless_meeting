@@ -642,15 +642,13 @@ class MeetingCardResponse(BaseModel):
     check_in_time: Optional[datetime] = None
     is_today_meeting: bool = False
 
-APP_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
-
-# 默认会议图改为后端本地静态资源，确保 Web / Android 命中同一套可控图片
+# 默认会议图统一放到 uploads/meeting_defaults 下，通过现有 /static 链路暴露
 DEFAULT_IMAGES = {
-    "weekly": "/app-assets/meeting_defaults/weekly.png",
-    "urgent": "/app-assets/meeting_defaults/urgent.png",
-    "review": "/app-assets/meeting_defaults/review.png",
-    "kickoff": "/app-assets/meeting_defaults/kickoff.png",
-    "default": "/app-assets/meeting_defaults/default.png",
+    "weekly": "/static/meeting_defaults/weekly.png",
+    "urgent": "/static/meeting_defaults/urgent.png",
+    "review": "/static/meeting_defaults/review.png",
+    "kickoff": "/static/meeting_defaults/kickoff.png",
+    "default": "/static/meeting_defaults/default.png",
 }
 
 from cachetools import TTLCache
@@ -789,10 +787,6 @@ def build_thumbnail_url(image_url: Optional[str], base_url: str) -> Optional[str
             )
         return image_url
 
-    asset_source = _resolve_app_asset_path(image_url)
-    if asset_source is not None:
-        return _public_static_url(image_url, base_url, asset_source)
-
     return _optimize_unsplash_url(image_url)
 
 
@@ -825,33 +819,7 @@ def _normalize_public_image_url(image_url: Optional[str], base_url: str) -> Opti
     if image_url.startswith("/static/"):
         source = _resolve_local_source_path(image_url)
         return _public_static_url(image_url, base_url, source)
-    if image_url.startswith("/app-assets/"):
-        source = _resolve_app_asset_path(image_url)
-        return _public_static_url(image_url, base_url, source)
     return image_url
-
-
-def _resolve_app_asset_path(image_url: str) -> Optional[Path]:
-    parsed = urlparse(image_url)
-    path = parsed.path or image_url
-    if not path.startswith("/app-assets/"):
-        return None
-
-    rel = path.replace("/app-assets/", "", 1)
-    rel_path = Path(rel)
-    if any(part == ".." for part in rel_path.parts):
-        return None
-
-    try:
-        source = (APP_ASSETS_DIR / rel_path).resolve()
-        asset_root = APP_ASSETS_DIR.resolve()
-        if asset_root not in source.parents and source != asset_root:
-            return None
-        if not source.is_file():
-            return None
-        return source
-    except Exception:
-        return None
 
 
 def _classify_default_source(type_name: str) -> str:

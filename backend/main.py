@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
+import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -19,12 +20,29 @@ from models import MeetingType
 
 # 调试模式：生产环境设为 false，避免泄露 traceback
 DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+BACKEND_ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
+DEFAULT_MEETING_SOURCE_DIR = BACKEND_ASSETS_DIR / "meeting_defaults"
+DEFAULT_MEETING_UPLOAD_DIR = UPLOADS_DIR / "meeting_defaults"
+
+
+def sync_default_meeting_assets() -> None:
+    """Sync version-controlled default meeting covers into uploads for /static serving."""
+    if not DEFAULT_MEETING_SOURCE_DIR.exists():
+        return
+
+    DEFAULT_MEETING_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    for asset in DEFAULT_MEETING_SOURCE_DIR.iterdir():
+        if not asset.is_file():
+            continue
+        shutil.copy2(asset, DEFAULT_MEETING_UPLOAD_DIR / asset.name)
 
 # 定义应用生命周期管理器
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时执行: 创建数据库表
     create_db_and_tables()
+    sync_default_meeting_assets()
     
     # 检查并创建默认会议类型
     with Session(engine) as session:
@@ -50,7 +68,6 @@ async def lifespan(app: FastAPI):
 
 # 创建 FastAPI 应用实例
 app = FastAPI(title="Paperless Meeting System", lifespan=lifespan)
-BACKEND_ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -87,7 +104,6 @@ app.add_middleware(
 # 挂载静态文件目录
 # 用于让平版端可以通过 URL (如 http://ip:8000/static/file.pdf) 访问上传的文件
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
-app.mount("/app-assets", StaticFiles(directory=str(BACKEND_ASSETS_DIR)), name="app-assets")
 
 # 注册 API 路由器
 app.include_router(users.router)
