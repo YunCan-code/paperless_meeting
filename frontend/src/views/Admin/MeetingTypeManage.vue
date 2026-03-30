@@ -100,39 +100,12 @@
         <el-form-item label="类型名称" required>
           <el-input v-model="form.name" placeholder="如：党委会、办公会" maxlength="20" show-word-limit />
         </el-form-item>
-        <el-form-item label="封面策略">
-          <el-radio-group v-model="form.is_fixed_image">
-            <el-radio :label="false" border>系统随机分配</el-radio>
-            <el-radio :label="true" border>固定封面图片</el-radio>
-          </el-radio-group>
-          <div class="el-upload__tip" style="margin-top: 8px;">
-            如果要统一维护类型随机池、公共随机池和登录海报，建议前往封面中心操作。
-          </div>
-        </el-form-item>
-
-        <el-form-item label="封面设置" v-if="form.is_fixed_image">
-          <div class="type-cover-panel">
-            <div class="type-cover-preview">
-              <img v-if="form.cover_image" :src="form.cover_image" class="cover-image" />
-              <el-icon v-else class="cover-uploader-icon"><Plus /></el-icon>
-            </div>
-            <div class="type-cover-actions">
-              <el-upload
-                action="/api/meeting_types/upload_cover"
-                :show-file-list="false"
-                :on-success="handleCoverSuccess"
-                :on-error="handleCoverError"
-                :before-upload="beforeCoverUpload"
-              >
-                <el-button type="primary" plain>
-                  {{ form.cover_image ? '替换封面' : '上传封面' }}
-                </el-button>
-              </el-upload>
-              <el-button v-if="form.cover_image" plain @click="clearCover">清空封面</el-button>
-            </div>
-            <div class="el-upload__tip">
-              推荐尺寸 1600 x 900，支持 JPG / PNG / WebP，文件大小不超过 5MB
-            </div>
+        <el-form-item label="封面配置">
+          <div class="cover-entry-hint">
+            <p>会议类型的固定封面、随机池、公共随机池和 Android 登录海报，统一在封面中心维护。</p>
+            <el-button text type="primary" @click="router.push('/admin/toolbox/covers')">
+              前往封面中心
+            </el-button>
           </div>
         </el-form-item>
 
@@ -250,32 +223,6 @@ const openDialog = (item = null) => {
     }
   }
   dialogVisible.value = true
-}
-
-const handleCoverSuccess = (res) => {
-  form.value.cover_image = res?.url || ''
-  ElMessage.success('封面上传成功')
-}
-
-const handleCoverError = () => {
-  ElMessage.error('封面上传失败，请稍后重试')
-}
-
-const beforeCoverUpload = (rawFile) => {
-  const isSupported = ['image/jpeg', 'image/png', 'image/webp'].includes(rawFile.type)
-  if (!isSupported) {
-    ElMessage.error('仅支持 JPG、PNG、WebP 格式')
-    return false
-  }
-  if (rawFile.size / 1024 / 1024 > 5) {
-    ElMessage.error('图片大小不能超过 5MB')
-    return false
-  }
-  return true
-}
-
-const clearCover = () => {
-  form.value.cover_image = ''
 }
 
 const handleSave = async () => {
@@ -524,42 +471,17 @@ onMounted(fetchTypes)
   gap: 12px;
 }
 
-.type-cover-preview {
-  border: 1px dashed var(--border-color);
-  border-radius: 8px;
-  position: relative;
-  overflow: hidden;
-  transition: var(--el-transition-duration-fast);
+.cover-entry-hint {
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
   background: var(--bg-main);
+  padding: 14px 16px;
 }
 
-.type-cover-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.type-cover-actions :deep(.el-upload) {
-  display: inline-flex;
-}
-
-.cover-uploader-icon {
-  font-size: 28px;
-  color: #8c939d;
-  width: 100%;
-  height: 120px;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-main);
-}
-
-.cover-image {
-  width: 100%;
-  height: 120px;
-  display: block;
-  object-fit: cover;
+.cover-entry-hint p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
 }
 </style>

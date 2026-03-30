@@ -14,10 +14,6 @@
         </div>
       </div>
 
-      <div class="header-right">
-        <el-button plain @click="router.push('/admin/meetings')">会议管理</el-button>
-        <el-button type="primary" plain @click="router.push('/admin/media')">媒体库</el-button>
-      </div>
     </div>
 
     <div class="summary-grid">
@@ -49,7 +45,7 @@
       :closable="false"
       show-icon
       title="管理原则"
-      description="单场会议封面优先级最高，类型固定封面次之；若类型使用随机策略，则先取该类型随机池，再回退到公共随机池，最后使用系统默认封面。"
+      description="单场会议封面优先级最高，类型固定封面次之；若类型使用随机策略，则先取该类型随机池，再回退到公共随机池，最后使用系统默认封面。会议专属封面仍在会议管理里单独设置，不会汇总到这里。"
     />
 
     <div class="content-grid">
@@ -252,7 +248,7 @@
           </template>
 
           <div class="exclusive-card">
-            <p>这里负责统一的全局规则与类型规则；单场会议封面属于临时特例，继续在会议管理里操作更合适。</p>
+            <p>这里负责统一的全局规则与类型规则；单场会议封面属于临时特例，继续在会议管理里操作更合适，也不会在本页单独列出。</p>
             <el-button type="primary" plain @click="router.push('/admin/meetings')">前往会议管理</el-button>
           </div>
         </el-card>
@@ -480,12 +476,6 @@ onMounted(fetchOverview)
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.header-right {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 .collapse-btn {

@@ -37,8 +37,9 @@
               <div class="stat-value">
                 {{ stat.value }}
                 <span class="stat-trend" :class="stat.trend >= 0 ? 'up' : 'down'" v-if="stat.trend !== undefined">
+                  <span>{{ stat.trendLabel }}</span>
                   <el-icon><component :is="stat.trend >= 0 ? 'Top' : 'Bottom'" /></el-icon>
-                  {{ Math.abs(stat.trend) }}% {{ stat.trendLabel }}
+                  <span>{{ Math.abs(stat.trend) }}%</span>
                 </span>
               </div>
               <!-- <div class="stat-desc">{{ stat.subtitle }}</div> -->
@@ -566,10 +567,11 @@
                       <div>支持格式：JPG / PNG / WebP</div>
                       <div>文件大小建议：&lt;= 5MB</div>
                       <div>说明：该图片优先级高于会议类型封面，将同时用于安卓会议卡片和详情 Banner。</div>
+                      <div>说明：会议专属封面只在当前会议中生效，不会同步展示到封面中心。</div>
                     </div>
                     <div class="meeting-cover-shortcut">
                       <el-button text type="primary" @click="router.push('/admin/toolbox/covers')">
-                        去封面中心管理默认封面与类型封面
+                        去封面中心统一管理类型封面与默认封面
                       </el-button>
                     </div>
                   </div>
