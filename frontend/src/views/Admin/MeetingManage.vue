@@ -38,7 +38,7 @@
                 {{ stat.value }}
                 <span class="stat-trend" :class="stat.trend >= 0 ? 'up' : 'down'" v-if="stat.trend !== undefined">
                   <el-icon><component :is="stat.trend >= 0 ? 'Top' : 'Bottom'" /></el-icon>
-                  {{ Math.abs(stat.trend) }}%
+                  {{ Math.abs(stat.trend) }}% {{ stat.trendLabel }}
                 </span>
               </div>
               <!-- <div class="stat-desc">{{ stat.subtitle }}</div> -->
@@ -850,6 +850,7 @@ const statsData = computed(() => {
       title: '本年会议数', 
       value: stats.value.yearly_count, 
       trend: stats.value.yearly_growth || 0,
+      trendLabel: '同比',
       icon: 'DataAnalysis', 
       bgClass: 'bg-purple-50', 
       textClass: 'text-purple-500' 
@@ -858,6 +859,7 @@ const statsData = computed(() => {
       title: '本月会议数', 
       value: stats.value.monthly_count, 
       trend: stats.value.monthly_growth || 0,
+      trendLabel: '环比',
       icon: 'Calendar', 
       bgClass: 'bg-blue-50', 
       textClass: 'text-blue-500' 
@@ -866,6 +868,7 @@ const statsData = computed(() => {
       title: '本周会议数', 
       value: stats.value.weekly_count, 
       trend: stats.value.weekly_growth || 0,
+      trendLabel: '环比',
       icon: 'CollectionTag', 
       bgClass: 'bg-orange-50', 
       textClass: 'text-orange-500' 
@@ -874,6 +877,7 @@ const statsData = computed(() => {
       title: '文件存储', 
       value: storageStr, 
       trend: stats.value.storage_growth || 0,
+      trendLabel: '环比',
       icon: 'FolderOpened', 
       bgClass: 'bg-green-50', 
       textClass: 'text-green-500',
