@@ -49,6 +49,8 @@ def create_db_and_tables():
         SQLModel.metadata.create_all(engine)
         _ensure_compatible_meeting_schema()
         _ensure_compatible_device_schema()
+        _ensure_compatible_vote_schema()
+        _ensure_compatible_lottery_schema()
     except Exception as e:
         # 在多 worker 启动时，可能会遇到并发创建表的竞争条件
         # 如果甚至 "UniqueViolation" 等错误，通常意味着另一个 worker 已经创建了表
@@ -132,6 +134,59 @@ def _ensure_compatible_meeting_schema():
         print("[INFO] Added meeting compatibility columns")
     except Exception as e:
         print(f"[WARN] Meeting schema compatibility check failed: {e}")
+
+def _ensure_compatible_vote_schema():
+    """
+    兼容旧库，补齐投票扩展字段。
+    """
+    try:
+        inspector = inspect(engine)
+        if "vote" not in inspector.get_table_names():
+            return
+
+        existing_columns = {column["name"] for column in inspector.get_columns("vote")}
+        statements = []
+
+        if "countdown_seconds" not in existing_columns:
+            if "sqlite" in DATABASE_URL:
+                statements.append("ALTER TABLE vote ADD COLUMN countdown_seconds INTEGER DEFAULT 10")
+            else:
+                statements.append("ALTER TABLE vote ADD COLUMN countdown_seconds INTEGER DEFAULT 10")
+
+        if "closed_at" not in existing_columns:
+            if "sqlite" in DATABASE_URL:
+                statements.append("ALTER TABLE vote ADD COLUMN closed_at TIMESTAMP")
+            else:
+                statements.append("ALTER TABLE vote ADD COLUMN closed_at TIMESTAMP")
+
+        if not statements:
+            return
+
+        with engine.begin() as connection:
+            for statement in statements:
+                connection.execute(text(statement))
+
+        print("[INFO] Added vote compatibility columns")
+    except Exception as e:
+        print(f"[WARN] Vote schema compatibility check failed: {e}")
+
+def _ensure_compatible_lottery_schema():
+    """
+    兼容旧库中的抽签状态枚举值。
+    """
+    try:
+        inspector = inspect(engine)
+        if "lottery" not in inspector.get_table_names():
+            return
+
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE lottery SET status = 'draft' WHERE status IN ('pending', 'waiting', 'active')")
+            )
+
+        print("[INFO] Normalized lottery status values")
+    except Exception as e:
+        print(f"[WARN] Lottery schema compatibility check failed: {e}")
 
 def get_session():
     """

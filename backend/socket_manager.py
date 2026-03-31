@@ -2,6 +2,7 @@
 Socket.IO 实时通信管理器
 用于投票等实时功能的 WebSocket 通信
 """
+import json
 import socketio
 import os
 from typing import Dict, Set, Optional
@@ -10,10 +11,10 @@ from typing import Dict, Set, Optional
 from sqlmodel import Session as SQLSession
 try:
     from backend.database import engine
-    from backend.models import User, LotteryParticipant, Lottery, LotteryWinner
+    from backend.models import User, LotteryParticipant, Lottery, LotteryWinner, LotterySession
 except ImportError:
     from database import engine
-    from models import User, LotteryParticipant, Lottery, LotteryWinner
+    from models import User, LotteryParticipant, Lottery, LotteryWinner, LotterySession
 
 # 获取 Redis URL (用于多 Worker 模式下的跨进程通信)
 REDIS_URL = os.environ.get('REDIS_URL')
@@ -146,13 +147,61 @@ async def leave_meeting(sid, data):
 
 # --- 投票相关广播 ---
 
-async def broadcast_vote_start(meeting_id: int, vote_data: dict):
+async def broadcast_vote_state(meeting_id: int, vote_data: dict):
     room = f"meeting_{meeting_id}"
-    await sio.emit('vote_start', vote_data, room=room)
+    await sio.emit('vote_state_change', vote_data, room=room)
+
+    # 兼容旧前端事件
+    status = vote_data.get("status")
+    if status in {"countdown", "active"}:
+        await sio.emit(
+            'vote_start',
+            {
+                "id": vote_data.get("id"),
+                "title": vote_data.get("title"),
+                "duration_seconds": vote_data.get("duration_seconds"),
+                "started_at": vote_data.get("started_at"),
+                "wait_seconds": vote_data.get("countdown_remaining_seconds") or 0,
+            },
+            room=room,
+        )
+    if status == "closed":
+        await sio.emit(
+            'vote_end',
+            {
+                "vote_id": vote_data.get("id"),
+                "results": {
+                    "vote_id": vote_data.get("id"),
+                    "title": vote_data.get("title"),
+                    "total_voters": vote_data.get("total_voters", 0),
+                    "results": vote_data.get("results", []),
+                },
+            },
+            room=room,
+        )
+
+
+async def broadcast_vote_results(meeting_id: int, vote_id: int, result_data: dict):
+    room = f"meeting_{meeting_id}"
+    await sio.emit('vote_results_change', result_data, room=room)
+    await sio.emit(
+        'vote_update',
+        {
+            'vote_id': vote_id,
+            'results': result_data.get('results', []),
+        },
+        room=room,
+    )
+
+
+async def broadcast_vote_start(meeting_id: int, vote_data: dict):
+    await broadcast_vote_state(meeting_id, vote_data)
+
 
 async def broadcast_vote_end(meeting_id: int, vote_id: int, final_results: dict):
     room = f"meeting_{meeting_id}"
     await sio.emit('vote_end', {'vote_id': vote_id, 'results': final_results}, room=room)
+
 
 async def broadcast_vote_update(meeting_id: int, vote_id: int, results: list):
     room = f"meeting_{meeting_id}"
@@ -163,6 +212,71 @@ async def broadcast_meeting_changed(action: str, meeting_data: Optional[dict] = 
     if meeting_data:
         payload.update(meeting_data)
     await sio.emit('meeting_changed', payload)
+
+
+def _get_lottery_session_snapshot(meeting_id: int) -> dict:
+    with get_db_session() as session:
+        meeting_session = session.get(LotterySession, meeting_id)
+        participants = get_db_participants(meeting_id)
+        rounds = session.exec(select(Lottery).where(Lottery.meeting_id == meeting_id).order_by(Lottery.created_at)).all()
+
+        current_round = None
+        if meeting_session and meeting_session.current_round_id:
+            current_round = session.get(Lottery, meeting_session.current_round_id)
+
+        winners = []
+        if meeting_session and meeting_session.last_result:
+            try:
+                winners = json.loads(meeting_session.last_result)
+            except Exception:
+                winners = []
+
+        return {
+            "meeting_id": meeting_id,
+            "session_status": meeting_session.session_status if meeting_session else "idle",
+            "current_round_id": current_round.id if current_round else None,
+            "current_round": {
+                "id": current_round.id,
+                "title": current_round.title,
+                "count": current_round.count,
+                "allow_repeat": current_round.allow_repeat,
+                "status": current_round.status,
+            } if current_round else None,
+            "participants": participants,
+            "participants_count": len(participants),
+            "winners": winners,
+            "rounds": [
+                {
+                    "id": round_item.id,
+                    "title": round_item.title,
+                    "count": round_item.count,
+                    "allow_repeat": round_item.allow_repeat,
+                    "status": round_item.status,
+                    "winner_count": len(round_item.winners),
+                }
+                for round_item in rounds
+            ],
+        }
+
+
+async def broadcast_lottery_session_change(meeting_id: int, payload: Optional[dict] = None):
+    room = f"meeting_{meeting_id}"
+    snapshot = payload or _get_lottery_session_snapshot(meeting_id)
+    await sio.emit('lottery_session_change', snapshot, room=room)
+
+    # 兼容旧前端的 state_change 结构
+    await sio.emit(
+        'lottery_state_change',
+        {
+            "status": str(snapshot.get("session_status", "idle")).upper(),
+            "participants": snapshot.get("participants", []),
+            "current_title": snapshot.get("current_round", {}).get("title") if snapshot.get("current_round") else None,
+            "current_count": snapshot.get("current_round", {}).get("count") if snapshot.get("current_round") else 1,
+            "winners": snapshot.get("winners", []),
+            "participant_count": snapshot.get("participants_count", 0),
+        },
+        room=room,
+    )
 
 
 # ========== 抽签功能 ==========

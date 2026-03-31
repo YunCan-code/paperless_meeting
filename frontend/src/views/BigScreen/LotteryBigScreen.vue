@@ -1,1091 +1,749 @@
 <template>
-  <div class="lottery-bigscreen">
-    <!-- Top Banner -->
-    <div class="top-banner">
-      <div class="banner-content">
-        <div class="title-section">
-          <h1 class="page-title">{{ state.current_title || '抽签活动' }}</h1>
-          <div class="round-info" v-if="rounds.length > 0">
-            第 {{ currentRoundIndex + 1 }}/{{ rounds.length }} 轮
-            <span v-if="state.current_count > 0"> · 抽取 {{ state.current_count }} 人</span>
-          </div>
-        </div>
-        <div class="status-section">
-          <div class="status-badge" :class="state.status.toLowerCase()">
-            <span class="status-dot"></span>
-            {{ getStatusText(state.status) }}
-          </div>
-          <div class="participant-stats">
-            <el-icon><User /></el-icon>
-            <span>{{ state.participant_count }} 人参与</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-content">
-      <!-- IDLE / PREPARING: Participant Pool -->
-      <div v-if="state.status === 'IDLE' || state.status === 'PREPARING'" class="pool-container">
-        <!-- IDLE State Notice -->
-        <div v-if="state.status === 'IDLE'" class="idle-notice">
-          <el-icon class="notice-icon"><InfoFilled /></el-icon>
-          <div class="notice-content">
-            <h3 v-if="rounds.length === 0">暂无抽签轮次</h3>
-            <h3 v-else-if="allFinished">所有轮次已完成</h3>
-            <h3 v-else>等待配置中...</h3>
-            <p v-if="rounds.length === 0">请先在管理界面创建抽签轮次</p>
-            <div v-else-if="allFinished">
-              <p>所有抽签轮次已完成,可在历史记录中查看结果</p>
-              <div style="margin-top: 24px;">
-                <el-button type="primary" size="large" @click="resetLottery(true)">
-                  <el-icon><Refresh /></el-icon>
-                  清除记录并重新开始
-                </el-button>
-              </div>
-            </div>
-            <p v-else>正在加载抽签配置,请稍候...</p>
-          </div>
-        </div>
-        
-        <!-- Control Panel -->
-        <div v-if="state.status === 'PREPARING'" class="control-panel">
-          <el-button 
-            type="primary" 
-            size="large" 
-            @click="startLottery"
-            :disabled="state.participant_count === 0 || allFinished"
-            :type="allFinished ? 'info' : 'primary'"
-          >
-            <el-icon><VideoPlay /></el-icon>
-            {{ allFinished ? '抽签结束' : (state.participant_count === 0 ? '等待参与者...' : '开始抽签') }}
-          </el-button>
-          <!-- 测试按钮已隐藏
-          <el-button 
-            size="large" 
-            @click="resetLottery"
-          >
-            <el-icon><RefreshLeft /></el-icon>
-            重置
-          </el-button>
-          <el-button 
-            type="warning"
-            size="large" 
-            @click="addTestParticipants"
-          >
-            <el-icon><UserFilled /></el-icon>
-            添加测试参与者
-          </el-button>
-          -->
-        </div>
-
-        <!-- Participant Pool -->
-        <div class="pool-section">
-          <div class="pool-header" v-if="state.participants.length > 0">
-            <h2>参与者池</h2>
-            <div class="pool-count">{{ state.participants.length }} 人</div>
-          </div>
-          
-          <div class="pool-grid" v-if="state.participants.length > 0">
-            <transition-group name="list">
-              <div 
-                v-for="p in sortedParticipants" 
-                :key="p.id" 
-                class="participant-card"
-                :class="getWinnerClass(p)"
-              >
-                <div class="avatar-placeholder">
-                  <img v-if="p.avatar" :src="p.avatar" :alt="p.name" />
-                  <span v-else class="avatar-text">{{ p.name.charAt(0) }}</span>
-                </div>
-                <div class="participant-info">
-                  <span class="name">{{ p.name }}</span>
-                  <span class="dept" v-if="p.department">{{ p.department }}</span>
-                </div>
-              </div>
-            </transition-group>
-          </div>
-          
-          <div v-else class="empty-pool">
-            <div class="scanning-animation">
-              <el-icon class="scanning-icon"><Cpu /></el-icon>
-            </div>
-            <h3>等待参与者加入</h3>
-            <p>请在移动端扫码或点击"抽签"加入本轮抽签</p>
-            <div class="mobile-hint">
-              <el-icon><Cellphone /></el-icon>
-              <span>手机端路径: 会议详情 → 抽签</span>
-            </div>
-          </div>
-        </div>
+  <div class="lottery-screen">
+    <section class="screen-header">
+      <div>
+        <span class="eyebrow">会议互动中心 / 抽签大屏</span>
+        <h1>{{ currentRoundTitle }}</h1>
+        <p>{{ sessionSummary }}</p>
       </div>
 
-      <!-- ROLLING: Rolling Animation -->
-      <div v-else-if="state.status === 'ROLLING'" class="rolling-container">
-        <div class="rolling-machine">
-          <div class="rolling-window">
-            <div class="rolling-name">{{ rollingName }}</div>
+      <div class="header-metrics">
+        <div class="metric-box">
+          <span>会话状态</span>
+          <strong>{{ sessionStatusLabel }}</strong>
+        </div>
+        <div class="metric-box">
+          <span>参与池</span>
+          <strong>{{ session.participants_count || 0 }} 人</strong>
+        </div>
+        <div class="metric-box">
+          <span>已完成轮次</span>
+          <strong>{{ finishedRoundsCount }}/{{ rounds.length }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen-body">
+      <div class="main-panel">
+        <div class="panel-toolbar">
+          <div class="toolbar-status" :class="`status-${session.session_status}`">
+            <span class="dot" />
+            {{ sessionStatusLabel }}
           </div>
-          <div class="rolling-status">正在抽取 {{ state.current_count }} 位幸运儿...</div>
-          
-          <!-- Stop Button -->
-          <div class="stop-button-section">
-            <el-button 
-              type="danger" 
+          <div class="toolbar-actions">
+            <el-button
+              v-if="!session.current_round && nextRound"
+              type="primary"
               size="large"
-              @click="stopLottery"
+              :loading="actionLoading"
+              @click="prepareRound(nextRound)"
             >
-              <el-icon><CircleClose /></el-icon>
-              停止抽签
+              准备下一轮
+            </el-button>
+            <el-button
+              v-if="session.current_round && ['collecting', 'ready', 'result', 'completed', 'idle'].includes(session.session_status)"
+              type="primary"
+              size="large"
+              :loading="actionLoading"
+              :disabled="session.participants_count === 0 || session.current_round.status === 'finished'"
+              @click="startRoll"
+            >
+              开始滚动
+            </el-button>
+            <el-button
+              v-if="session.session_status === 'rolling'"
+              type="danger"
+              size="large"
+              :loading="actionLoading"
+              @click="stopRoll"
+            >
+              停止开奖
+            </el-button>
+            <el-button plain size="large" :loading="actionLoading" @click="resetSession">
+              重置会话
             </el-button>
           </div>
         </div>
-      </div>
 
-      <!-- RESULT: Winners Display -->
-      <div v-else-if="state.status === 'RESULT' && !showSummary" class="result-container">
-        <div class="result-header">
-          <h2>🎉 {{ state.current_title }} 中奖名单 🎉</h2>
-        </div>
-        
-        <div class="winners-grid">
-          <div 
-            v-for="(winner, index) in state.winners" 
-            :key="winner.id || index" 
-            class="winner-card"
-            :style="{ animationDelay: index * 0.15 + 's' }"
-          >
-            <div class="winner-rank">{{ index + 1 }}</div>
-            <div class="trophy-icon">🏆</ div>
-            <div class="winner-name">{{ winner.name }}</div>
-          </div>
-        </div>
-        
-        <!-- Action Buttons -->
-        <div class="result-actions">
-          <el-button 
-            v-if="hasNextRound" 
-            type="primary" 
-            size="large"
-            @click="prepareNextRound"
-          >
-            <el-icon><DArrowRight /></el-icon>
-            下一轮抽签
-          </el-button>
-
-          <el-button 
-            size="large"
-            @click="backToPool"
-          >
-            <el-icon><Back /></el-icon>
-            返回参与者池
-          </el-button>
-        </div>
-        
-        <div class="confetti-canvas"></div>
-      </div>
-
-      <!-- ALL ROUNDS SUMMARY -->
-      <div v-else-if="showSummary" class="summary-container">
-        <div class="summary-header">
-          <h1>🎊 本次抽签活动完整结果 🎊</h1>
-          <p>共 {{ rounds.length }} 轮抽签</p>
-          <div style="margin-top: 20px;">
-             <el-button type="primary" size="large" @click="showSummary = false">
-                <el-icon><Back /></el-icon> 返回大屏
-             </el-button>
-          </div>
+        <div v-if="!rounds.length" class="empty-stage">
+          <h2>还没有抽签轮次</h2>
+          <p>请先在后台互动中心创建轮次，再进入大屏控制现场节奏。</p>
         </div>
 
-        <div class="rounds-summary">
-          <div 
-            v-for="(round, rIndex) in rounds" 
-            :key="round.id"
-            class="round-block"
-            :style="{ animationDelay: rIndex * 0.1 + 's' }"
-          >
-            <div class="round-header">
-              <span class="round-number">第 {{ rIndex + 1 }} 轮</span>
-              <h3>{{ round.title }}</h3>
-              <span class="round-count">抽取 {{ round.count }} 人</span>
+        <template v-else>
+          <div v-if="session.session_status === 'rolling'" class="rolling-stage">
+            <div class="rolling-card">
+              <span class="rolling-label">{{ currentRoundTitle }}</span>
+              <strong>{{ rollingDisplay }}</strong>
+              <p>主持人停止后立即生成本轮中奖结果</p>
             </div>
-            
-            <div class="round-winners" v-if="round.winners && round.winners.length > 0">
-              <div 
-                v-for="(winner, wIndex) in round.winners" 
-                :key="winner.id || wIndex"
-                class="summary-winner-card"
+          </div>
+
+          <div v-else-if="session.winners?.length" class="winner-stage">
+            <article v-for="winner in session.winners" :key="winner.user_id || winner.id" class="winner-card">
+              <span class="winner-badge">中签</span>
+              <h2>{{ winner.name || winner.user_name }}</h2>
+              <p>{{ winner.department || '会议参会人员' }}</p>
+            </article>
+          </div>
+
+          <div v-else class="pool-stage">
+            <div class="pool-copy">
+              <h2>{{ session.current_round ? `当前轮次：${session.current_round.title}` : '等待准备轮次' }}</h2>
+              <p>
+                {{
+                  session.current_round
+                    ? `本轮抽取 ${session.current_round.count} 人，移动端成员可在会议详情页主动加入或退出抽签池。`
+                    : '选择一轮后即可进入准备状态，现场成员加入后再开始滚动。'
+                }}
+              </p>
+            </div>
+
+            <div v-if="participants.length" class="participant-grid">
+              <div
+                v-for="participant in participants"
+                :key="participant.user_id"
+                class="participant-card"
+                :class="{ winner: participant.is_winner }"
               >
-                <div class="winner-badge">{{ wIndex + 1 }}</div>
-                <div class="winner-info">
-                  <div class="winner-name">{{ winner.user_name }}</div>
-                  <div class="winner-dept" v-if="winner.department">{{ winner.department }}</div>
-                </div>
+                <strong>{{ participant.name }}</strong>
+                <span>{{ participant.department || '参会人员' }}</span>
               </div>
             </div>
-            <div class="no-winners" v-else>
-              <span>暂无中奖者</span>
+            <el-empty v-else description="等待成员加入抽签池" :image-size="120" />
+          </div>
+        </template>
+      </div>
+
+      <aside class="side-panel">
+        <section class="side-card">
+          <div class="side-head">
+            <h3>轮次编排</h3>
+            <span>{{ rounds.length }} 轮</span>
+          </div>
+          <div class="round-list">
+            <button
+              v-for="round in rounds"
+              :key="round.id"
+              type="button"
+              class="round-item"
+              :class="{
+                active: session.current_round_id === round.id,
+                finished: round.status === 'finished'
+              }"
+              @click="prepareRound(round)"
+              :disabled="round.status === 'finished' || actionLoading"
+            >
+              <div>
+                <strong>{{ round.title }}</strong>
+                <span>抽取 {{ round.count }} 人</span>
+              </div>
+              <el-tag size="small" :type="round.status === 'finished' ? 'success' : round.status === 'ready' ? 'warning' : 'info'">
+                {{ getRoundStatusLabel(round.status) }}
+              </el-tag>
+            </button>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <div class="side-head">
+            <h3>历史结果</h3>
+            <span>{{ winnerHistory.length }} 条</span>
+          </div>
+          <div v-if="winnerHistory.length" class="history-list">
+            <div v-for="history in winnerHistory" :key="history.id" class="history-item">
+              <strong>{{ history.title }}</strong>
+              <div class="history-winners">
+                <span v-for="winner in history.winners" :key="winner.id">{{ winner.user_name }}</span>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div class="summary-actions">
-          <el-button 
-            type="primary"
-            size="large"
-            @click="showSummary = false"
-          >
-            <el-icon><Back /></el-icon>
-            返回当前轮结果
-          </el-button>
-        </div>
-      </div>
-    </div>
+          <el-empty v-else description="尚未产生中奖结果" :image-size="80" />
+        </section>
+      </aside>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
-import { 
-  Cpu, User, VideoPlay, RefreshLeft, Cellphone, 
-  DArrowRight, CircleCheck, Back, CircleClose, InfoFilled, UserFilled, Document 
-} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
 const route = useRoute()
-const meetingId = route.params.meetingId
+const meetingId = Number(route.params.meetingId)
 
-// Rounds list (fetched from API)
-const rounds = ref([])
-const currentRoundIndex = ref(0)
-
-// State
-const state = ref({
-  status: 'IDLE',
+const session = ref({
+  session_status: 'idle',
+  current_round_id: null,
+  current_round: null,
   participants: [],
-  current_title: '',
-  current_count: 1,
+  participants_count: 0,
   winners: [],
-  participant_count: 0
+  rounds: []
 })
+const actionLoading = ref(false)
+const rollingDisplay = ref('准备开始')
 
-const showSummary = ref(false) // Show all rounds summary
-
-const rollingName = ref('???')
-let rollingInterval = null
 let socket = null
+let rollingTimer = null
 
-// Computed: is there a next round?
-const hasNextRound = computed(() => {
-  return currentRoundIndex.value < rounds.value.length - 1
-})
+const rounds = computed(() => Array.isArray(session.value.rounds) ? session.value.rounds : [])
+const participants = computed(() => Array.isArray(session.value.participants) ? session.value.participants : [])
+const finishedRoundsCount = computed(() => rounds.value.filter(item => item.status === 'finished').length)
+const nextRound = computed(() => rounds.value.find(item => item.status !== 'finished') || null)
+const winnerHistory = computed(() => rounds.value.filter(item => Array.isArray(item.winners) && item.winners.length > 0))
 
-const allFinished = computed(() => {
-  return rounds.value.length > 0 && rounds.value.every(r => r.status === 'finished')
-})
+const sessionStatusLabel = computed(() => ({
+  idle: '空闲',
+  collecting: '收集中',
+  ready: '准备就绪',
+  rolling: '滚动中',
+  result: '结果展示中',
+  completed: '全部完成'
+}[session.value.session_status] || '未知状态'))
 
-// Computed: Sort participants (winners first)
-const sortedParticipants = computed(() => {
-  if (!state.value.participants) return []
-  const list = Array.isArray(state.value.participants) 
-    ? state.value.participants 
-    : Object.values(state.value.participants)
-    
-  return [...list].sort((a, b) => {
-    // Winners first
-    const aWin = a.is_winner ? 1 : 0
-    const bWin = b.is_winner ? 1 : 0
-    if (aWin !== bWin) return bWin - aWin
-    
-    // Within winners, newer rounds first
-    if (a.is_winner) {
-      const aRid = a.winning_lottery_id || 0
-      const bRid = b.winning_lottery_id || 0
-      if (aRid !== bRid) return bRid - aRid
-    }
-    
-    // Default by ID
-    return (a.id || 0) - (b.id || 0)
-  })
-})
+const currentRoundTitle = computed(() => session.value.current_round?.title || nextRound.value?.title || '抽签活动')
 
-// Helper: Get winner class based on round index
-const getWinnerClass = (p) => {
-  if (!p.is_winner) return ''
-  if (!p.winning_lottery_id) return 'is-winner winner-round-default'
-  
-  const roundIndex = rounds.value.findIndex(r => r.id === p.winning_lottery_id)
-  if (roundIndex === -1) return 'is-winner winner-round-default'
-  return `is-winner winner-round-${roundIndex % 5}`
-}
-
-// Flag to track if initial state has been received
-let initialStateReceived = false
-
-// Helpers
-const getStatusText = (status) => {
-  const map = {
-    'IDLE': '等待配置',
-    'PREPARING': '准备就绪',
-    'ROLLING': '正在抽签',
-    'RESULT': '结果公布'
+const sessionSummary = computed(() => {
+  if (!rounds.value.length) {
+    return '先在后台创建轮次，再由现场大屏控制开始、停止与结果展示。'
   }
-  return map[status] || status
+  if (session.value.session_status === 'rolling') {
+    return `当前正在滚动 ${currentRoundTitle.value}，主持人可随时停止并开奖。`
+  }
+  if (session.value.winners?.length) {
+    return `本轮已产生 ${session.value.winners.length} 位中奖者，可继续准备下一轮或保留结果展示。`
+  }
+  return session.value.current_round
+    ? `当前轮次将抽取 ${session.value.current_round.count} 人，等待主持控制开始。`
+    : '当前还没有准备好的轮次，可从右侧直接选择并准备。'
+})
+
+const clearRollingTimer = () => {
+  if (rollingTimer) {
+    clearInterval(rollingTimer)
+    rollingTimer = null
+  }
 }
 
-// Socket Initialization
-const initSocket = () => {
+const startRollingAnimation = () => {
+  clearRollingTimer()
+  const source = participants.value.filter(item => !item.is_winner || session.value.current_round?.allow_repeat)
+  if (!source.length) {
+    rollingDisplay.value = '等待参与者'
+    return
+  }
+  rollingDisplay.value = source[0].name
+  rollingTimer = window.setInterval(() => {
+    const pick = source[Math.floor(Math.random() * source.length)]
+    rollingDisplay.value = pick?.name || '等待参与者'
+  }, 120)
+}
+
+const applySnapshot = (payload) => {
+  if (!payload || Number(payload.meeting_id) !== meetingId) return
+  session.value = {
+    session_status: payload.session_status || 'idle',
+    current_round_id: payload.current_round_id || null,
+    current_round: payload.current_round || null,
+    participants: Array.isArray(payload.participants) ? payload.participants : [],
+    participants_count: payload.participants_count || 0,
+    winners: Array.isArray(payload.winners) ? payload.winners : [],
+    rounds: Array.isArray(payload.rounds) ? payload.rounds : []
+  }
+
+  if (session.value.session_status === 'rolling') {
+    startRollingAnimation()
+  } else {
+    clearRollingTimer()
+  }
+}
+
+const fetchSession = async () => {
+  try {
+    const payload = await request.get(`/lottery/${meetingId}/session`)
+    applySnapshot(payload)
+    if (!socket) {
+      connectSocket()
+    }
+  } catch (error) {
+    session.value = {
+      session_status: 'idle',
+      current_round_id: null,
+      current_round: null,
+      participants: [],
+      participants_count: 0,
+      winners: [],
+      rounds: []
+    }
+  }
+}
+
+const connectSocket = () => {
+  if (socket) return
   const url = import.meta.env.VITE_API_URL || window.location.origin
   socket = io(url, {
     path: '/socket.io',
     transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelay: 2000
+    reconnection: true
   })
 
   socket.on('connect', () => {
-    console.log('Connected to socket')
     socket.emit('join_meeting', { meeting_id: meetingId })
-    // Fetch initial state - fetchRoundsAndPrepareFirst will be called after state is received
-    socket.emit('get_lottery_state', { meeting_id: meetingId })
   })
-
-  socket.on('disconnect', (reason) => {
-    console.warn('Socket disconnected:', reason)
-  })
-
-  socket.on('connect_error', (err) => {
-    console.error('Socket connect error:', err.message)
-  })
-
-  socket.on('lottery_state_change', (data) => {
-    console.log('State update:', data)
-    handleStateChange(data)
-  })
-
-  socket.on('lottery_players_update', (data) => {
-    console.log('Players update:', data)
-    // Use unified 'participants' field
-    const participants = data.participants || data.all_participants
-    if (participants) {
-      state.value.participants = participants
-      state.value.participant_count = data.participant_count || data.count || participants.length
-      console.log('State updated - participants:', state.value.participants)
-    }
-  })
-
-  socket.on('lottery_state_sync', (data) => {
-    console.log('State sync (initial load):', data)
-    // Handle initial state from database
-    // Map backend field names to frontend state structure
-    state.value.status = data.status || 'IDLE'
-    state.value.participants = data.participants || data.all_participants || []
-    state.value.participant_count = data.participant_count || data.participants_count || state.value.participants.length
-    state.value.current_title = data.config?.title || ''
-    state.value.current_count = data.config?.count || 1
-    state.value.winners = data.last_result || []
-    
-    // On first state receive, fetch rounds and prepare if needed
-    if (!initialStateReceived) {
-      initialStateReceived = true
-      fetchRoundsAndPrepareFirst()
-    }
-  })
-
-  socket.on('lottery_error', (data) => {
-    ElMessage.error(data.message)
-  })
+  socket.on('lottery_session_change', applySnapshot)
 }
 
-// State Logic
-const handleStateChange = (newState) => {
-  const oldStatus = state.value.status
-  
-  // Normalize incoming data fields
-  const participants = newState.participants || newState.all_participants || state.value.participants
-  const participant_count = newState.participant_count || newState.participants_count || newState.count || participants?.length || 0
-  
-  state.value = {
-    ...newState,
-    participants,
-    participant_count
-  }
-
-  // On first state receive, fetch rounds and prepare if needed
-  if (!initialStateReceived) {
-    initialStateReceived = true
-    fetchRoundsAndPrepareFirst()
-  } else if (state.value.status === 'IDLE') {
-    // Reload on reset
-    fetchRoundsAndPrepareFirst()
-  }
-
-  // Status transitions
-  if (newState.status === 'ROLLING' && oldStatus !== 'ROLLING') {
-    startRolling()
-  } else if (newState.status !== 'ROLLING' && oldStatus === 'ROLLING') {
-    stopRolling()
-  }
+const disconnectSocket = () => {
+  if (!socket) return
+  socket.disconnect()
+  socket = null
 }
 
-// Rolling Logic
-const startRolling = () => {
-  if (rollingInterval) return
-  const names = state.value.participants.map(p => p.name)
-  if (names.length === 0) return
-
-  rollingInterval = setInterval(() => {
-    const randomName = names[Math.floor(Math.random() * names.length)]
-    rollingName.value = randomName
-  }, 50) // Fast switching
-}
-
-const stopRolling = () => {
-  if (rollingInterval) {
-    clearInterval(rollingInterval)
-    rollingInterval = null
-  }
-}
-
-// Fetch rounds from API and prepare first unfinished
-const fetchRoundsAndPrepareFirst = async () => {
+const prepareRound = async (round) => {
+  if (!round || round.status === 'finished') return
+  actionLoading.value = true
   try {
-    const res = await request.get(`/lottery/${meetingId}/history`)
-    rounds.value = res.rounds || []
-    
-    // Find first unfinished round
-    const firstUnfinished = rounds.value.findIndex(r => r.status !== 'finished')
-    if (firstUnfinished >= 0) {
-      currentRoundIndex.value = firstUnfinished
-      const round = rounds.value[firstUnfinished]
-      
-      // Only send prepare if state is IDLE (to avoid resetting when refreshing)
-      // If already PREPARING/ROLLING/RESULT, just sync the round index
-      if (state.value.status === 'IDLE') {
-        console.log('Auto-preparing round:', round.title)
-        socket.emit('lottery_action', {
-          action: 'prepare',
-          meeting_id: parseInt(meetingId),
-          lottery_id: round.id,
-          title: round.title,
-          count: round.count
-        })
-      } else {
-        console.log('State is not IDLE, skipping auto-prepare. Current status:', state.value.status)
-      }
-    } else if (rounds.value.length > 0) {
-      // All finished, show last round result
-      currentRoundIndex.value = rounds.value.length - 1
-    }
-  } catch (e) {
-    console.error('Failed to fetch rounds:', e)
+    const payload = await request.post(`/lottery/${meetingId}/prepare`, { lottery_id: round.id })
+    applySnapshot(payload)
+    ElMessage.success(`已准备轮次「${round.title}」`)
+  } finally {
+    actionLoading.value = false
   }
 }
 
-// Prepare next round
-const prepareNextRound = () => {
-  const nextIndex = currentRoundIndex.value + 1
-  if (nextIndex < rounds.value.length) {
-    currentRoundIndex.value = nextIndex
-    const round = rounds.value[nextIndex]
-    console.log('Preparing next round:', round.title)
-    socket.emit('lottery_action', {
-      action: 'prepare',
-      meeting_id: parseInt(meetingId),
-      lottery_id: round.id,
-      title: round.title,
-      count: round.count
+const startRoll = async () => {
+  actionLoading.value = true
+  try {
+    const payload = await request.post(`/lottery/${meetingId}/roll`)
+    applySnapshot(payload)
+    ElMessage.success('抽签已开始滚动')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const stopRoll = async () => {
+  actionLoading.value = true
+  try {
+    const payload = await request.post(`/lottery/${meetingId}/stop`)
+    applySnapshot(payload)
+    ElMessage.success('本轮开奖结果已生成')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const resetSession = async () => {
+  try {
+    await ElMessageBox.confirm('确定重置当前会议的抽签会话吗？将清空参与池与轮次中奖结果。', '重置确认', {
+      type: 'warning',
+      confirmButtonText: '重置',
+      cancelButtonText: '取消'
     })
-  }
-}
-
-// Start lottery (admin control)
-const startLottery = () => {
-  const round = rounds.value[currentRoundIndex.value]
-  if (!round) {
-    ElMessage.warning('没有可用的轮次')
+  } catch {
     return
   }
-  socket.emit('lottery_action', {
-    action: 'roll',
-    meeting_id: parseInt(meetingId),
-    lottery_id: round.id
-  })
-}
 
-// Reset lottery (clear all participants)
-const resetLottery = async (forceFull = false) => {
+  actionLoading.value = true
   try {
-    const isFull = forceFull === true
-    await ElMessageBox.confirm(
-      isFull ? '确定要清除所有中奖记录并重新开始吗？该操作不可撤销。' : '确定要重置本轮抽签吗？这将清空当前参与者。',
-      '确认重置',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    socket.emit('lottery_action', {
-      action: 'reset',
-      meeting_id: parseInt(meetingId),
-      full_reset: isFull
-    })
-    
-    if (isFull) {
-      setTimeout(() => {
-        fetchRoundsAndPrepareFirst()
-      }, 500)
-    }
-    
-    ElMessage.success('已重置')
-  } catch (e) {
-    // User cancelled
+    const payload = await request.post(`/lottery/${meetingId}/reset`)
+    applySnapshot(payload)
+    ElMessage.success('抽签会话已重置')
+  } finally {
+    actionLoading.value = false
   }
 }
 
-// Back to pool (return from result to preparing)
-const backToPool = async () => {
-  try {
-    // 强制同步一次轮次信息，确保拿到最新的 status
-    const res = await request.get(`/lottery/${meetingId}/history`)
-    rounds.value = res.rounds || []
-    
-    // 寻找第一个未完成的轮次
-    const firstUnfinished = rounds.value.findIndex(r => r.status !== 'finished')
-    
-    if (firstUnfinished >= 0) {
-      currentRoundIndex.value = firstUnfinished
-      const round = rounds.value[firstUnfinished]
-      console.log('[BackToPool] Advancing to next unfinished round:', round.title)
-      socket.emit('lottery_action', {
-        action: 'prepare',
-        meeting_id: parseInt(meetingId),
-        lottery_id: round.id,
-        title: round.title,
-        count: round.count
-      })
-    } else {
-      // 全部完成，返回最后一轮的池子预览
-      const round = rounds.value[rounds.value.length - 1]
-      if (round) {
-        socket.emit('lottery_action', {
-          action: 'prepare',
-          meeting_id: parseInt(meetingId),
-          lottery_id: round.id,
-          title: round.title,
-          count: round.count
-        })
-      }
-    }
-  } catch (e) {
-    console.error('Failed to sync in backToPool:', e)
-    // 降级原逻辑
-    const round = rounds.value[currentRoundIndex.value]
-    if (round) {
-      socket.emit('lottery_action', {
-        action: 'prepare',
-        meeting_id: parseInt(meetingId),
-        lottery_id: round.id,
-        title: round.title,
-        count: round.count
-      })
-    }
-  }
-}
+const getRoundStatusLabel = (status) => ({
+  draft: '草稿',
+  ready: '已准备',
+  finished: '已完成'
+}[status] || status)
 
-// Stop lottery (trigger result)
-const stopLottery = () => {
-  socket.emit('lottery_action', {
-    action: 'stop',
-    meeting_id: parseInt(meetingId)
-  })
-}
-
-// Add test participants for testing
-const addTestParticipants = () => {
-  // Check socket connection
-  if (!socket || !socket.connected) {
-    ElMessage.error('Socket未连接,请稍后重试')
-    console.error('[Test Participants] Socket not connected')
-    return
-  }
-  
-  // Check if in valid state
-  if (state.value.status !== 'PREPARING') {
-    ElMessage.warning(`当前状态为"${getStatusText(state.value.status)}",需要在"准备就绪"状态下添加参与者`)
-    return
-  }
-  
-
-  // Dynamic generation of test users
-  const currentCount = state.value.participants.length
-  const batchSize = 10
-  const departments = ['技术部', '市场部', '财务部', '人事部', '运营部', '研发部', '设计部', '销售部']
-  const surnames = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨']
-  
-  console.log('[Test Participants] Starting to add dynamic test users...')
-  let addedCount = 0
-  
-  for (let i = 0; i < batchSize; i++) {
-    // 使用会议ID作为前缀，确保不同会议之间的测试用户ID不冲突 (Primary Key: meeting_id + user_id)
-    // 同时也为了避免和真实用户ID(通常较小)冲突，使用较大的偏移量
-    const id = parseInt(meetingId) * 10000 + currentCount + i + 1
-    const randomSurname = surnames[Math.floor(Math.random() * surnames.length)]
-    const randomName = `${randomSurname}测试${id}` // Unique name
-    const dept = departments[i % departments.length]
-    
-    setTimeout(() => {
-       console.log(`[Test Participants] Adding user ${i + 1}:`, randomName)
-       socket.emit('lottery_action', {
-        action: 'join',
-        meeting_id: parseInt(meetingId),
-        user_id: id,
-        user_name: randomName,
-        department: dept,
-        avatar: ''
-      })
-      addedCount++
-      if (addedCount === batchSize) {
-        console.log('[Test Participants] All dynamic users added')
-        ElMessage.success(`已添加 ${batchSize} 个测试参与者`)
-      }
-    }, i * 100)
-  }
-}
-
-// View all results summary
-const viewAllResults = async () => {
-  try {
-    // Fetch latest round data with winners
-    const res = await request.get(`/lottery/${meetingId}/history`)
-    rounds.value = res.rounds || []
-    showSummary.value = true
-  } catch (e) {
-    console.error('Failed to fetch results:', e)
-    ElMessage.error('获取结果失败')
-  }
-}
-
-onMounted(() => {
-  document.documentElement.classList.add('dark')
-  initSocket()
-})
+onMounted(fetchSession)
 
 onUnmounted(() => {
-  document.documentElement.classList.remove('dark')
-  if (socket) socket.disconnect()
-  stopRolling()
+  clearRollingTimer()
+  disconnectSocket()
 })
 </script>
 
 <style scoped>
-/* Base Layout matching VoteBigScreen */
-.lottery-bigscreen {
-  width: 100vw;
-  height: 100vh;
-  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
-  color: #ffffff;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
+.lottery-screen {
+  min-height: 100vh;
+  padding: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.14), transparent 22%),
+    linear-gradient(145deg, #0f172a 0%, #111827 46%, #1e293b 100%);
+  color: #e5eefb;
 }
 
-/* Background Grid */
-.lottery-bigscreen::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-image: 
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  pointer-events: none;
-  opacity: 0.3;
+.screen-header,
+.main-panel,
+.side-card {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.84);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.34);
 }
 
-/* Banner */
-.top-banner {
-  background: linear-gradient(180deg, rgba(26, 31, 58, 0.95) 0%, rgba(26, 31, 58, 0.7) 100%);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 16px 48px;
-  z-index: 10;
+.screen-header {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+  max-width: 1440px;
+  margin: 0 auto 24px;
+  padding: 32px;
+  border-radius: 28px;
 }
 
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #ffffff 0%, #a0aec0 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #7dd3fc;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.screen-header h1 {
   margin: 0;
+  font-size: 42px;
 }
 
-.subtitle {
-  display: flex;
+.screen-header p {
+  margin: 14px 0 0;
+  color: #94a3b8;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.header-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-top: 8px;
 }
 
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border-radius: 20px;
-  background: rgba(255,255,255,0.1);
-  font-size: 14px;
-}
-
-.status-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #aaa;
-}
-
-.status-badge.preparing .status-dot { background: #10b981; animation: pulse 2s infinite; }
-.status-badge.rolling .status-dot { background: #f59e0b; }
-.status-badge.result .status-dot { background: #8b5cf6; }
-
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
-}
-
-/* Main Content */
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column; /* Ensure children stack vertically if multiple */
-  padding: 40px;
-  position: relative;
-  z-index: 5;
-  min-height: 0; /* Important for flex children to scroll */
-}
-
-/* Pool View */
-.pool-container {
-  width: 100%;
-  max-width: 1200px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  margin: 0 auto;
-  overflow: hidden; /* Ensure no overflow leaves the container */
-}
-
-.pool-grid {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0; /* Critical for nested flex scrolling */
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  justify-content: center;
-  align-content: flex-start;
+.metric-box {
   padding: 20px;
+  border-radius: 20px;
+  background: rgba(30, 41, 59, 0.78);
 }
 
-.pool-grid::-webkit-scrollbar { width: 8px; }
-.pool-grid::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
-.pool-grid::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
-.pool-grid::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
-
-.participant-card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  padding: 8px 16px;
-  border-radius: 30px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.avatar-placeholder {
-  width: 32px; height: 32px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 14px;
-}
-
-/* Empty State */
-.empty-pool {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #64748b;
-}
-
-.scanning-icon {
-  font-size: 64px;
-  margin-bottom: 24px;
-  animation: float 3s ease-in-out infinite;
-}
-
-.empty-pool .text { font-size: 24px; margin-bottom: 8px; }
-.empty-pool .sub-text { font-size: 16px; opacity: 0.7; }
-
-/* Rolling & Result View Centering */
-.rolling-container, .result-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 0;
-}
-
-.rolling-machine {
-  text-align: center;
-}
-
-.rolling-window {
-  font-size: 80px;
-  font-weight: 800;
-  color: #fbbf24;
-  text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
-  margin-bottom: 32px;
-  min-height: 120px;
-}
-
-.participant-card.is-winner {
-  animation: pulse 2s infinite;
-  /* Default to Round 0 style if specific round is not found */
-  border-color: #fbbf24;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
-  background: rgba(251, 191, 36, 0.15);
-}
-
-.participant-card.is-winner .name {
-  color: #fbbf24;
-}
-
-/* Round Specific Winner Colors (override default) */
-.winner-round-0, .winner-round-default { /* Round 1 - Gold */
-  border-color: #fbbf24 !important;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4) !important;
-  background: rgba(251, 191, 36, 0.15) !important;
-}
-.winner-round-0 .name, .winner-round-default .name { color: #fbbf24 !important; }
-
-.winner-round-1 { /* Round 2 - Silver/Blue */
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 20px rgba(96, 165, 250, 0.4) !important;
-  background: rgba(96, 165, 250, 0.15) !important;
-}
-.winner-round-1 .name { color: #60a5fa !important; }
-
-.winner-round-2 { /* Round 3 - Bronze/Orange */
-  border-color: #f97316 !important;
-  box-shadow: 0 0 20px rgba(249, 115, 22, 0.4) !important;
-  background: rgba(249, 115, 22, 0.15) !important;
-}
-.winner-round-2 .name { color: #f97316 !important; }
-
-.winner-round-3 { /* Round 4 - Emerald */
-  border-color: #10b981 !important;
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
-  background: rgba(16, 185, 129, 0.15) !important;
-}
-.winner-round-3 .name { color: #10b981 !important; }
-
-.winner-round-4 { /* Round 5 - Purple */
-  border-color: #a855f7 !important;
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.4) !important;
-  background: rgba(168, 85, 247, 0.15) !important;
-}
-.winner-round-4 .name { color: #a855f7 !important; }
-
-.rolling-status {
-  font-size: 24px;
+.metric-box span {
+  display: block;
+  margin-bottom: 10px;
   color: #94a3b8;
 }
 
-/* Result View */
-.winners-grid {
+.metric-box strong {
+  font-size: 24px;
+}
+
+.screen-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 380px;
+  gap: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.main-panel {
+  border-radius: 28px;
+  padding: 28px;
+}
+
+.panel-toolbar {
   display: flex;
-  gap: 32px;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.toolbar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-idle {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.status-collecting,
+.status-ready {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.status-rolling {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.18);
+}
+
+.status-result,
+.status-completed {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.toolbar-actions {
+  display: flex;
   flex-wrap: wrap;
+  gap: 12px;
+}
+
+.empty-stage,
+.pool-stage,
+.rolling-stage,
+.winner-stage {
+  min-height: 520px;
+}
+
+.empty-stage,
+.pool-stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.empty-stage h2,
+.pool-copy h2 {
+  margin: 0 0 12px;
+  font-size: 32px;
+}
+
+.empty-stage p,
+.pool-copy p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.participant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.participant-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.participant-card strong,
+.winner-card h2 {
+  display: block;
+  font-size: 22px;
+}
+
+.participant-card span,
+.winner-card p {
+  display: block;
+  margin-top: 8px;
+  color: #94a3b8;
+}
+
+.participant-card.winner {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.rolling-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rolling-card {
+  width: min(100%, 780px);
+  padding: 48px 36px;
+  border-radius: 32px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(14, 165, 233, 0.16));
+  border: 1px solid rgba(125, 211, 252, 0.18);
+}
+
+.rolling-label {
+  color: #bae6fd;
+  font-size: 18px;
+}
+
+.rolling-card strong {
+  display: block;
+  margin-top: 18px;
+  font-size: 82px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.rolling-card p {
+  margin: 20px 0 0;
+  color: #cbd5e1;
+  font-size: 18px;
+}
+
+.winner-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
 }
 
 .winner-card {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(217, 119, 6, 0.2));
-  border: 2px solid #fbbf24;
-  border-radius: 20px;
-  padding: 32px;
-  text-align: center;
-  min-width: 240px;
-  animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
-  box-shadow: 0 0 50px rgba(251, 191, 36, 0.3);
+  padding: 30px 26px;
+  border-radius: 24px;
+  background: linear-gradient(150deg, rgba(30, 64, 175, 0.22), rgba(14, 165, 233, 0.18));
+  border: 1px solid rgba(125, 211, 252, 0.18);
 }
 
-.trophy-icon { font-size: 64px; margin-bottom: 16px; }
-.winner-name { font-size: 36px; font-weight: bold; margin-bottom: 8px; color: #fff; }
-.winner-label { color: #fbbf24; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
-
-/* Animations */
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.5); }
-  to { opacity: 1; transform: scale(1); }
+.winner-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #e0f2fe;
+  font-size: 14px;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+.side-panel {
+  display: grid;
+  gap: 18px;
+  align-content: start;
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(50px); }
-  to { opacity: 1; transform: translateY(0); }
+.side-card {
+  border-radius: 24px;
+  padding: 22px;
 }
 
-/* Transitions */
-.list-move {
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.list-enter-active, .list-leave-active {
-  transition: all 0.5s ease;
-}
-.list-leave-active {
-  position: absolute;
-}
-.list-enter-from, .list-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-/* Next Round Section */
-.next-round-section {
-  margin-top: 48px;
-  text-align: center;
+.side-head h3 {
+  margin: 0;
+  font-size: 22px;
 }
 
-.next-round-section .el-button {
-  padding: 16px 48px;
-  font-size: 20px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #10b981, #059669);
-  border: none;
-  animation: pulse 2s infinite;
+.side-head span {
+  color: #94a3b8;
 }
 
-.all-done-section {
-  margin-top: 48px;
-  text-align: center;
+.round-list,
+.history-list {
+  display: grid;
+  gap: 12px;
 }
 
-.all-done-text {
-  font-size: 32px;
-  color: #fbbf24;
-  font-weight: 600;
-  text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+.round-item,
+.history-item {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(30, 41, 59, 0.72);
+  color: inherit;
 }
 
-.action-footer {
-  margin-top: 32px;
-  text-align: center;
-  animation: slideUp 0.5s ease;
+.round-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
 }
 
-.start-btn {
-  padding: 20px 60px;
-  font-size: 24px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  border: none;
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
-  transition: all 0.3s ease;
+.round-item strong,
+.history-item strong {
+  display: block;
+  font-size: 17px;
+  text-align: left;
 }
 
-.start-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(245, 158, 11, 0.6);
+.round-item span {
+  display: block;
+  margin-top: 6px;
+  color: #94a3b8;
 }
 
-.start-btn:active {
-  transform: translateY(1px);
+.round-item.active {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(14, 165, 233, 0.14);
 }
 
-/* Enhanced UI Styles */
-.banner-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; }
-.title-section { flex: 1; }
-.page-title { background-clip: text; }
-.round-info { margin-top: 8px; font-size: 16px; color: rgba(255, 255, 255, 0.7); font-weight: 500; }
-.status-section { display: flex; gap: 20px; align-items: center; }
-.participant-stats { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-radius: 24px; background: rgba(59, 130, 246, 0.15); color: #93C5FD; font-size: 15px; font-weight: 500; }
-.status-badge.idle .status-dot { background: #6B7280; }
-.control-panel { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; padding: 24px; background: rgba(255, 255, 255, 0.03); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); }
-.control-panel .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
-.pool-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
-.pool-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
-.pool-header h2 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0; }
-.pool-count { font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.8); padding: 8px 20px; background: rgba(59, 130, 246, 0.15); border-radius: 20px; }
-.participant-info { display: flex; flex-direction: column; gap: 2px; }
-.participant-info .name { font-size: 15px; font-weight: 600; color: #ffffff; }
-.participant-info .dept { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
-.avatar-placeholder img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.avatar-text { color: #ffffff; font-weight: 600; }
-.scanning-animation { margin-bottom: 24px; animation: float 3s ease-in-out infinite; }
-.empty-pool h3 { font-size: 28px; font-weight: 600; color: rgba(255, 255, 255, 0.9); margin: 0 0 12px 0; }
-.empty-pool p { font-size: 16px; color: rgba(255, 255, 255, 0.6); margin: 0 0 20px 0; }
-.mobile-hint { display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: rgba(59, 130, 246, 0.1); border-radius: 24px; color: #93C5FD; font-size: 14px; }
-.result-header { text-align: center; margin-bottom: 40px; }
-.result-header h2 { font-size: 36px; font-weight: 700; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0; animation: slideUp 0.6s ease; }
-.winner-rank { position: absolute; top: -8px; left: -8px; width: 32px; height: 32px; background: linear-gradient(135deg, #3B82F6, #1D4ED8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #ffffff; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
-.winner-card { position: relative; }
-.result-actions { display: flex; gap: 16px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
-.result-actions .el-button { padding: 14px 32px; font-size: 16px; font-weight: 600; }
+.round-item.finished {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
 
-/* Stop Button */
-.stop-button-section { margin-top: 40px; text-align: center; }
-.stop-button-section .el-button { padding: 16px 48px; font-size: 20px; font-weight: 700; animation: pulse 1.5s infinite; }
+.history-winners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
 
-/* IDLE Notice */
-.idle-notice { display: flex; align-items: flex-start; gap: 20px; padding: 60px 40px; background: rgba(59, 130, 246, 0.1); border-radius: 16px; border: 1px solid rgba(59, 130, 246, 0.2); max-width: 800px; margin: 100px auto; }
-.notice-icon { font-size: 48px; color: #60A5FA; flex-shrink: 0; }
-.notice-content h3 { font-size: 24px; font-weight: 600; color: #93C5FD; margin: 0 0 12px 0; }
-.notice-content p { font-size: 16px; color: rgba(255, 255, 255, 0.7); margin: 0; line-height: 1.6; }
+.history-winners span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #dbeafe;
+  font-size: 13px;
+}
 
-/* Summary View */
-.summary-container { padding: 40px 60px; max-width: 1400px; margin: 0 auto; animation: fadeIn 0.6s ease; }
-.summary-header { text-align: center; margin-bottom: 60px; }
-.summary-header h1 { font-size: 48px; font-weight: 700; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 16px 0; }
-.summary-header p { font-size: 20px; color: rgba(255, 255, 255, 0.7); margin: 0; }
-.rounds-summary { display: flex; flex-direction: column; gap: 32px; margin-bottom: 60px; max-height: 65vh; overflow-y: auto; padding-right: 12px; }
-.rounds-summary::-webkit-scrollbar { width: 8px; }
-.rounds-summary::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
-.rounds-summary::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
-.rounds-summary::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
-.round-block { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%); border-radius: 20px; border: 2px solid rgba(59, 130, 246, 0.3); padding: 32px; animation: slideUp 0.6s ease both; }
-.round-header { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid rgba(59, 130, 246, 0.2); }
-.round-number { font-size: 18px; font-weight: 600; color: #60A5FA; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); border-radius: 12px; }
-.round-header h3 { flex: 1; font-size: 28px; font-weight: 700; color: #93C5FD; margin: 0; }
-.round-count { font-size: 16px; color: rgba(255, 255, 255, 0.7); }
-.round-winners { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-.summary-winner-card { display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
-.summary-winner-card:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(59, 130, 246, 0.4); transform: translateY(-2px); }
-.winner-badge { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #fbbf24, #f59e0b); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #000; flex-shrink: 0; }
-.winner-info { flex: 1; min-width: 0; }
-.winner-name { font-size: 16px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
-.winner-dept { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
-.no-winners { text-align: center; padding: 40px; color: rgba(255, 255, 255, 0.4); font-size: 16px; }
-.summary-actions { text-align: center; }
-.summary-actions .el-button { padding: 16px 48px; font-size: 18px; font-weight: 600; }
+@media (max-width: 1120px) {
+  .lottery-screen {
+    padding: 18px;
+  }
+
+  .screen-header,
+  .screen-body {
+    grid-template-columns: 1fr;
+  }
+
+  .header-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .screen-header,
+  .main-panel,
+  .side-card {
+    border-radius: 22px;
+  }
+
+  .screen-header h1 {
+    font-size: 30px;
+  }
+
+  .rolling-card strong {
+    font-size: 48px;
+  }
+}
 </style>

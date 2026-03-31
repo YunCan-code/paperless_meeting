@@ -245,8 +245,10 @@ class Vote(SQLModel, table=True):
     is_anonymous: bool = Field(default=False)  # 是否匿名
     max_selections: int = Field(default=1)  # 最多可选数量
     duration_seconds: int = Field(default=60)  # 投票时长（秒）
-    status: str = Field(default="draft")  # draft/active/closed
-    started_at: Optional[datetime] = None
+    countdown_seconds: int = Field(default=10)  # 开始前倒计时秒数
+    status: str = Field(default="draft")  # draft/countdown/active/closed
+    started_at: Optional[datetime] = None  # active 阶段真正开始的时间；countdown 阶段表示计划开始时间
+    closed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
 
 class VoteOption(SQLModel, table=True):
@@ -276,13 +278,17 @@ class VoteRead(SQLModel):
     is_anonymous: bool
     max_selections: int
     duration_seconds: int
+    countdown_seconds: int
     status: str
     started_at: Optional[datetime]
+    closed_at: Optional[datetime]
     created_at: datetime
     options: List["VoteOptionRead"] = []
     remaining_seconds: Optional[int] = None  # 计算剩余时间
-    wait_seconds: Optional[int] = None # 距离开始因该等待的秒数 (倒计时)
+    wait_seconds: Optional[int] = None # 兼容旧前端：距离开始还需等待的秒数
+    countdown_remaining_seconds: Optional[int] = None
     user_voted: bool = False # 当前用户是否已投票
+    total_voters: int = 0
 
 class VoteOptionRead(SQLModel):
     id: int
@@ -300,7 +306,19 @@ class VoteCreate(SQLModel):
     is_anonymous: bool = False
     max_selections: int = 1
     duration_seconds: int = 60
+    countdown_seconds: int = 10
     options: List[str]  # 选项内容列表
+
+
+class VoteUpdate(SQLModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    is_multiple: Optional[bool] = None
+    is_anonymous: Optional[bool] = None
+    max_selections: Optional[int] = None
+    duration_seconds: Optional[int] = None
+    countdown_seconds: Optional[int] = None
+    options: Optional[List[str]] = None
 
 class VoteOptionResult(SQLModel):
     option_id: int
@@ -335,7 +353,7 @@ class Lottery(SQLModel, table=True):
     title: str 
     count: int = Field(default=1)  # 本轮中奖人数
     allow_repeat: bool = Field(default=False)  # 是否允许重复中奖
-    status: str = Field(default="pending")  # pending/active/finished
+    status: str = Field(default="draft")  # draft/ready/finished
     created_at: datetime = Field(default_factory=datetime.now)
     
     # 关联中奖者
@@ -365,6 +383,15 @@ class LotteryParticipant(SQLModel, table=True):
     is_winner: bool = Field(default=False) # 是否已中奖 (防止重复中奖)
     winning_lottery_id: Optional[int] = Field(default=None) # 中奖轮次ID (用于区分不同轮次变色)
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class LotterySession(SQLModel, table=True):
+    """会议级抽签会话状态，作为跨端同步的真相源。"""
+    meeting_id: int = Field(foreign_key="meeting.id", primary_key=True)
+    session_status: str = Field(default="idle")  # idle/collecting/ready/rolling/result/completed
+    current_round_id: Optional[int] = Field(default=None, foreign_key="lottery.id")
+    last_result: Optional[str] = None  # JSON 字符串
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 # ==================== 媒体库模型 ====================

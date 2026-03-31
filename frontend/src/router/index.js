@@ -57,6 +57,11 @@ const router = createRouter({
                     path: 'toolbox/covers',
                     name: 'cover-center',
                     component: () => import('../views/Admin/CoverCenter.vue')
+                },
+                {
+                    path: 'toolbox/interactions',
+                    name: 'interaction-center',
+                    component: () => import('../views/Admin/InteractionCenter.vue')
                 }
             ]
         },

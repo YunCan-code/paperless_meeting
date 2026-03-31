@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
 from models import Vote
 from database import engine
-from socket_manager import broadcast_vote_end
+from socket_manager import broadcast_vote_results, broadcast_vote_state
 
 
 async def auto_close_expired_votes():
@@ -14,34 +14,49 @@ async def auto_close_expired_votes():
     while True:
         try:
             with Session(engine) as session:
-                # 查找所有 active 状态的投票
-                stmt = select(Vote).where(Vote.status == "active")
-                active_votes = session.exec(stmt).all()
-
+                stmt = select(Vote).where(Vote.status.in_(["countdown", "active"]))
+                runtime_votes = session.exec(stmt).all()
                 now = datetime.now(timezone.utc)
 
-                for vote in active_votes:
-                    if vote.started_at:
-                        # 兼容 naive datetime：如果 started_at 无时区信息，当作 UTC 处理
-                        started = vote.started_at
-                        if started.tzinfo is None:
-                            started = started.replace(tzinfo=timezone.utc)
+                for vote in runtime_votes:
+                    if not vote.started_at:
+                        continue
 
-                        # 计算投票结束时间
+                    started = vote.started_at
+                    if started.tzinfo is None:
+                        started = started.replace(tzinfo=timezone.utc)
+
+                    if vote.status == "countdown" and now >= started:
+                        vote.status = "active"
+                        session.add(vote)
+                        session.commit()
+                        session.refresh(vote)
+                        try:
+                            from routes.vote import _build_vote_read, _build_vote_result
+                            snapshot = _build_vote_read(vote, session).model_dump()
+                            snapshot["results"] = _build_vote_result(vote, session).model_dump()["results"]
+                            await broadcast_vote_state(vote.meeting_id, snapshot)
+                            await broadcast_vote_results(vote.meeting_id, vote.id, _build_vote_result(vote, session).model_dump())
+                        except Exception as e:
+                            print(f"[AUTO-CLOSE] Failed to broadcast vote activation: {e}")
+                        continue
+
+                    if vote.status == "active":
                         end_time = started + timedelta(seconds=vote.duration_seconds)
-
-                        # 如果已到期，关闭投票
                         if now >= end_time:
                             print(f"[AUTO-CLOSE] Closing expired vote {vote.id} ('{vote.title}')")
                             vote.status = "closed"
+                            vote.closed_at = now
                             session.add(vote)
                             session.commit()
+                            session.refresh(vote)
 
-                            # 计算结果并广播
                             try:
-                                from routes.vote import _calculate_vote_result
-                                final_results = _calculate_vote_result(vote.id, session)
-                                await broadcast_vote_end(vote.meeting_id, vote.id, final_results)
+                                from routes.vote import _build_vote_read, _build_vote_result
+                                snapshot = _build_vote_read(vote, session).model_dump()
+                                snapshot["results"] = _build_vote_result(vote, session).model_dump()["results"]
+                                await broadcast_vote_state(vote.meeting_id, snapshot)
+                                await broadcast_vote_results(vote.meeting_id, vote.id, _build_vote_result(vote, session).model_dump())
                             except Exception as e:
                                 print(f"[AUTO-CLOSE] Failed to broadcast vote end: {e}")
 

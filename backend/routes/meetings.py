@@ -314,6 +314,19 @@ def _get_checkin_map_for_user(meetings: List[Meeting], user_id: Optional[int], s
     ).all()
     return {checkin.meeting_id: checkin for checkin in checkins}
 
+
+def _get_attending_meeting_ids_for_user(user_id: Optional[int], session: Session) -> set[int]:
+    if not user_id:
+        return set()
+
+    return {
+        link.meeting_id
+        for link in session.exec(
+            select(MeetingAttendeeLink).where(MeetingAttendeeLink.user_id == user_id)
+        ).all()
+        if link.meeting_id is not None
+    }
+
 def _resolve_effective_visibility_hours(meeting: Meeting, session: Session) -> Optional[int]:
     mode = (meeting.android_visibility_mode or "inherit").strip().lower()
 
@@ -956,6 +969,9 @@ def read_meetings(
     # [Start] Visibility Timeout Logic - MUST BE BEFORE offset/limit
     # 默认过滤掉超时的会议，除非显式请求 force_show_all
     meetings = session.exec(query).all()
+    attending_meeting_ids = _get_attending_meeting_ids_for_user(user_id, session) if user_id else None
+    if attending_meeting_ids is not None:
+        meetings = [meeting for meeting in meetings if meeting.id in attending_meeting_ids]
     checkin_map = _get_checkin_map_for_user(meetings, user_id, session)
     meetings = [
         meeting for meeting in meetings
@@ -1024,6 +1040,8 @@ def read_meeting(
     """
     meeting = session.get(Meeting, meeting_id)
     if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    if user_id and meeting_id not in _get_attending_meeting_ids_for_user(user_id, session):
         raise HTTPException(status_code=404, detail="Meeting not found")
     checkin = _get_checkin_map_for_user([meeting], user_id, session).get(meeting_id)
     if not _is_meeting_visible_for_android(

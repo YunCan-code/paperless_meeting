@@ -1,280 +1,195 @@
 """
 投票功能 HTTP API
-用于 Web 管理端创建和管理投票
+统一支持后台草稿配置、现场大屏控制与移动端参与。
 """
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from typing import List, Optional
-from datetime import datetime, timedelta, timezone
+from sqlmodel import Session, delete, select
 
 from database import get_session
-from models import Vote, VoteCreate, VoteRead, VoteOption, VoteOptionRead, VoteResult, VoteOptionResult, VoteOptionContent, VoteStatusUpdate, VoteSubmit, User, UserVote, MeetingAttendeeLink
-from socket_manager import broadcast_vote_start, broadcast_vote_end, broadcast_vote_update
+from models import (
+    MeetingAttendeeLink,
+    User,
+    UserVote,
+    Vote,
+    VoteCreate,
+    VoteOption,
+    VoteOptionRead,
+    VoteRead,
+    VoteResult,
+    VoteSubmit,
+    VoteUpdate,
+)
+from socket_manager import broadcast_vote_results, broadcast_vote_state
 
 router = APIRouter(prefix="/vote", tags=["投票管理"])
 
+UTC = timezone.utc
 
 
-@router.post("/", response_model=VoteRead)
-def create_vote(data: VoteCreate, session: Session = Depends(get_session)):
-    """创建投票（Web管理端）"""
-    vote = Vote(
-        meeting_id=data.meeting_id,
-        title=data.title,
-        description=data.description,
-        is_multiple=data.is_multiple,
-        is_anonymous=data.is_anonymous,
-        max_selections=data.max_selections,
-        duration_seconds=data.duration_seconds,
-        status="draft"
-    )
-    session.add(vote)
-    session.commit()
-    session.refresh(vote)
-    
-    # 添加选项
-    for i, content in enumerate(data.options):
-        option = VoteOption(vote_id=vote.id, content=content, sort_order=i)
-        session.add(option)
-    session.commit()
-    
-    return _get_vote_with_options(vote.id, session)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
-@router.get("/history", response_model=List[VoteRead])
-def get_vote_history(
-    user_id: int, 
-    skip: int = 0, 
-    limit: int = 20, 
-    session: Session = Depends(get_session)
-):
-    """
-    获取用户的投票历史
-    逻辑：查询该用户实际投过票的记录
-    """
-    # 1. 查询用户实际参与投票的记录 (UserVote)
-    stmt_voted = select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct()
-    voted_ids = session.exec(stmt_voted).all()
-    
-    if not voted_ids:
-        return []
-
-    # 2. 获取这些投票详情
-    stmt_votes = select(Vote).where(
-        Vote.id.in_(voted_ids)
-    ).order_by(Vote.created_at.desc()).offset(skip).limit(limit)
-    
-    votes = session.exec(stmt_votes).all()
-    
-    return [_get_vote_with_options(v.id, session, include_remaining=False, user_id=user_id) for v in votes]
-
-
-@router.get("/{vote_id}", response_model=VoteRead)
-def get_vote(vote_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
-    """获取投票详情"""
-    return _get_vote_with_options(vote_id, session, include_remaining=True, user_id=user_id)
-
-
-@router.post("/{vote_id}/start")
-async def start_vote(vote_id: int, session: Session = Depends(get_session)):
-    """开始投票"""
-    vote = session.get(Vote, vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="投票不存在")
-    if vote.status != "draft":
-        raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
-
-    vote.status = "active"
-    # 设置开始时间为当前时间 + 10秒 (倒计时缓冲)
-    vote.started_at = datetime.now(timezone.utc) + timedelta(seconds=10)
-    session.add(vote)
-    session.commit()
-
-    # 广播 vote_start（包含 started_at 和 wait_seconds 用于倒计时）
-    await broadcast_vote_start(vote.meeting_id, {
-        "id": vote.id,
-        "title": vote.title,
-        "duration_seconds": vote.duration_seconds,
-        "started_at": vote.started_at.isoformat(),
-        "wait_seconds": 10
-    })
-    return {"success": True, "vote_id": vote_id}
-
-
-@router.post("/{vote_id}/close")
-async def close_vote(vote_id: int, session: Session = Depends(get_session)):
-    """结束投票"""
-    vote = session.get(Vote, vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="投票不存在")
-    
-    vote.status = "closed"
-    session.add(vote)
-    session.commit()
-    
-    # 计算最终结果并广播
-    final_results = _calculate_vote_result(vote_id, session)
-    await broadcast_vote_end(vote.meeting_id, vote_id, final_results)
-    
-    return {"success": True, "vote_id": vote_id}
-
-
-@router.get("/meeting/{meeting_id}/active", response_model=Optional[VoteRead])
-def get_active_vote(meeting_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
-    """获取会议当前进行中的投票"""
-    stmt = select(Vote).where(Vote.meeting_id == meeting_id, Vote.status == "active")
-    vote = session.exec(stmt).first()
-    if not vote:
+def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
         return None
-    return _get_vote_with_options(vote.id, session, include_remaining=True, user_id=user_id)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
-@router.post("/{vote_id}/submit")
-async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_session)):
-    """提交投票（Android端）"""
-    vote = session.get(Vote, vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="投票不存在")
-    if vote.status != "active":
-        raise HTTPException(status_code=400, detail="投票已结束或未开始")
-    
-    # 检查是否已投过
-    existing = session.exec(
-        select(UserVote).where(UserVote.vote_id == vote_id, UserVote.user_id == data.user_id)
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="您已投过票")
-    
-    # 验证选项数量
-    if len(data.option_ids) > vote.max_selections:
-        raise HTTPException(status_code=400, detail=f"最多只能选择{vote.max_selections}个选项")
-    
-    # 记录投票
-    for option_id in data.option_ids:
-        user_vote = UserVote(vote_id=vote_id, user_id=data.user_id, option_id=option_id)
-        session.add(user_vote)
-    try:
+def _normalize_vote_options(options: List[str]) -> List[str]:
+    normalized = [str(option).strip() for option in options if str(option).strip()]
+    if len(normalized) < 2:
+        raise HTTPException(status_code=400, detail="至少需要 2 个有效选项")
+    return normalized
+
+
+def _validate_vote_payload(
+    options: List[str],
+    is_multiple: bool,
+    max_selections: int,
+    duration_seconds: int,
+    countdown_seconds: int,
+) -> None:
+    if duration_seconds <= 0:
+        raise HTTPException(status_code=400, detail="投票时长必须大于 0")
+    if countdown_seconds < 0:
+        raise HTTPException(status_code=400, detail="倒计时不能为负数")
+    if is_multiple:
+        if max_selections < 2:
+            raise HTTPException(status_code=400, detail="多选投票至少允许选择 2 项")
+        if max_selections > len(options):
+            raise HTTPException(status_code=400, detail="最多选择数不能超过选项数量")
+    else:
+        if max_selections != 1:
+            raise HTTPException(status_code=400, detail="单选投票最多只能选择 1 项")
+
+
+def _sync_vote_runtime_state(vote: Vote, session: Session) -> Vote:
+    now = _utc_now()
+    started_at = _normalize_datetime(vote.started_at)
+
+    if vote.status == "countdown" and started_at and now >= started_at:
+        vote.status = "active"
+        session.add(vote)
         session.commit()
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(status_code=400, detail="您已投过票（并发重复提交）")
-    
-    # 广播投票更新 (直接await确保执行)
-    from socket_manager import broadcast_vote_update
-    await broadcast_vote_update(
-        meeting_id=vote.meeting_id,
-        vote_id=vote_id,
-        results=_calculate_vote_result(vote_id, session)['results']
-    )
-    
-    return {"success": True}
+        session.refresh(vote)
+        started_at = _normalize_datetime(vote.started_at)
+
+    if vote.status == "active" and started_at:
+        if now >= started_at + timedelta(seconds=vote.duration_seconds):
+            vote.status = "closed"
+            vote.closed_at = now
+            session.add(vote)
+            session.commit()
+            session.refresh(vote)
+
+    return vote
 
 
-@router.get("/{vote_id}/result")
-def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
-    """获取投票结果"""
-    return _calculate_vote_result(vote_id, session)
-
-
-def _calculate_vote_result(vote_id: int, session: Session):
-    """辅助函数：计算投票结果"""
+def _get_vote_or_404(vote_id: int, session: Session) -> Vote:
     vote = session.get(Vote, vote_id)
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
-    
-    # 获取选项
-    options = session.exec(select(VoteOption).where(VoteOption.vote_id == vote_id)).all()
-    
-    # 统计各选项票数和总人数
-    results = []
-    
-    # 总参与人数
-    total_votes = session.exec(
-        select(func.count(func.distinct(UserVote.user_id))).where(UserVote.vote_id == vote_id)
-    ).one()
-    
-    for opt in options:
-        # 该选项票数
-        count = session.exec(
-            select(func.count()).select_from(UserVote).where(UserVote.option_id == opt.id)
-        ).one()
-        
-        percent = (count / total_votes * 100) if total_votes > 0 else 0
-        
-        # 获取投票人姓名 (如果非匿名)
-        # 即使进行中也可以返回，前端根据状态决定是否显示，或者这里加逻辑控制
-        # 用户要求：投票结束后显示。为灵活起见，后端都返回，前端控制。
-        voters = []
-        if not vote.is_anonymous:
-            # Query User.name joined 
-            stmt = select(User.name).join(UserVote, User.id == UserVote.user_id)\
-                   .where(UserVote.option_id == opt.id)
-            voters = session.exec(stmt).all()
-
-        results.append({
-            "option_id": opt.id,
-            "content": opt.content,
-            "count": count,
-            "percent": round(percent, 1),
-            "voters": voters
-        })
-    
-    return {
-        "vote_id": vote_id,
-        "title": vote.title,
-        "total_voters": total_votes,
-        "results": results
-    }
+    return _sync_vote_runtime_state(vote, session)
 
 
-@router.get("/meeting/{meeting_id}/list", response_model=List[VoteRead])
-def list_meeting_votes(meeting_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
-    """获取会议所有投票"""
-    votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
-    return [_get_vote_with_options(v.id, session, include_remaining=True, user_id=user_id) for v in votes]
-
-
-def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bool = False, user_id: Optional[int] = None) -> VoteRead:
-    """辅助函数：获取带选项的投票"""
-    vote = session.get(Vote, vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="投票不存在")
-
-    options = session.exec(
-        select(VoteOption).where(VoteOption.vote_id == vote_id).order_by(VoteOption.sort_order)
+def _get_vote_options(vote_id: int, session: Session) -> List[VoteOption]:
+    return session.exec(
+        select(VoteOption).where(VoteOption.vote_id == vote_id).order_by(VoteOption.sort_order, VoteOption.id)
     ).all()
 
-    remaining = None
-    wait = None
-    if include_remaining and vote.status == "active" and vote.started_at:
-        now = datetime.now(timezone.utc)
-        # 兼容 naive datetime
-        started = vote.started_at
-        if started.tzinfo is None:
-            started = started.replace(tzinfo=timezone.utc)
-        # 计算是否需要等待 (倒计时缓冲)
-        diff_start = (started - now).total_seconds()
 
-        if diff_start > 0:
-            # 还在倒计时阶段
-            wait = int(diff_start) + 1  # 向上取整
-            remaining = vote.duration_seconds  # 还没开始消耗时间
-        else:
-            # 已经开始
-            wait = 0
-            elapsed = (now - started).total_seconds()
-            remaining = max(0, vote.duration_seconds - int(elapsed))
+def _get_total_voters(vote_id: int, session: Session) -> int:
+    total = session.exec(
+        select(func.count(func.distinct(UserVote.user_id))).where(UserVote.vote_id == vote_id)
+    ).one()
+    return int(total or 0)
 
-    # Check if user voted
-    user_voted = False
-    if user_id:
-        existing = session.exec(
-            select(UserVote).where(UserVote.vote_id == vote_id, UserVote.user_id == user_id)
-        ).first()
-        if existing:
-            user_voted = True
+
+def _get_user_voted(vote_id: int, user_id: Optional[int], session: Session) -> bool:
+    if not user_id:
+        return False
+    return (
+        session.exec(select(UserVote).where(UserVote.vote_id == vote_id, UserVote.user_id == user_id)).first()
+        is not None
+    )
+
+
+def _ensure_user_can_join_vote(vote: Vote, user_id: int, session: Session) -> None:
+    attendee = session.exec(
+        select(MeetingAttendeeLink).where(
+            MeetingAttendeeLink.meeting_id == vote.meeting_id,
+            MeetingAttendeeLink.user_id == user_id,
+        )
+    ).first()
+    if attendee is None:
+        raise HTTPException(status_code=403, detail="您不在当前会议的参会名单中")
+
+
+def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
+    vote = _sync_vote_runtime_state(vote, session)
+    total_voters = _get_total_voters(vote.id, session)
+    options = _get_vote_options(vote.id, session)
+
+    results = []
+    for option in options:
+        count = session.exec(
+            select(func.count()).select_from(UserVote).where(UserVote.option_id == option.id)
+        ).one()
+        count_value = int(count or 0)
+        percent = round((count_value / total_voters * 100) if total_voters > 0 else 0, 1)
+
+        voters: List[str] = []
+        if vote.status == "closed" and not vote.is_anonymous:
+            voters = session.exec(
+                select(User.name)
+                .join(UserVote, User.id == UserVote.user_id)
+                .where(UserVote.option_id == option.id)
+                .order_by(User.name)
+            ).all()
+
+        results.append(
+            {
+                "option_id": option.id,
+                "content": option.content,
+                "count": count_value,
+                "percent": percent,
+                "voters": voters,
+            }
+        )
+
+    return VoteResult(
+        vote_id=vote.id,
+        title=vote.title,
+        total_voters=total_voters,
+        results=results,
+    )
+
+
+def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None) -> VoteRead:
+    vote = _sync_vote_runtime_state(vote, session)
+    options = _get_vote_options(vote.id, session)
+    total_voters = _get_total_voters(vote.id, session)
+
+    now = _utc_now()
+    started_at = _normalize_datetime(vote.started_at)
+    remaining_seconds: Optional[int] = None
+    countdown_remaining_seconds: Optional[int] = None
+    wait_seconds: Optional[int] = None
+
+    if vote.status == "countdown" and started_at:
+        countdown_remaining_seconds = max(0, int((started_at - now).total_seconds()))
+        wait_seconds = countdown_remaining_seconds
+    elif vote.status == "active" and started_at:
+        remaining_seconds = max(0, int((started_at + timedelta(seconds=vote.duration_seconds) - now).total_seconds()))
+        wait_seconds = 0
 
     return VoteRead(
         id=vote.id,
@@ -285,11 +200,229 @@ def _get_vote_with_options(vote_id: int, session: Session, include_remaining: bo
         is_anonymous=vote.is_anonymous,
         max_selections=vote.max_selections,
         duration_seconds=vote.duration_seconds,
+        countdown_seconds=vote.countdown_seconds,
         status=vote.status,
         started_at=vote.started_at,
+        closed_at=vote.closed_at,
         created_at=vote.created_at,
         options=[VoteOptionRead(id=o.id, content=o.content, sort_order=o.sort_order) for o in options],
-        remaining_seconds=remaining,
-        wait_seconds=wait,
-        user_voted=user_voted
+        remaining_seconds=remaining_seconds,
+        wait_seconds=wait_seconds,
+        countdown_remaining_seconds=countdown_remaining_seconds,
+        user_voted=_get_user_voted(vote.id, user_id, session),
+        total_voters=total_voters,
     )
+
+
+async def _broadcast_vote_snapshot(vote_id: int, session: Session) -> None:
+    vote = _get_vote_or_404(vote_id, session)
+    snapshot = _build_vote_read(vote, session).model_dump()
+    snapshot["results"] = _build_vote_result(vote, session).model_dump()["results"]
+    await broadcast_vote_state(vote.meeting_id, snapshot)
+    await broadcast_vote_results(vote.meeting_id, vote.id, _build_vote_result(vote, session).model_dump())
+
+
+@router.post("/", response_model=VoteRead)
+def create_vote(data: VoteCreate, session: Session = Depends(get_session)):
+    options = _normalize_vote_options(data.options)
+    _validate_vote_payload(
+        options=options,
+        is_multiple=data.is_multiple,
+        max_selections=data.max_selections,
+        duration_seconds=data.duration_seconds,
+        countdown_seconds=data.countdown_seconds,
+    )
+
+    vote = Vote(
+        meeting_id=data.meeting_id,
+        title=data.title.strip(),
+        description=(data.description or "").strip() or None,
+        is_multiple=data.is_multiple,
+        is_anonymous=data.is_anonymous,
+        max_selections=data.max_selections,
+        duration_seconds=data.duration_seconds,
+        countdown_seconds=data.countdown_seconds,
+        status="draft",
+    )
+    session.add(vote)
+    session.commit()
+    session.refresh(vote)
+
+    for index, content in enumerate(options):
+        session.add(VoteOption(vote_id=vote.id, content=content, sort_order=index))
+    session.commit()
+    session.refresh(vote)
+    return _build_vote_read(vote, session)
+
+
+@router.put("/{vote_id}", response_model=VoteRead)
+def update_vote(vote_id: int, data: VoteUpdate, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    if vote.status != "draft":
+        raise HTTPException(status_code=400, detail="只有草稿状态的投票允许编辑")
+
+    payload = data.model_dump(exclude_unset=True)
+    options = None
+    if "options" in payload and payload["options"] is not None:
+        options = _normalize_vote_options(payload["options"])
+
+    is_multiple = payload.get("is_multiple", vote.is_multiple)
+    max_selections = payload.get("max_selections", vote.max_selections)
+    duration_seconds = payload.get("duration_seconds", vote.duration_seconds)
+    countdown_seconds = payload.get("countdown_seconds", vote.countdown_seconds)
+    option_list = options if options is not None else [option.content for option in _get_vote_options(vote.id, session)]
+
+    _validate_vote_payload(option_list, is_multiple, max_selections, duration_seconds, countdown_seconds)
+
+    for field in (
+        "title",
+        "description",
+        "is_multiple",
+        "is_anonymous",
+        "max_selections",
+        "duration_seconds",
+        "countdown_seconds",
+    ):
+        if field in payload:
+            value = payload[field]
+            if field in {"title", "description"} and value is not None:
+                value = value.strip() or None
+            setattr(vote, field, value)
+
+    session.add(vote)
+    session.commit()
+
+    if options is not None:
+        session.exec(delete(VoteOption).where(VoteOption.vote_id == vote.id))
+        session.commit()
+        for index, content in enumerate(options):
+            session.add(VoteOption(vote_id=vote.id, content=content, sort_order=index))
+        session.commit()
+
+    session.refresh(vote)
+    return _build_vote_read(vote, session)
+
+
+@router.delete("/{vote_id}")
+def delete_vote(vote_id: int, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    if vote.status != "draft":
+        raise HTTPException(status_code=400, detail="只有草稿状态的投票允许删除")
+
+    session.exec(delete(UserVote).where(UserVote.vote_id == vote.id))
+    session.exec(delete(VoteOption).where(VoteOption.vote_id == vote.id))
+    session.delete(vote)
+    session.commit()
+    return {"ok": True}
+
+
+@router.get("/meeting/{meeting_id}/list", response_model=List[VoteRead])
+def list_meeting_votes(meeting_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
+    votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
+    return [_build_vote_read(vote, session, user_id=user_id) for vote in votes]
+
+
+@router.get("/meeting/{meeting_id}/active", response_model=Optional[VoteRead])
+def get_active_vote(meeting_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
+    votes = session.exec(
+        select(Vote)
+        .where(Vote.meeting_id == meeting_id, Vote.status.in_(["countdown", "active"]))
+        .order_by(Vote.created_at.desc())
+    ).all()
+    for vote in votes:
+        vote = _sync_vote_runtime_state(vote, session)
+        if vote.status in {"countdown", "active"}:
+            return _build_vote_read(vote, session, user_id=user_id)
+    return None
+
+
+@router.get("/{vote_id}", response_model=VoteRead)
+def get_vote(vote_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    return _build_vote_read(vote, session, user_id=user_id)
+
+
+@router.post("/{vote_id}/start")
+async def start_vote(vote_id: int, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    if vote.status != "draft":
+        raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
+
+    vote.status = "countdown"
+    vote.started_at = _utc_now() + timedelta(seconds=vote.countdown_seconds)
+    vote.closed_at = None
+    session.add(vote)
+    session.commit()
+    session.refresh(vote)
+
+    await _broadcast_vote_snapshot(vote.id, session)
+    return {"success": True, "vote_id": vote.id}
+
+
+@router.post("/{vote_id}/close")
+async def close_vote(vote_id: int, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    if vote.status not in {"countdown", "active"}:
+        raise HTTPException(status_code=400, detail="当前投票不在进行中")
+
+    vote.status = "closed"
+    vote.closed_at = _utc_now()
+    session.add(vote)
+    session.commit()
+    session.refresh(vote)
+
+    await _broadcast_vote_snapshot(vote.id, session)
+    return {"success": True, "vote_id": vote.id}
+
+
+@router.post("/{vote_id}/submit")
+async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    if vote.status != "active":
+        raise HTTPException(status_code=400, detail="投票未开始或已结束")
+    _ensure_user_can_join_vote(vote, data.user_id, session)
+
+    if _get_user_voted(vote.id, data.user_id, session):
+        raise HTTPException(status_code=400, detail="您已投过票")
+
+    option_ids = list(dict.fromkeys(data.option_ids))
+    if not option_ids:
+        raise HTTPException(status_code=400, detail="请至少选择 1 个选项")
+    if len(option_ids) > vote.max_selections:
+        raise HTTPException(status_code=400, detail=f"最多只能选择 {vote.max_selections} 个选项")
+    if not vote.is_multiple and len(option_ids) != 1:
+        raise HTTPException(status_code=400, detail="单选投票只能选择 1 个选项")
+
+    valid_option_ids = {option.id for option in _get_vote_options(vote.id, session)}
+    if any(option_id not in valid_option_ids for option_id in option_ids):
+        raise HTTPException(status_code=400, detail="存在无效的投票选项")
+
+    for option_id in option_ids:
+        session.add(UserVote(vote_id=vote.id, user_id=data.user_id, option_id=option_id))
+
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=400, detail="您已投过票")
+
+    await _broadcast_vote_snapshot(vote.id, session)
+    return {"success": True}
+
+
+@router.get("/{vote_id}/result", response_model=VoteResult)
+def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
+    vote = _get_vote_or_404(vote_id, session)
+    return _build_vote_result(vote, session)
+
+
+@router.get("/history", response_model=List[VoteRead])
+def get_vote_history(user_id: int, skip: int = 0, limit: int = 20, session: Session = Depends(get_session)):
+    vote_ids = session.exec(
+        select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct().offset(skip).limit(limit)
+    ).all()
+    if not vote_ids:
+        return []
+
+    votes = session.exec(select(Vote).where(Vote.id.in_(vote_ids)).order_by(Vote.created_at.desc())).all()
+    return [_build_vote_read(vote, session, user_id=user_id) for vote in votes]

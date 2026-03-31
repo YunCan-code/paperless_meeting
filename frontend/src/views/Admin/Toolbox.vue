@@ -38,72 +38,16 @@
       </el-col>
     </el-row>
 
-    <!-- Meeting Selector Dialog -->
-    <el-dialog
-      v-model="meetingSelectVisible"
-      title="选择会议"
-      width="500px"
-      append-to-body
-      align-center
-    >
-      <div class="meeting-select-content">
-        <p class="select-tip">{{ selectTip }}</p>
-        <el-select 
-          v-model="selectedMeetingId" 
-          placeholder="搜索或选择会议" 
-          filterable 
-          style="width: 100%"
-          size="large"
-          :loading="loadingMeetings"
-        >
-          <el-option
-            v-for="item in meetings"
-            :key="item.id"
-            :label="item.title"
-            :value="item.id"
-          >
-            <span style="float: left">{{ item.title }}</span>
-            <span style="float: right; color: #8492a6; font-size: 13px">{{ formatDate(item.start_time) }}</span>
-          </el-option>
-        </el-select>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="meetingSelectVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmMeetingSelect" :disabled="!selectedMeetingId">
-            下一步
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <VoteConfigDialog
-      v-model="voteDialogVisible"
-      :meeting-id="currentMeeting?.id"
-      :meeting-title="currentMeeting?.title"
-    />
-
-    <!-- Lottery Configuration Drawer -->
-    <LotteryManagerDrawer
-      v-model="lotteryDialogVisible"
-      :meeting-id="currentMeeting?.id"
-      :meeting-title="currentMeeting?.title"
-    />
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
-  DataAnalysis, Trophy, CircleCheck, Notebook,
-  ArrowRight, MagicStick, Timer, Fold, Expand, PictureFilled
+  ChatLineRound, CircleCheck, Notebook,
+  ArrowRight, Fold, Expand, PictureFilled
 } from '@element-plus/icons-vue'
 import { useSidebar } from '@/composables/useSidebar'
-import request from '@/utils/request'
-import VoteConfigDialog from '@/views/Admin/components/VoteConfigDialog.vue'
-import LotteryManagerDrawer from '@/views/Admin/components/LotteryManagerDrawer.vue'
 import { ElMessage } from 'element-plus'
 
 const { isCollapse, toggleSidebar } = useSidebar()
@@ -112,20 +56,12 @@ const router = useRouter()
 // Tools Configuration
 const tools = [
   {
-    id: 'vote',
-    title: '现场投票',
-    desc: '发起实时投票，支持大屏展示结果',
-    icon: 'DataAnalysis',
-    bgColor: '#eff6ff', // blue-50
-    color: '#3b82f6'    // blue-500
-  },
-  {
-    id: 'lottery',
-    title: '抽签',
-    desc: '随机抽取参会人员',
-    icon: 'Trophy',
-    bgColor: '#fff7ed', // orange-50
-    color: '#f97316'    // orange-500
+    id: 'interaction-center',
+    title: '会议互动中心',
+    desc: '统一管理投票、抽签、大屏控制与互动历史',
+    icon: 'ChatLineRound',
+    bgColor: '#eff6ff',
+    color: '#2563eb'
   },
   {
     id: 'followup',
@@ -153,85 +89,16 @@ const tools = [
   }
 ]
 
-// Logic
-const meetingSelectVisible = ref(false)
-const voteDialogVisible = ref(false)
-const lotteryDialogVisible = ref(false)
-const meetings = ref([])
-const loadingMeetings = ref(false)
-const selectedMeetingId = ref(null)
-const activeToolId = ref(null)
-
-const selectTip = computed(() => {
-  if (activeToolId.value === 'lottery') {
-    return '请选择要进行抽签的会议：'
-  }
-  return '请选择通过哪个会议发起投票：'
-})
-
-const currentMeeting = computed(() => {
-  return meetings.value.find(m => m.id === selectedMeetingId.value)
-})
-
 const handleToolClick = (tool) => {
   if (tool.id === 'followup') {
     router.push('/admin/followup')
   } else if (tool.id === 'cover-center') {
     router.push('/admin/toolbox/covers')
-  } else if (tool.id === 'vote' || tool.id === 'lottery') {
-    activeToolId.value = tool.id
-    openMeetingSelect()
+  } else if (tool.id === 'interaction-center') {
+    router.push('/admin/toolbox/interactions')
   } else {
     ElMessage.info('该功能正在开发中，敬请期待')
   }
-}
-
-const openMeetingSelect = async () => {
-  selectedMeetingId.value = null
-  meetingSelectVisible.value = true
-  if (meetings.value.length === 0) {
-    await fetchMeetings()
-  }
-}
-
-const fetchMeetings = async () => {
-  loadingMeetings.value = true
-  try {
-    // Standard params, maybe sort by start_time desc
-    const res = await request.get('/meetings/', { params: { limit: 100 } }) 
-    // Usually res is the list or res.items. Assuming wrapper handles it or it returns list.
-    // Based on MeetingManage.vue: meetings.value = await request.get('/meetings/', ...)
-    // which seemed to imply direct array or handled by interceptor.
-    // MeetingManage uses params: { force_show_all: true }
-    let list = Array.isArray(res) ? res : (res.items || [])
-    // Sort by start_time desc
-    list.sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
-    meetings.value = list
-  } catch (e) {
-    ElMessage.error('获取会议列表失败')
-  } finally {
-    loadingMeetings.value = false
-  }
-}
-
-const confirmMeetingSelect = () => {
-  if (!selectedMeetingId.value) return
-  meetingSelectVisible.value = false
-  
-  if (activeToolId.value === 'vote') {
-    voteDialogVisible.value = true
-  } else if (activeToolId.value === 'lottery') {
-    lotteryDialogVisible.value = true
-  }
-}
-
-const formatDate = (str) => {
-  if (!str) return ''
-  const d = new Date(str)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 </script>
@@ -338,8 +205,4 @@ const formatDate = (str) => {
   transform: translateX(0);
 }
 
-.select-tip {
-  margin-bottom: 12px;
-  color: var(--text-secondary);
-}
 </style>
