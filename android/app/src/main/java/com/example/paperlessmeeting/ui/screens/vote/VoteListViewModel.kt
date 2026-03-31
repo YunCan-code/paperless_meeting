@@ -3,9 +3,14 @@ package com.example.paperlessmeeting.ui.screens.vote
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
+import com.example.paperlessmeeting.data.local.UserPreferences
+import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.data.repository.MeetingRepository
+import com.example.paperlessmeeting.domain.model.Meeting
+import com.example.paperlessmeeting.domain.model.MeetingStatus
 import com.example.paperlessmeeting.domain.model.Vote
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDateTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -15,20 +20,26 @@ import javax.inject.Inject
 @HiltViewModel
 class VoteListViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
-    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager,
+    private val userPreferences: UserPreferences,
+    private val socketManager: SocketManager,
     private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     data class VoteListUiState(
         val isLoading: Boolean = false,
-        val activeVotes: List<Vote> = emptyList(),
-        val historyVotes: List<Vote> = emptyList(),
+        val todayMeetings: List<Meeting> = emptyList(),
+        val selectedMeetingId: Int? = null,
+        val selectedMeeting: Meeting? = null,
+        val selectedMeetingActiveVotes: List<Vote> = emptyList(),
+        val selectedMeetingHistoryVotes: List<Vote> = emptyList(),
+        val globalHistoryVotes: List<Vote> = emptyList(),
         val error: String? = null
     )
 
     private val _uiState = MutableStateFlow(VoteListUiState())
     val uiState = _uiState.asStateFlow()
+
+    private var votesByMeetingId: Map<Int, List<Vote>> = emptyMap()
 
     init {
         loadData()
@@ -38,12 +49,10 @@ class VoteListViewModel @Inject constructor(
     private fun observeSocketEvents() {
         viewModelScope.launch {
             socketManager.voteStartEvent.collect {
-                // Refresh list when new vote starts
                 loadData()
             }
         }
-        
-        // Also listen for end events to auto-refresh list (e.g. to move it to history or update status)
+
         viewModelScope.launch {
             socketManager.voteEndEvent.collect {
                 loadData()
@@ -55,84 +64,87 @@ class VoteListViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                // 1. Get User ID
                 val userId = userPreferences.getUserId()
                 if (userId == -1) {
                     _uiState.update { it.copy(isLoading = false, error = "用户未登录") }
                     return@launch
                 }
 
-                // 2. Load Active Votes (from today's meetings)
-                // Logic similar to DashboardViewModel but focused on list
                 val todayStr = java.time.LocalDate.now().toString()
                 val todayMeetings = repository.getMeetings(
-                    limit = 20, 
-                    startDate = todayStr, 
+                    limit = 20,
+                    startDate = todayStr,
                     endDate = todayStr
                 )
-                
-                val allActiveVotes = mutableListOf<Vote>()
-                val now = java.time.LocalDateTime.now()
 
-                for (meeting in todayMeetings) {
-                    try {
-                        val votes = repository.getVoteList(meeting.id)
-                        val filtered = votes.filter { vote ->
-                            when (vote.status) {
-                                "active" -> true
-                                "closed" -> {
-                                    // Keep closed votes for 10 minutes after expected end time
-                                    // expected_end = started_at + duration
-                                    if (vote.started_at != null) {
-                                        try {
-                                            // Backend uses isoformat(), e.g. "2023-10-27T10:00:00.123456"
-                                            val startedAt = java.time.LocalDateTime.parse(vote.started_at)
-                                            val duration = vote.duration_seconds
-                                            val endTime = startedAt.plusSeconds(duration.toLong())
-                                            val hideTime = endTime.plusMinutes(10)
-                                            now.isBefore(hideTime)
-                                        } catch (e: Exception) {
-                                            false 
-                                        }
-                                    } else {
-                                        false
-                                    }
-                                }
-                                else -> false // "draft" not shown
-                            }
-                        }
-                        allActiveVotes.addAll(filtered)
-                    } catch (e: Exception) {
-                        continue
-                    }
+                val sortedMeetings = todayMeetings.sortedWith(
+                    compareBy<Meeting>(
+                        { meetingStatusRank(it.getUiStatus()) },
+                        { parseMeetingDateTime(it.startTime) ?: LocalDateTime.MAX }
+                    )
+                )
+
+                votesByMeetingId = sortedMeetings.associate { meeting ->
+                    meeting.id to repository.getVoteList(meeting.id)
                 }
 
-                // 3. Load History Votes
-                val history = repository.getVoteHistory(userId, 0, 50)
+                val globalHistoryVotes = repository.getVoteHistory(userId, 0, 50)
+                    .sortedByDescending { parseMeetingDateTime(it.started_at ?: it.created_at) ?: LocalDateTime.MIN }
 
-                _uiState.update { 
+                val selectedMeetingId = resolveSelectedMeetingId(
+                    currentSelectedId = _uiState.value.selectedMeetingId,
+                    meetings = sortedMeetings,
+                    voteMap = votesByMeetingId
+                )
+
+                val selectedMeeting = sortedMeetings.find { it.id == selectedMeetingId }
+                val selectedMeetingVotes = votesByMeetingId[selectedMeetingId].orEmpty()
+
+                _uiState.update {
                     it.copy(
                         isLoading = false,
-                        activeVotes = allActiveVotes,
-                        historyVotes = history
-                    ) 
+                        todayMeetings = sortedMeetings,
+                        selectedMeetingId = selectedMeetingId,
+                        selectedMeeting = selectedMeeting,
+                        selectedMeetingActiveVotes = resolveMeetingActiveVotes(selectedMeetingVotes),
+                        selectedMeetingHistoryVotes = resolveMeetingHistoryVotes(selectedMeetingVotes),
+                        globalHistoryVotes = globalHistoryVotes,
+                        error = null
+                    )
                 }
-                
-                // 4. Connect Socket and Join Rooms
-                joinMeetingRooms(todayMeetings)
-                
+
+                joinMeetingRooms(sortedMeetings)
             } catch (e: Exception) {
-                 _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "加载投票数据失败"
+                    )
+                }
             }
         }
     }
-    
-    private fun joinMeetingRooms(meetings: List<com.example.paperlessmeeting.domain.model.Meeting>) {
+
+    fun selectMeeting(meetingId: Int) {
+        val selectedMeeting = _uiState.value.todayMeetings.find { it.id == meetingId } ?: return
+        val votes = votesByMeetingId[meetingId].orEmpty()
+        _uiState.update {
+            it.copy(
+                selectedMeetingId = meetingId,
+                selectedMeeting = selectedMeeting,
+                selectedMeetingActiveVotes = resolveMeetingActiveVotes(votes),
+                selectedMeetingHistoryVotes = resolveMeetingHistoryVotes(votes)
+            )
+        }
+    }
+
+    fun refresh() {
+        loadData()
+    }
+
+    private fun joinMeetingRooms(meetings: List<Meeting>) {
         try {
-            // Establish connection (idempotent if already connected)
-            // Note: Ideally this URL should come from a centralized config
             socketManager.connect(appSettingsState.getSocketBaseUrl())
-            
             meetings.forEach { meeting ->
                 socketManager.joinMeeting(meeting.id)
             }
@@ -140,8 +152,65 @@ class VoteListViewModel @Inject constructor(
             e.printStackTrace()
         }
     }
-    
-    fun refresh() {
-        loadData()
+
+    private fun resolveSelectedMeetingId(
+        currentSelectedId: Int?,
+        meetings: List<Meeting>,
+        voteMap: Map<Int, List<Vote>>
+    ): Int? {
+        if (meetings.isEmpty()) return null
+        if (currentSelectedId != null && meetings.any { it.id == currentSelectedId }) {
+            return currentSelectedId
+        }
+
+        meetings
+            .filter { it.getUiStatus() == MeetingStatus.Ongoing }
+            .minByOrNull { parseMeetingDateTime(it.startTime) ?: LocalDateTime.MAX }
+            ?.let { return it.id }
+
+        meetings
+            .filter { it.getUiStatus() == MeetingStatus.Upcoming }
+            .minByOrNull { parseMeetingDateTime(it.startTime) ?: LocalDateTime.MAX }
+            ?.let { return it.id }
+
+        meetings
+            .filter { voteMap[it.id].orEmpty().isNotEmpty() }
+            .minByOrNull { parseMeetingDateTime(it.startTime) ?: LocalDateTime.MAX }
+            ?.let { return it.id }
+
+        return meetings.minByOrNull { parseMeetingDateTime(it.startTime) ?: LocalDateTime.MAX }?.id
+    }
+
+    private fun resolveMeetingActiveVotes(votes: List<Vote>): List<Vote> {
+        return votes
+            .filter { it.status == "active" }
+            .sortedWith(
+                compareBy<Vote> { if ((it.wait_seconds ?: 0) > 0) 0 else 1 }
+                    .thenByDescending { parseMeetingDateTime(it.started_at ?: it.created_at) ?: LocalDateTime.MIN }
+            )
+    }
+
+    private fun resolveMeetingHistoryVotes(votes: List<Vote>): List<Vote> {
+        return votes
+            .filter { it.status == "closed" }
+            .sortedByDescending { parseMeetingDateTime(it.started_at ?: it.created_at) ?: LocalDateTime.MIN }
+    }
+
+    private fun meetingStatusRank(status: MeetingStatus): Int {
+        return when (status) {
+            MeetingStatus.Ongoing -> 0
+            MeetingStatus.Upcoming -> 1
+            MeetingStatus.Finished -> 2
+            MeetingStatus.Draft -> 3
+        }
+    }
+
+    private fun parseMeetingDateTime(value: String?): LocalDateTime? {
+        if (value.isNullOrBlank()) return null
+        return try {
+            LocalDateTime.parse(value.replace(" ", "T"))
+        } catch (_: Exception) {
+            null
+        }
     }
 }

@@ -114,6 +114,7 @@ fun MainScreen(
 
     val currentRoute = currentDestination?.route?.substringBefore("?")
     val isReaderScreen = currentRoute == "reader"
+    val isVoteDetailScreen = currentRoute?.startsWith("vote_detail") == true
     val currentMainTabIndex = resolveCurrentMainTabIndex(
         currentRoute = currentRoute,
         pagerPage = pagerState.currentPage
@@ -402,7 +403,7 @@ fun MainScreen(
 
                 AppNoticeHost(
                     hostState = appNoticeHostState,
-                    hasFloatingNav = !isReaderScreen,
+                    hasFloatingNav = !isReaderScreen && !isVoteDetailScreen,
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
 
@@ -422,7 +423,7 @@ fun MainScreen(
                 }
 
                 AnimatedVisibility(
-                    visible = !isReaderScreen,
+                    visible = !isReaderScreen && !isVoteDetailScreen,
                     enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                     modifier = Modifier
