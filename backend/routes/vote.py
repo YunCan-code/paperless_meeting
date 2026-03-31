@@ -336,6 +336,18 @@ def get_active_vote(meeting_id: int, user_id: Optional[int] = None, session: Ses
     return None
 
 
+@router.get("/history", response_model=List[VoteRead])
+def get_vote_history(user_id: int, skip: int = 0, limit: int = 20, session: Session = Depends(get_session)):
+    vote_ids = session.exec(
+        select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct().offset(skip).limit(limit)
+    ).all()
+    if not vote_ids:
+        return []
+
+    votes = session.exec(select(Vote).where(Vote.id.in_(vote_ids)).order_by(Vote.created_at.desc())).all()
+    return [_build_vote_read(vote, session, user_id=user_id) for vote in votes]
+
+
 @router.get("/{vote_id}", response_model=VoteRead)
 def get_vote(vote_id: int, user_id: Optional[int] = None, session: Session = Depends(get_session)):
     vote = _get_vote_or_404(vote_id, session)
@@ -415,14 +427,3 @@ def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
     vote = _get_vote_or_404(vote_id, session)
     return _build_vote_result(vote, session)
 
-
-@router.get("/history", response_model=List[VoteRead])
-def get_vote_history(user_id: int, skip: int = 0, limit: int = 20, session: Session = Depends(get_session)):
-    vote_ids = session.exec(
-        select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct().offset(skip).limit(limit)
-    ).all()
-    if not vote_ids:
-        return []
-
-    votes = session.exec(select(Vote).where(Vote.id.in_(vote_ids)).order_by(Vote.created_at.desc())).all()
-    return [_build_vote_read(vote, session, user_id=user_id) for vote in votes]
