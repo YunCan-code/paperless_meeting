@@ -57,8 +57,7 @@ class ForegroundHeartbeatManager @Inject constructor(
     }
 
     private suspend fun sendHeartbeatOnce() {
-        val userId = userPreferences.getUserId()
-        if (userId <= 0) return
+        if (userPreferences.getCachedUserIdHint() <= 0) return
         try {
             val heartbeat = HeartbeatPayloadFactory.build(context, userPreferences)
             deviceRepository.sendHeartbeat(heartbeat)

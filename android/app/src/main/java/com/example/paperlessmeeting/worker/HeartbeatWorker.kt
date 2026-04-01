@@ -21,6 +21,9 @@ class HeartbeatWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
+            if (userPreferences.getCachedUserIdHint() <= 0) {
+                return Result.success()
+            }
             val context = applicationContext
             
             val heartbeat = HeartbeatPayloadFactory.build(context, userPreferences)

@@ -83,11 +83,14 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        
-        // Trigger immediate heartbeat when app opens to update status
-        val authRequest = OneTimeWorkRequestBuilder<HeartbeatWorker>()
-            .build()
-        WorkManager.getInstance(this).enqueue(authRequest)
+
+        // Avoid adding extra startup pressure before the first frame is drawn.
+        window.decorView.post {
+            (application as? PaperlessApp)?.ensureBackgroundServicesStarted()
+            val authRequest = OneTimeWorkRequestBuilder<HeartbeatWorker>()
+                .build()
+            WorkManager.getInstance(this).enqueue(authRequest)
+        }
     }
 
     override fun onStart() {

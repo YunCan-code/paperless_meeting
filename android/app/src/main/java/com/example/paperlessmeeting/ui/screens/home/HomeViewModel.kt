@@ -1,5 +1,6 @@
 package com.example.paperlessmeeting.ui.screens.home
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
@@ -26,8 +27,13 @@ class HomeViewModel @Inject constructor(
     private val repository: MeetingRepository,
     private val appSettingsState: AppSettingsState,
     private val userPreferences: UserPreferences,
-    private val socketManager: SocketManager
+    private val socketManager: SocketManager,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    companion object {
+        private const val SELECTED_MEETING_ID_KEY = "selected_meeting_id"
+    }
 
     val staticBaseUrl: String
         get() = appSettingsState.getStaticBaseUrl()
@@ -35,7 +41,7 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val _selectedMeetingId = MutableStateFlow<Int?>(null)
+    private val _selectedMeetingId = MutableStateFlow(savedStateHandle.get<Int?>(SELECTED_MEETING_ID_KEY))
     val selectedMeetingId: StateFlow<Int?> = _selectedMeetingId.asStateFlow()
 
     private val _isCheckInSubmitting = MutableStateFlow(false)
@@ -56,6 +62,11 @@ class HomeViewModel @Inject constructor(
 
     fun selectMeeting(id: Int?) {
         _selectedMeetingId.value = id
+        if (id == null) {
+            savedStateHandle.remove<Int>(SELECTED_MEETING_ID_KEY)
+        } else {
+            savedStateHandle[SELECTED_MEETING_ID_KEY] = id
+        }
     }
 
     private fun sortMeetingsWithTodayFirst(meetings: List<Meeting>): List<Meeting> {

@@ -59,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -91,7 +92,6 @@ fun MainScreen(
     onExitApp: () -> Unit = {}
 ) {
     val navController = rememberNavController()
-    val sharedMeetingViewModel: HomeViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -218,6 +218,7 @@ fun MainScreen(
                         .windowInsetsPadding(WindowInsets.systemBars)
                 ) {
                 composable(MAIN_TABS_ROUTE) {
+                    val sharedMeetingViewModel = rememberMainTabsHomeViewModel(navController)
                     HorizontalPager(
                         state = pagerState,
                         beyondBoundsPageCount = 1,
@@ -294,6 +295,7 @@ fun MainScreen(
                     )
                 ) { backStackEntry ->
                     val meetingId = backStackEntry.arguments?.getString("meetingId")?.toIntOrNull()
+                    val sharedMeetingViewModel = rememberMainTabsHomeViewModel(navController)
                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = "ALL",
                         navController = navController,
@@ -315,6 +317,7 @@ fun MainScreen(
                     )
                 ) { backStackEntry ->
                     val typeName = backStackEntry.arguments?.getString("typeName") ?: "ALL"
+                    val sharedMeetingViewModel = rememberMainTabsHomeViewModel(navController)
                     com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
                         meetingTypeName = typeName,
                         navController = navController,
@@ -643,6 +646,14 @@ private data class NavItemFrame(
 
 private fun lerpFloat(start: Float, end: Float, fraction: Float): Float {
     return start + ((end - start) * fraction)
+}
+
+@Composable
+private fun rememberMainTabsHomeViewModel(navController: NavController): HomeViewModel {
+    val mainTabsEntry = remember(navController) {
+        navController.getBackStackEntry(MAIN_TABS_ROUTE)
+    }
+    return hiltViewModel(mainTabsEntry)
 }
 
 @Composable

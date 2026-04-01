@@ -1,9 +1,13 @@
 package com.example.paperlessmeeting.data.local
 
 import com.example.paperlessmeeting.BuildConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,17 +17,29 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 class AppSettingsState @Inject constructor(
     private val userPreferences: UserPreferences
 ) {
-    private val _themeMode = MutableStateFlow(loadThemeMode())
+    private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val initialSnapshot = userPreferences.getCachedDeviceSettingsSnapshot()
+
+    private val _themeMode = MutableStateFlow(resolveThemeMode(initialSnapshot.themeMode))
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
-    private val _fontScaleLevel = MutableStateFlow(userPreferences.getFontScaleLevel())
+    private val _fontScaleLevel = MutableStateFlow(initialSnapshot.fontScaleLevel?.coerceIn(0, 3) ?: 1)
     val fontScaleLevel: StateFlow<Int> = _fontScaleLevel.asStateFlow()
 
-    private val _serverHost = MutableStateFlow(userPreferences.getServerHost())
+    private val _serverHost = MutableStateFlow(initialSnapshot.serverHost ?: getDefaultHost())
     val serverHost: StateFlow<String> = _serverHost.asStateFlow()
 
-    private fun loadThemeMode(): ThemeMode {
-        return when (userPreferences.getThemeMode()) {
+    init {
+        settingsScope.launch {
+            val hydrated = userPreferences.hydrateLegacyDeviceSettingsIfNeeded()
+            _themeMode.value = resolveThemeMode(hydrated.themeMode)
+            _fontScaleLevel.value = hydrated.fontScaleLevel?.coerceIn(0, 3) ?: _fontScaleLevel.value
+            _serverHost.value = hydrated.serverHost ?: _serverHost.value
+        }
+    }
+
+    private fun resolveThemeMode(rawMode: String?): ThemeMode {
+        return when (rawMode) {
             "light" -> ThemeMode.LIGHT
             "dark" -> ThemeMode.DARK
             else -> ThemeMode.SYSTEM

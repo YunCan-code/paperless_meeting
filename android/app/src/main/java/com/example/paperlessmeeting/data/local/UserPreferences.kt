@@ -12,17 +12,30 @@ import javax.inject.Singleton
 class UserPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context, 
-        "user_prefs_encrypted", 
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    data class DeviceSettingsSnapshot(
+        val themeMode: String? = null,
+        val fontScaleLevel: Int? = null,
+        val serverHost: String? = null
     )
+
+    private val devicePrefs: SharedPreferences =
+        context.getSharedPreferences("device_prefs", Context.MODE_PRIVATE)
+
+    private val masterKey by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+    }
+
+    private val securePrefs: SharedPreferences by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        EncryptedSharedPreferences.create(
+            context,
+            "user_prefs_encrypted",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     companion object {
         private const val KEY_USER_NAME = "user_name"
@@ -38,99 +51,105 @@ class UserPreferences @Inject constructor(
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_FONT_SCALE_LEVEL = "font_scale_level"
         private const val KEY_SERVER_HOST = "server_host"
+        private const val KEY_LAST_USER_ID_HINT = "last_user_id_hint"
         private const val KEY_CHECKIN_HINT_SEEN_PREFIX = "checkin_hint_seen"
     }
 
     fun saveUserId(id: Int) {
-        prefs.edit().putInt(KEY_USER_ID, id).apply()
+        securePrefs.edit().putInt(KEY_USER_ID, id).apply()
+        devicePrefs.edit().putInt(KEY_LAST_USER_ID_HINT, id).apply()
     }
 
     fun getUserId(): Int {
-        return prefs.getInt(KEY_USER_ID, -1)
+        return securePrefs.getInt(KEY_USER_ID, -1)
     }
 
     fun saveUserName(name: String) {
-        prefs.edit().putString(KEY_USER_NAME, name).apply()
+        securePrefs.edit().putString(KEY_USER_NAME, name).apply()
     }
 
     fun getUserName(): String? {
-        return prefs.getString(KEY_USER_NAME, null)
+        return securePrefs.getString(KEY_USER_NAME, null)
     }
 
     fun saveUserDept(dept: String) {
-        prefs.edit().putString(KEY_USER_DEPT, dept).apply()
+        securePrefs.edit().putString(KEY_USER_DEPT, dept).apply()
     }
 
     fun getUserDept(): String? {
-        return prefs.getString(KEY_USER_DEPT, null)
+        return securePrefs.getString(KEY_USER_DEPT, null)
     }
 
     fun saveUserDistrict(district: String) {
-        prefs.edit().putString(KEY_USER_DISTRICT, district).apply()
+        securePrefs.edit().putString(KEY_USER_DISTRICT, district).apply()
     }
 
     fun getUserDistrict(): String? {
-        return prefs.getString(KEY_USER_DISTRICT, null)
+        return securePrefs.getString(KEY_USER_DISTRICT, null)
     }
 
     fun saveUserPhone(phone: String) {
-        prefs.edit().putString(KEY_USER_PHONE, phone).apply()
+        securePrefs.edit().putString(KEY_USER_PHONE, phone).apply()
     }
 
     fun getUserPhone(): String? {
-        return prefs.getString(KEY_USER_PHONE, null)
+        return securePrefs.getString(KEY_USER_PHONE, null)
     }
 
     fun saveUserEmail(email: String) {
-        prefs.edit().putString(KEY_USER_EMAIL, email).apply()
+        securePrefs.edit().putString(KEY_USER_EMAIL, email).apply()
     }
 
     fun getUserEmail(): String? {
-        return prefs.getString(KEY_USER_EMAIL, null)
+        return securePrefs.getString(KEY_USER_EMAIL, null)
     }
 
     fun saveUserRole(role: String) {
-        prefs.edit().putString(KEY_USER_ROLE, role).apply()
+        securePrefs.edit().putString(KEY_USER_ROLE, role).apply()
     }
 
     fun getUserRole(): String? {
-        return prefs.getString(KEY_USER_ROLE, null)
+        return securePrefs.getString(KEY_USER_ROLE, null)
     }
 
     fun saveToken(token: String) {
-        prefs.edit().putString(KEY_TOKEN, token).apply()
+        securePrefs.edit().putString(KEY_TOKEN, token).apply()
     }
 
     fun getToken(): String? {
-        return prefs.getString(KEY_TOKEN, null)
+        return securePrefs.getString(KEY_TOKEN, null)
     }
 
     // --- Device-level settings (theme, font, server) ---
 
     fun saveThemeMode(mode: String) {
-        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
+        devicePrefs.edit().putString(KEY_THEME_MODE, mode).apply()
     }
 
     fun getThemeMode(): String {
-        return prefs.getString(KEY_THEME_MODE, "system") ?: "system"
+        return devicePrefs.getString(KEY_THEME_MODE, "system") ?: "system"
     }
 
     fun saveFontScaleLevel(level: Int) {
-        prefs.edit().putInt(KEY_FONT_SCALE_LEVEL, level).apply()
+        devicePrefs.edit().putInt(KEY_FONT_SCALE_LEVEL, level).apply()
     }
 
     fun getFontScaleLevel(): Int {
-        return prefs.getInt(KEY_FONT_SCALE_LEVEL, 1) // default: 标准
+        return devicePrefs.getInt(KEY_FONT_SCALE_LEVEL, 1) // default: 标准
     }
 
     fun saveServerHost(host: String) {
-        prefs.edit().putString(KEY_SERVER_HOST, host).apply()
+        devicePrefs.edit().putString(KEY_SERVER_HOST, host).apply()
     }
 
     fun getServerHost(): String {
         val apiUrl = com.example.paperlessmeeting.BuildConfig.API_BASE_URL
         val defaultHost = apiUrl.removeSuffix("/api/").removeSuffix("/api").removeSuffix("/")
-        return prefs.getString(KEY_SERVER_HOST, defaultHost) ?: defaultHost
+        return devicePrefs.getString(KEY_SERVER_HOST, defaultHost) ?: defaultHost
+    }
+
+    fun getCachedUserIdHint(): Int {
+        return devicePrefs.getInt(KEY_LAST_USER_ID_HINT, -1)
     }
 
     private fun checkInHintKey(userId: Int, meetingId: Int): String {
@@ -139,25 +158,60 @@ class UserPreferences @Inject constructor(
 
     fun hasSeenCheckInHint(userId: Int, meetingId: Int): Boolean {
         if (userId <= 0 || meetingId <= 0) return true
-        return prefs.getBoolean(checkInHintKey(userId, meetingId), false)
+        return devicePrefs.getBoolean(checkInHintKey(userId, meetingId), false)
     }
 
     fun markCheckInHintSeen(userId: Int, meetingId: Int) {
         if (userId <= 0 || meetingId <= 0) return
-        prefs.edit().putBoolean(checkInHintKey(userId, meetingId), true).apply()
+        devicePrefs.edit().putBoolean(checkInHintKey(userId, meetingId), true).apply()
+    }
+
+    fun getCachedDeviceSettingsSnapshot(): DeviceSettingsSnapshot {
+        val fontScaleLevel = if (devicePrefs.contains(KEY_FONT_SCALE_LEVEL)) {
+            devicePrefs.getInt(KEY_FONT_SCALE_LEVEL, 1)
+        } else {
+            null
+        }
+
+        return DeviceSettingsSnapshot(
+            themeMode = devicePrefs.getString(KEY_THEME_MODE, null),
+            fontScaleLevel = fontScaleLevel,
+            serverHost = devicePrefs.getString(KEY_SERVER_HOST, null)
+        )
+    }
+
+    fun hydrateLegacyDeviceSettingsIfNeeded(): DeviceSettingsSnapshot {
+        val editor = devicePrefs.edit()
+        var changed = false
+
+        if (!devicePrefs.contains(KEY_THEME_MODE)) {
+            securePrefs.getString(KEY_THEME_MODE, null)?.let {
+                editor.putString(KEY_THEME_MODE, it)
+                changed = true
+            }
+        }
+
+        if (!devicePrefs.contains(KEY_FONT_SCALE_LEVEL) && securePrefs.contains(KEY_FONT_SCALE_LEVEL)) {
+            editor.putInt(KEY_FONT_SCALE_LEVEL, securePrefs.getInt(KEY_FONT_SCALE_LEVEL, 1))
+            changed = true
+        }
+
+        if (!devicePrefs.contains(KEY_SERVER_HOST)) {
+            securePrefs.getString(KEY_SERVER_HOST, null)?.let {
+                editor.putString(KEY_SERVER_HOST, it)
+                changed = true
+            }
+        }
+
+        if (changed) {
+            editor.apply()
+        }
+
+        return getCachedDeviceSettingsSnapshot()
     }
 
     fun clear() {
-        // Backup device-level settings before clearing
-        val themeMode = getThemeMode()
-        val fontScaleLevel = getFontScaleLevel()
-        val serverHost = getServerHost()
-
-        prefs.edit().clear().apply()
-
-        // Restore device-level settings
-        saveThemeMode(themeMode)
-        saveFontScaleLevel(fontScaleLevel)
-        saveServerHost(serverHost)
+        securePrefs.edit().clear().apply()
+        devicePrefs.edit().remove(KEY_LAST_USER_ID_HINT).apply()
     }
 }
