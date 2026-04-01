@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -221,18 +222,22 @@ fun MainScreen(
                     val sharedMeetingViewModel = rememberMainTabsHomeViewModel(navController)
                     HorizontalPager(
                         state = pagerState,
-                        beyondBoundsPageCount = 1,
-                        modifier = Modifier.fillMaxSize()
+                        beyondBoundsPageCount = 0,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clipToBounds()
                     ) { page ->
                         val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
                         val distanceFromCenter = abs(pageOffset)
+                        val transitionProgress = abs(pagerState.currentPageOffsetFraction).coerceIn(0f, 1f)
                         val pageAlpha = 0.9f + ((1f - distanceFromCenter) * 0.1f)
                         val pageScale = 0.985f + ((1f - distanceFromCenter) * 0.015f)
-                        val pageTranslationX = with(LocalDensity.current) { 28.dp.toPx() } * pageOffset
+                        val pageTranslationX = with(LocalDensity.current) { 28.dp.toPx() } * pageOffset * transitionProgress
 
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .clipToBounds()
                                 .graphicsLayer {
                                     alpha = pageAlpha
                                     scaleX = pageScale
