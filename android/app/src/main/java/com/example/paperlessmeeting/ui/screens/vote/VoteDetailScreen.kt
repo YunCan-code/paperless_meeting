@@ -92,13 +92,18 @@ fun VoteDetailScreen(
     val currentVote = uiState.vote
     val shouldShowResults = currentVote?.status == "closed" && uiState.voteResult != null
     val shouldShowSubmitBar = currentVote?.status == "active" && !uiState.hasVoted
+    val pageTitle = when {
+        shouldShowResults -> "投票结果"
+        currentVote?.status == "active" -> "参与投票"
+        else -> "投票状态"
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = if (shouldShowResults) "投票结果" else "参与投票",
+                        text = pageTitle,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = TextPrimary
@@ -365,10 +370,12 @@ private fun VoteSelectionHintCard(
     uiState: VoteDetailViewModel.VoteDetailUiState
 ) {
     val description = when {
+        vote.status == "draft" -> "投票尚未开始，等待主持人开启后即可参与。"
         uiState.waitLeft > 0 -> "投票尚未开始，倒计时结束后即可选择并提交。"
         vote.is_multiple -> "请从下方选择 1 至 ${vote.max_selections} 个选项，然后在底部提交。"
         else -> "请选择你认可的一个选项，然后在底部提交投票。"
     }
+    val title = if (vote.status == "draft") "等待投票开始" else "请选择投票选项"
 
     Surface(
         shape = RoundedCornerShape(18.dp),
@@ -377,7 +384,7 @@ private fun VoteSelectionHintCard(
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
-                text = "请选择投票选项",
+                text = title,
                 color = TextPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold

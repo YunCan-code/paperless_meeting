@@ -29,18 +29,50 @@ from socket_manager import broadcast_vote_results, broadcast_vote_state
 router = APIRouter(prefix="/vote", tags=["投票管理"])
 
 UTC = timezone.utc
+SHANGHAI_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
+def _local_now() -> datetime:
+    return datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
 
 
-def _normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
+def _to_shanghai_naive(value: datetime, assume_tz: timezone) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=assume_tz).astimezone(SHANGHAI_TZ).replace(tzinfo=None)
+    return value.astimezone(SHANGHAI_TZ).replace(tzinfo=None)
+
+
+def _resolve_runtime_datetime(value: Optional[datetime], vote: Vote) -> Optional[datetime]:
     if value is None:
         return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
+    if value.tzinfo is not None:
+        return value.astimezone(SHANGHAI_TZ).replace(tzinfo=None)
+    if vote.status not in {"countdown", "active"}:
+        return value
+
+    now = _local_now()
+    local_candidate = value
+    utc_candidate = _to_shanghai_naive(value, UTC)
+    upper_bound = vote.countdown_seconds if vote.status == "countdown" else vote.duration_seconds
+
+    def _remaining_seconds(candidate: datetime) -> float:
+        if vote.status == "countdown":
+            return (candidate - now).total_seconds()
+        return (candidate + timedelta(seconds=vote.duration_seconds) - now).total_seconds()
+
+    local_remaining = _remaining_seconds(local_candidate)
+    utc_remaining = _remaining_seconds(utc_candidate)
+    local_valid = -5 <= local_remaining <= upper_bound + 60
+    utc_valid = -5 <= utc_remaining <= upper_bound + 60
+
+    if local_valid and not utc_valid:
+        return local_candidate
+    if utc_valid and not local_valid:
+        return utc_candidate
+    if local_valid and utc_valid:
+        return local_candidate if abs(local_remaining) <= abs(utc_remaining) else utc_candidate
+
+    return local_candidate if abs(local_remaining) <= abs(utc_remaining) else utc_candidate
 
 
 def _normalize_vote_options(options: List[str]) -> List[str]:
@@ -72,15 +104,15 @@ def _validate_vote_payload(
 
 
 def _sync_vote_runtime_state(vote: Vote, session: Session) -> Vote:
-    now = _utc_now()
-    started_at = _normalize_datetime(vote.started_at)
+    now = _local_now()
+    started_at = _resolve_runtime_datetime(vote.started_at, vote)
 
     if vote.status == "countdown" and started_at and now >= started_at:
         vote.status = "active"
         session.add(vote)
         session.commit()
         session.refresh(vote)
-        started_at = _normalize_datetime(vote.started_at)
+        started_at = _resolve_runtime_datetime(vote.started_at, vote)
 
     if vote.status == "active" and started_at:
         if now >= started_at + timedelta(seconds=vote.duration_seconds):
@@ -178,8 +210,8 @@ def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None
     options = _get_vote_options(vote.id, session)
     total_voters = _get_total_voters(vote.id, session)
 
-    now = _utc_now()
-    started_at = _normalize_datetime(vote.started_at)
+    now = _local_now()
+    started_at = _resolve_runtime_datetime(vote.started_at, vote)
     remaining_seconds: Optional[int] = None
     countdown_remaining_seconds: Optional[int] = None
     wait_seconds: Optional[int] = None
@@ -361,7 +393,7 @@ async def start_vote(vote_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
 
     vote.status = "countdown"
-    vote.started_at = _utc_now() + timedelta(seconds=vote.countdown_seconds)
+    vote.started_at = _local_now() + timedelta(seconds=vote.countdown_seconds)
     vote.closed_at = None
     session.add(vote)
     session.commit()
@@ -378,7 +410,7 @@ async def close_vote(vote_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail="当前投票不在进行中")
 
     vote.status = "closed"
-    vote.closed_at = _utc_now()
+    vote.closed_at = _local_now()
     session.add(vote)
     session.commit()
     session.refresh(vote)
@@ -426,4 +458,3 @@ async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends
 def get_vote_result(vote_id: int, session: Session = Depends(get_session)):
     vote = _get_vote_or_404(vote_id, session)
     return _build_vote_result(vote, session)
-

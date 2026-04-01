@@ -1,7 +1,13 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import UniqueConstraint
+
+SHANGHAI_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
+
+
+def shanghai_now_naive() -> datetime:
+    return datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
 
 # 会议和参会人员的多对多关联表
 class MeetingAttendeeLink(SQLModel, table=True):
@@ -249,7 +255,7 @@ class Vote(SQLModel, table=True):
     status: str = Field(default="draft")  # draft/countdown/active/closed
     started_at: Optional[datetime] = None  # active 阶段真正开始的时间；countdown 阶段表示计划开始时间
     closed_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=shanghai_now_naive)
 
 class VoteOption(SQLModel, table=True):
     """投票选项"""
@@ -267,7 +273,7 @@ class UserVote(SQLModel, table=True):
     vote_id: int = Field(foreign_key="vote.id")
     user_id: int = Field(foreign_key="user.id")
     option_id: int = Field(foreign_key="voteoption.id")
-    voted_at: datetime = Field(default_factory=datetime.now)
+    voted_at: datetime = Field(default_factory=shanghai_now_naive)
 
 class VoteRead(SQLModel):
     id: int

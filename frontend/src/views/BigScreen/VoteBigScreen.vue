@@ -285,13 +285,36 @@ const advanceMockVoteState = () => {
   }
 }
 
+const sanitizeTimerSeed = (status, rawValue, configuredSeconds) => {
+  const safeRaw = Number(rawValue || 0)
+  const safeConfigured = Number(configuredSeconds || 0)
+  if (!Number.isFinite(safeRaw) || safeRaw <= 0) return 0
+
+  const abnormalUpperBound = status === 'countdown'
+    ? Math.max(safeConfigured + 120, 3600)
+    : Math.max(safeConfigured + 120, 3600)
+
+  if (safeRaw > abnormalUpperBound) {
+    return Math.max(0, safeConfigured)
+  }
+  return safeRaw
+}
+
 const startLocalTimer = () => {
   clearTimer()
 
   if (vote.value.status === 'countdown') {
-    countdownValue.value = vote.value.countdown_remaining_seconds || 0
+    countdownValue.value = sanitizeTimerSeed(
+      'countdown',
+      vote.value.countdown_remaining_seconds,
+      vote.value.countdown_seconds
+    )
   } else if (vote.value.status === 'active') {
-    countdownValue.value = vote.value.remaining_seconds || 0
+    countdownValue.value = sanitizeTimerSeed(
+      'active',
+      vote.value.remaining_seconds,
+      vote.value.duration_seconds
+    )
   } else {
     countdownValue.value = 0
     return

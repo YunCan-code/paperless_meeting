@@ -59,6 +59,11 @@ fun resolveVoteStatusVisual(
             containerColor = Color(0xFFE2E8F0),
             contentColor = Color(0xFF475569)
         )
+        status == "draft" -> VoteStatusVisual(
+            label = "待开始",
+            containerColor = Color(0xFFE8EEF7),
+            contentColor = Color(0xFF475569)
+        )
         waitLeft > 0 -> VoteStatusVisual(
             label = "即将开始",
             containerColor = Color(0xFFFFF1D6),
@@ -190,7 +195,7 @@ fun VoteSegmentedToggle(
 fun VoteEmptyStateCard(
     icon: ImageVector,
     title: String,
-    description: String,
+    description: String? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -229,15 +234,17 @@ fun VoteEmptyStateCard(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            description?.takeIf { it.isNotBlank() }?.let {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = description,
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
+                Text(
+                    text = it,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+            }
         }
     }
 }
