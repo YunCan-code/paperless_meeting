@@ -13,7 +13,6 @@ from sqlmodel import Session, delete, select
 
 from database import get_session
 from models import (
-    MeetingAttendeeLink,
     User,
     UserVote,
     Vote,
@@ -154,17 +153,6 @@ def _get_user_voted(vote_id: int, user_id: Optional[int], session: Session) -> b
         session.exec(select(UserVote).where(UserVote.vote_id == vote_id, UserVote.user_id == user_id)).first()
         is not None
     )
-
-
-def _ensure_user_can_join_vote(vote: Vote, user_id: int, session: Session) -> None:
-    attendee = session.exec(
-        select(MeetingAttendeeLink).where(
-            MeetingAttendeeLink.meeting_id == vote.meeting_id,
-            MeetingAttendeeLink.user_id == user_id,
-        )
-    ).first()
-    if attendee is None:
-        raise HTTPException(status_code=403, detail="您不在当前会议的参会名单中")
 
 
 def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
@@ -436,7 +424,6 @@ async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends
     vote = _get_vote_or_404(vote_id, session)
     if vote.status != "active":
         raise HTTPException(status_code=400, detail="投票未开始或已结束")
-    _ensure_user_can_join_vote(vote, data.user_id, session)
 
     if _get_user_voted(vote.id, data.user_id, session):
         raise HTTPException(status_code=400, detail="您已投过票")

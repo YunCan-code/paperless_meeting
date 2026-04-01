@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from database import get_session
-from models import Meeting, MeetingAttendeeLink, Vote
+from models import Meeting, Vote
 from routes.lottery import _build_session_snapshot
 from routes.vote import _build_vote_read, _get_vote_or_404
 
@@ -24,15 +24,6 @@ def get_meeting_interaction_overview(
     meeting = session.get(Meeting, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
-    if user_id:
-        attendee = session.exec(
-            select(MeetingAttendeeLink).where(
-                MeetingAttendeeLink.meeting_id == meeting_id,
-                MeetingAttendeeLink.user_id == user_id,
-            )
-        ).first()
-        if attendee is None:
-            raise HTTPException(status_code=403, detail="您不在当前会议的参会名单中")
 
     votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
     vote_items = [_build_vote_read(_get_vote_or_404(vote.id, session), session, user_id=user_id).model_dump() for vote in votes]

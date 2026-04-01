@@ -13,9 +13,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -40,6 +42,9 @@ class VoteListViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(VoteListUiState())
     val uiState = _uiState.asStateFlow()
 
+    private var currentVoteTimerJob: Job? = null
+    private var trackedMeetingIds: Set<Int> = emptySet()
+
     init {
         loadData()
         observeSocketEvents()
@@ -51,6 +56,14 @@ class VoteListViewModel @Inject constructor(
                 loadData()
             }
         }
+
+        viewModelScope.launch {
+            socketManager.connectionState.collect { connected ->
+                if (connected) {
+                    trackedMeetingIds.forEach(socketManager::joinMeeting)
+                }
+            }
+        }
     }
 
     fun loadData() {
@@ -59,6 +72,8 @@ class VoteListViewModel @Inject constructor(
             try {
                 val userId = userPreferences.getUserId()
                 if (userId <= 0) {
+                    stopCurrentVoteTimer()
+                    trackedMeetingIds = emptySet()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -82,11 +97,12 @@ class VoteListViewModel @Inject constructor(
                 }
                 val historyIds = myVoteHistory.map { it.id }.toSet()
                 val preservedExpandedId = _uiState.value.expandedHistoryVoteId?.takeIf { it in historyIds }
+                val currentDisplayVote = resolveCurrentDisplayVote(todayVotes)
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        currentDisplayVote = resolveCurrentDisplayVote(todayVotes),
+                        currentDisplayVote = currentDisplayVote,
                         myVoteHistory = myVoteHistory,
                         expandedHistoryVoteId = preservedExpandedId,
                         historyVoteResults = it.historyVoteResults.filterKeys(historyIds::contains),
@@ -96,10 +112,13 @@ class VoteListViewModel @Inject constructor(
                     )
                 }
 
+                startCurrentVoteTimer(currentDisplayVote)
+
                 preservedExpandedId?.let { voteId ->
                     fetchHistoryVoteResult(voteId, forceRefresh = true)
                 }
             } catch (e: Exception) {
+                stopCurrentVoteTimer()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -151,11 +170,10 @@ class VoteListViewModel @Inject constructor(
     }
 
     private fun joinMeetingRooms(meetings: List<Meeting>) {
+        trackedMeetingIds = meetings.map { it.id }.toSet()
         try {
             socketManager.connect(appSettingsState.getSocketBaseUrl())
-            meetings.forEach { meeting ->
-                socketManager.joinMeeting(meeting.id)
-            }
+            trackedMeetingIds.forEach(socketManager::joinMeeting)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -178,6 +196,69 @@ class VoteListViewModel @Inject constructor(
             "draft" -> 1
             else -> 0
         }
+    }
+
+    private fun startCurrentVoteTimer(vote: Vote?) {
+        stopCurrentVoteTimer()
+        if (vote == null || vote.status !in setOf("countdown", "active")) {
+            return
+        }
+
+        currentVoteTimerJob = viewModelScope.launch {
+            val voteId = vote.id
+            var waitLeft = (vote.wait_seconds ?: 0).coerceAtLeast(0)
+            var remainingLeft = (vote.remaining_seconds ?: 0).coerceAtLeast(0)
+
+            while (isActive) {
+                kotlinx.coroutines.delay(1000)
+
+                if (waitLeft > 0) {
+                    waitLeft -= 1
+                    _uiState.update { state ->
+                        val currentVote = state.currentDisplayVote
+                        if (currentVote?.id != voteId) {
+                            state
+                        } else {
+                            state.copy(
+                                currentDisplayVote = currentVote.copy(wait_seconds = waitLeft, remaining_seconds = 0)
+                            )
+                        }
+                    }
+                    if (waitLeft == 0) {
+                        loadData()
+                        break
+                    }
+                    continue
+                }
+
+                if (remainingLeft > 0) {
+                    remainingLeft -= 1
+                    _uiState.update { state ->
+                        val currentVote = state.currentDisplayVote
+                        if (currentVote?.id != voteId) {
+                            state
+                        } else {
+                            state.copy(
+                                currentDisplayVote = currentVote.copy(wait_seconds = 0, remaining_seconds = remainingLeft)
+                            )
+                        }
+                    }
+                    if (remainingLeft == 0) {
+                        loadData()
+                        break
+                    }
+                    continue
+                }
+
+                loadData()
+                break
+            }
+        }
+    }
+
+    private fun stopCurrentVoteTimer() {
+        currentVoteTimerJob?.cancel()
+        currentVoteTimerJob = null
     }
 
     private fun fetchHistoryVoteResult(voteId: Int, forceRefresh: Boolean = false) {
@@ -225,5 +306,10 @@ class VoteListViewModel @Inject constructor(
         } catch (_: Exception) {
             null
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopCurrentVoteTimer()
     }
 }

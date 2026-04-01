@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, delete, select
 
 from database import get_session
-from models import Lottery, LotteryParticipant, LotterySession, LotteryWinner, Meeting, MeetingAttendeeLink, User
+from models import Lottery, LotteryParticipant, LotterySession, LotteryWinner, Meeting, User
 from socket_manager import broadcast_lottery_session_change
 
 router = APIRouter(prefix="/lottery", tags=["lottery"])
@@ -58,17 +58,6 @@ def _ensure_meeting_or_404(meeting_id: int, session: Session) -> Meeting:
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
     return meeting
-
-
-def _ensure_user_attends_meeting(meeting_id: int, user_id: int, session: Session) -> None:
-    attendee = session.exec(
-        select(MeetingAttendeeLink).where(
-            MeetingAttendeeLink.meeting_id == meeting_id,
-            MeetingAttendeeLink.user_id == user_id,
-        )
-    ).first()
-    if attendee is None:
-        raise HTTPException(status_code=403, detail="您不在当前会议的参会名单中")
 
 
 def _ensure_round_or_404(lottery_id: int, session: Session) -> Lottery:
@@ -330,7 +319,6 @@ async def join_lottery_pool(
     session: Session = Depends(get_session),
 ):
     _ensure_meeting_or_404(meeting_id, session)
-    _ensure_user_attends_meeting(meeting_id, request.user_id, session)
     lottery_session = _ensure_session(meeting_id, session)
     if lottery_session.session_status == LOTTERY_SESSION_ROLLING:
         raise HTTPException(status_code=400, detail="抽签进行中，暂时不能加入")
@@ -376,7 +364,6 @@ async def quit_lottery_pool(
     session: Session = Depends(get_session),
 ):
     _ensure_meeting_or_404(meeting_id, session)
-    _ensure_user_attends_meeting(meeting_id, request.user_id, session)
     lottery_session = _ensure_session(meeting_id, session)
     if lottery_session.session_status == LOTTERY_SESSION_ROLLING:
         raise HTTPException(status_code=400, detail="抽签进行中，暂时不能退出")

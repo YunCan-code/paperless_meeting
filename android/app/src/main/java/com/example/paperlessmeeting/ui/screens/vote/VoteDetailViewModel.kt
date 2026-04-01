@@ -2,6 +2,9 @@ package com.example.paperlessmeeting.ui.screens.vote
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.data.local.AppSettingsState
+import com.example.paperlessmeeting.data.local.UserPreferences
+import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteResult
@@ -12,13 +15,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import retrofit2.HttpException
 import javax.inject.Inject
 
 @HiltViewModel
 class VoteDetailViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
-    private val socketManager: com.example.paperlessmeeting.data.remote.SocketManager
+    private val userPreferences: UserPreferences,
+    private val socketManager: SocketManager,
+    private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     data class VoteDetailUiState(
@@ -28,14 +34,15 @@ class VoteDetailViewModel @Inject constructor(
         val selectedOptionIds: Set<Int> = emptySet(),
         val voteResult: VoteResult? = null,
         val error: String? = null,
-        val timeLeft: Int = 0,    // Real-time countdown for voting duration
-        val waitLeft: Int = 0     // Real-time countdown for start wait
+        val timeLeft: Int = 0,
+        val waitLeft: Int = 0
     )
 
     private val _uiState = MutableStateFlow(VoteDetailUiState())
     val uiState = _uiState.asStateFlow()
-    
+
     private var timerJob: Job? = null
+    private var currentMeetingId: Int? = null
 
     init {
         observeSocketEvents()
@@ -69,6 +76,14 @@ class VoteDetailViewModel @Inject constructor(
                 }
             }
         }
+
+        viewModelScope.launch {
+            socketManager.connectionState.collect { connected ->
+                if (connected) {
+                    currentMeetingId?.let(socketManager::joinMeeting)
+                }
+            }
+        }
     }
 
     fun loadVote(voteId: Int) {
@@ -89,26 +104,27 @@ class VoteDetailViewModel @Inject constructor(
                     result = repository.getVoteResult(voteId)
                 }
 
-                _uiState.update { 
+                ensureSocketSubscription(vote.meeting_id)
+
+                _uiState.update {
                     it.copy(
-                        isLoading = false, 
+                        isLoading = false,
                         vote = vote,
                         voteResult = result,
                         hasVoted = vote.status == "closed" || vote.user_voted,
                         selectedOptionIds = emptySet(),
                         waitLeft = (vote.wait_seconds ?: 0).coerceAtLeast(0),
                         timeLeft = (vote.remaining_seconds ?: 0).coerceAtLeast(0)
-                    ) 
+                    )
                 }
 
                 startTimer(vote)
-                
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _uiState.update { it.copy(isLoading = false, error = extractErrorMessage(e)) }
             }
         }
     }
-    
+
     private fun startTimer(vote: Vote) {
         timerJob?.cancel()
         if (vote.status !in setOf("countdown", "active")) {
@@ -156,8 +172,8 @@ class VoteDetailViewModel @Inject constructor(
     fun toggleOption(optionId: Int) {
         val current = _uiState.value
         val vote = current.vote ?: return
-        
-        if (current.waitLeft > 0) return 
+
+        if (current.waitLeft > 0) return
         if (vote.status != "active" || current.hasVoted) return
 
         val newSelection = if (vote.is_multiple) {
@@ -168,7 +184,7 @@ class VoteDetailViewModel @Inject constructor(
                 if (currentIds.size < vote.max_selections) {
                     currentIds + optionId
                 } else {
-                    currentIds // Reached max
+                    currentIds
                 }
             }
         } else {
@@ -180,15 +196,13 @@ class VoteDetailViewModel @Inject constructor(
     fun submitVote() {
         val current = _uiState.value
         val vote = current.vote ?: return
-        
-        // Double check wait time
+
         if (current.waitLeft > 0) {
-             _uiState.update { it.copy(error = "投票尚未开始，请稍候...") }
-             return
+            _uiState.update { it.copy(error = "投票尚未开始，请稍候...") }
+            return
         }
-        
+
         val optionIds = current.selectedOptionIds.toList()
-        
         if (optionIds.isEmpty()) return
 
         viewModelScope.launch {
@@ -198,35 +212,60 @@ class VoteDetailViewModel @Inject constructor(
                     _uiState.update { it.copy(error = "用户未登录") }
                     return@launch
                 }
-                
+
                 repository.submitVote(vote.id, userId, optionIds)
-                
+
                 val result = repository.getVoteResult(vote.id)
-                 
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         hasVoted = true,
                         voteResult = result,
-                        error = null 
-                    ) 
+                        error = null
+                    )
                 }
             } catch (e: Exception) {
                 if (e.message?.contains("已投过") == true) {
                     val result = repository.getVoteResult(vote.id)
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             hasVoted = true,
                             voteResult = result,
                             error = "您已参与过投票"
-                        ) 
+                        )
                     }
                 } else {
-                    _uiState.update { it.copy(error = e.message) }
+                    _uiState.update { it.copy(error = extractErrorMessage(e)) }
                 }
             }
         }
     }
-    
+
+    private fun ensureSocketSubscription(meetingId: Int) {
+        currentMeetingId = meetingId
+        try {
+            socketManager.connect(appSettingsState.getSocketBaseUrl())
+            socketManager.joinMeeting(meetingId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun extractErrorMessage(exception: Exception): String {
+        if (exception is HttpException) {
+            val body = exception.response()?.errorBody()?.string()
+            if (!body.isNullOrBlank()) {
+                try {
+                    return JSONObject(body).optString("detail").takeIf { it.isNotBlank() }
+                        ?: "请求失败：HTTP ${exception.code()}"
+                } catch (_: Exception) {
+                    return "请求失败：HTTP ${exception.code()}"
+                }
+            }
+            return "请求失败：HTTP ${exception.code()}"
+        }
+        return exception.message ?: "提交投票失败"
+    }
+
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
