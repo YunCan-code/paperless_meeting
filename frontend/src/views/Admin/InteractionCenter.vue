@@ -89,10 +89,10 @@
                   <el-form-item label="匿名设置">
                     <el-switch v-model="voteForm.is_anonymous" inline-prompt active-text="匿名" inactive-text="实名" />
                   </el-form-item>
-                  <el-form-item label="投票时长">
+                  <el-form-item label="投票时长（秒）">
                     <el-input-number v-model="voteForm.duration_seconds" :min="10" :max="1800" />
                   </el-form-item>
-                  <el-form-item label="开始倒计时">
+                  <el-form-item label="开始倒计时（秒）">
                     <el-input-number v-model="voteForm.countdown_seconds" :min="0" :max="60" />
                   </el-form-item>
                 </div>

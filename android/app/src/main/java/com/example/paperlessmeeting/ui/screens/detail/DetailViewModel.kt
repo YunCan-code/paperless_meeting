@@ -255,11 +255,19 @@ class DetailViewModel @Inject constructor(
     private fun observeSocketEvents() {
         viewModelScope.launch {
             launch {
-                socketManager.voteStartEvent.collectLatest { vote ->
+                socketManager.voteStateChangeEvent.collectLatest { vote ->
+                    val currentMeetingId = meetingId?.toIntOrNull() ?: return@collectLatest
+                    if (vote.meeting_id != currentMeetingId) return@collectLatest
+
                     _currentVote.value = vote
-                    _voteResult.value = null
-                    _hasVoted.value = false
-                    _showVoteSheet.value = true
+                    _hasVoted.value = vote.user_voted
+
+                    if (vote.status == "closed") {
+                        fetchVoteResult(vote.id)
+                    } else {
+                        _voteResult.value = null
+                        _showVoteSheet.value = true
+                    }
                 }
             }
             launch {

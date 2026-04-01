@@ -184,6 +184,7 @@ private fun VoteDetailContent(
 ) {
     val sortedResults = uiState.voteResult?.results?.sortedByDescending { it.count }.orEmpty()
     val shouldShowWaitingState = uiState.hasVoted && vote.status == "active" && !shouldShowResults
+    val shouldShowPendingState = vote.status == "draft" || vote.status == "countdown"
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -223,6 +224,15 @@ private fun VoteDetailContent(
                 }
             }
 
+            vote.status == "closed" -> {
+                item {
+                    VoteWaitingResultCard(
+                        title = "结果暂未生成",
+                        description = "当前还没有可展示的统计结果，请稍后刷新查看。"
+                    )
+                }
+            }
+
             shouldShowWaitingState -> {
                 item {
                     VoteWaitingResultCard(
@@ -230,29 +240,24 @@ private fun VoteDetailContent(
                         description = "你的选择已经提交成功，结果会在主持人结束投票后显示在这里。"
                     )
                 }
+            }
 
+            shouldShowPendingState -> {
                 item {
-                    VoteSectionHeader(
-                        title = "本场投票选项",
-                        subtitle = "当前结果暂不对移动端实时展示"
-                    )
-                }
-
-                itemsIndexed(vote.options, key = { _, item -> item.id }) { index, option ->
-                    VoteOptionCard(
-                        option = option,
-                        index = index,
-                        isSelected = false,
-                        enabled = false,
-                        isMultiple = vote.is_multiple,
-                        onClick = {}
+                    VoteWaitingResultCard(
+                        title = if (vote.status == "draft") "等待投票开始" else "投票即将开始",
+                        description = if (vote.status == "draft") {
+                            "主持人开启投票后，这里会显示可参与的选项。"
+                        } else {
+                            "倒计时结束后，这里会自动切换为可投票状态。"
+                        }
                     )
                 }
             }
 
             else -> {
                 item {
-                    VoteSelectionHintCard(vote = vote, uiState = uiState)
+                    VoteSelectionHintCard(vote = vote)
                 }
 
                 itemsIndexed(vote.options, key = { _, item -> item.id }) { index, option ->
@@ -282,7 +287,7 @@ private fun VoteHeroCard(
     )
     val countdownLabel = when {
         vote.status == "closed" -> "投票已结束"
-        uiState.waitLeft > 0 -> "开始倒计时 ${uiState.waitLeft}s"
+        vote.status == "countdown" || uiState.waitLeft > 0 -> "开始倒计时 ${uiState.waitLeft}s"
         vote.status == "active" && !uiState.hasVoted && uiState.timeLeft > 0 -> "剩余 ${formatDuration(uiState.timeLeft)}"
         vote.status == "active" && uiState.hasVoted -> "已提交，等待结果公布"
         else -> "等待主持人开始"
@@ -366,16 +371,13 @@ private fun VoteHeroCard(
 
 @Composable
 private fun VoteSelectionHintCard(
-    vote: Vote,
-    uiState: VoteDetailViewModel.VoteDetailUiState
+    vote: Vote
 ) {
-    val description = when {
-        vote.status == "draft" -> "投票尚未开始，等待主持人开启后即可参与。"
-        uiState.waitLeft > 0 -> "投票尚未开始，倒计时结束后即可选择并提交。"
-        vote.is_multiple -> "请从下方选择 1 至 ${vote.max_selections} 个选项，然后在底部提交。"
-        else -> "请选择你认可的一个选项，然后在底部提交投票。"
+    val description = if (vote.is_multiple) {
+        "请从下方选择 1 至 ${vote.max_selections} 个选项，然后在底部提交。"
+    } else {
+        "请选择你认可的一个选项，然后在底部提交投票。"
     }
-    val title = if (vote.status == "draft") "等待投票开始" else "请选择投票选项"
 
     Surface(
         shape = RoundedCornerShape(18.dp),
@@ -384,7 +386,7 @@ private fun VoteSelectionHintCard(
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
-                text = title,
+                text = "请选择投票选项",
                 color = TextPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold

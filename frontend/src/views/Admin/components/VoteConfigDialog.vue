@@ -141,7 +141,7 @@
 
             <!-- Duration -->
              <div class="setting-control full-width">
-              <span class="control-label">投票时长</span>
+              <span class="control-label">投票时长（秒）</span>
               <el-radio-group v-model="createForm.duration_seconds" size="small">
                 <el-radio-button :label="30">30秒</el-radio-button>
                 <el-radio-button :label="60">1分钟</el-radio-button>

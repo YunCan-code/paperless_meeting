@@ -7,7 +7,6 @@ import com.google.gson.Gson
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -47,8 +46,11 @@ class SocketManager @Inject constructor(
     }
 
     // 事件流
-    private val _voteStartEvent = MutableSharedFlow<Vote>(extraBufferCapacity = 1)
-    val voteStartEvent: SharedFlow<Vote> = _voteStartEvent.asSharedFlow()
+    private val _voteStartEvent = MutableSharedFlow<VoteStartData>(extraBufferCapacity = 1)
+    val voteStartEvent: SharedFlow<VoteStartData> = _voteStartEvent.asSharedFlow()
+
+    private val _voteStateChangeEvent = MutableSharedFlow<Vote>(extraBufferCapacity = 1)
+    val voteStateChangeEvent: SharedFlow<Vote> = _voteStateChangeEvent.asSharedFlow()
 
     private val _voteUpdateEvent = MutableSharedFlow<VoteUpdateData>(extraBufferCapacity = 1)
     val voteUpdateEvent: SharedFlow<VoteUpdateData> = _voteUpdateEvent.asSharedFlow()
@@ -106,17 +108,26 @@ class SocketManager @Inject constructor(
             socket?.on("vote_start") { args ->
                 try {
                     val json = args[0] as JSONObject
-                    val vote = gson.fromJson(json.toString(), Vote::class.java)
+                    val vote = gson.fromJson(json.toString(), VoteStartData::class.java)
                     _voteStartEvent.tryEmit(vote)
                     Log.d(TAG, "Received vote_start: ${vote.title}")
                     
-                    // 全局 Toast 通知
                     Handler(Looper.getMainLooper()).post {
-                        // Toast.makeText(context, "收到新投票: ${vote.title}", Toast.LENGTH_LONG).show()
                         sendVoteNotification(vote)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing vote_start", e)
+                }
+            }
+
+            socket?.on("vote_state_change") { args ->
+                try {
+                    val json = args[0] as JSONObject
+                    val vote = gson.fromJson(json.toString(), Vote::class.java)
+                    _voteStateChangeEvent.tryEmit(vote)
+                    Log.d(TAG, "Received vote_state_change: id=${vote.id}, status=${vote.status}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing vote_state_change", e)
                 }
             }
 
@@ -133,9 +144,10 @@ class SocketManager @Inject constructor(
             socket?.on("vote_end") { args ->
                 try {
                     val json = args[0] as JSONObject
-                    val data = gson.fromJson(json.toString(), VoteEndData::class.java)
-                    _voteEndEvent.tryEmit(data)
-                    Log.d(TAG, "Received vote_end: ${data.vote_id}")
+                    parseVoteEndData(json)?.let { data ->
+                        _voteEndEvent.tryEmit(data)
+                        Log.d(TAG, "Received vote_end: ${data.vote_id}")
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing vote_end", e)
                 }
@@ -191,7 +203,7 @@ class SocketManager @Inject constructor(
         }
     }
 
-    private fun sendVoteNotification(vote: Vote) {
+    private fun sendVoteNotification(vote: VoteStartData) {
         try {
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -215,6 +227,28 @@ class SocketManager @Inject constructor(
             Log.e(TAG, "Notification permission missing", e)
         } catch (e: Exception) {
             Log.e(TAG, "Error showing notification", e)
+        }
+    }
+
+    private fun parseVoteEndData(json: JSONObject): VoteEndData? {
+        return try {
+            if (json.has("title") && json.has("results")) {
+                gson.fromJson(json.toString(), VoteEndData::class.java)
+            } else {
+                val nested = json.optJSONObject("results") ?: return null
+                VoteEndData(
+                    vote_id = json.optInt("vote_id"),
+                    title = nested.optString("title"),
+                    total_voters = nested.optInt("total_voters"),
+                    results = gson.fromJson(
+                        nested.optJSONArray("results")?.toString() ?: "[]",
+                        Array<VoteOptionResult>::class.java
+                    ).toList()
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mapping vote_end payload", e)
+            null
         }
     }
 
@@ -302,6 +336,11 @@ class SocketManager @Inject constructor(
 data class VoteUpdateData(
     val vote_id: Int,
     val results: List<VoteOptionResult>
+)
+
+data class VoteStartData(
+    val id: Int,
+    val title: String
 )
 
 data class VoteEndData(

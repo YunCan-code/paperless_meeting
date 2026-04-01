@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -286,16 +287,24 @@ private fun CurrentVoteSpotlightCard(vote: Vote, onClick: () -> Unit) {
                     }
                 }
 
-                Button(
-                    onClick = onClick,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = currentVoteActionLabel(vote),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Button(
+                        onClick = onClick,
+                        modifier = Modifier
+                            .height(40.dp)
+                            .widthIn(min = 72.dp, max = 96.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = currentVoteActionLabel(vote),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -599,10 +608,10 @@ private fun voteTimeChip(vote: Vote): String? {
 
 private fun currentVoteActionLabel(vote: Vote): String {
     return when {
-        vote.status == "draft" -> "查看投票"
-        (vote.wait_seconds ?: 0) > 0 -> "查看状态"
-        vote.user_voted -> "查看投票状态"
-        else -> "进入投票"
+        vote.status == "draft" -> "查看"
+        (vote.wait_seconds ?: 0) > 0 || vote.status == "countdown" -> "查看"
+        vote.user_voted -> "状态"
+        else -> "参与"
     }
 }
 

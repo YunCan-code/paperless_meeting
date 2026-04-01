@@ -47,13 +47,7 @@ class VoteListViewModel @Inject constructor(
 
     private fun observeSocketEvents() {
         viewModelScope.launch {
-            socketManager.voteStartEvent.collect {
-                loadData()
-            }
-        }
-
-        viewModelScope.launch {
-            socketManager.voteEndEvent.collect {
+            socketManager.voteStateChangeEvent.collect {
                 loadData()
             }
         }
@@ -80,9 +74,12 @@ class VoteListViewModel @Inject constructor(
                     return@launch
                 }
 
-                val todayVotes = loadTodayVotes(userId)
                 val myVoteHistory = repository.getVoteHistory(userId, 0, 50)
                     .sortedByDescending { parseVoteDateTime(it.started_at ?: it.created_at) ?: LocalDateTime.MIN }
+                val votedIds = myVoteHistory.map { it.id }.toSet()
+                val todayVotes = loadTodayVotes(userId).map { vote ->
+                    if (vote.id in votedIds) vote.copy(user_voted = true) else vote
+                }
                 val historyIds = myVoteHistory.map { it.id }.toSet()
                 val preservedExpandedId = _uiState.value.expandedHistoryVoteId?.takeIf { it in historyIds }
 

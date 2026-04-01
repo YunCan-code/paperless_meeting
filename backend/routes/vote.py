@@ -2,6 +2,7 @@
 投票功能 HTTP API
 统一支持后台草稿配置、现场大屏控制与移动端参与。
 """
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -27,6 +28,7 @@ from models import (
 from socket_manager import broadcast_vote_results, broadcast_vote_state
 
 router = APIRouter(prefix="/vote", tags=["投票管理"])
+logger = logging.getLogger(__name__)
 
 UTC = timezone.utc
 SHANGHAI_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
@@ -248,10 +250,20 @@ def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None
 
 async def _broadcast_vote_snapshot(vote_id: int, session: Session) -> None:
     vote = _get_vote_or_404(vote_id, session)
-    snapshot = _build_vote_read(vote, session).model_dump()
-    snapshot["results"] = _build_vote_result(vote, session).model_dump()["results"]
+    vote_read = _build_vote_read(vote, session)
+    vote_result = _build_vote_result(vote, session)
+    snapshot = vote_read.model_dump(mode="json")
+    result_payload = vote_result.model_dump(mode="json")
+    snapshot["results"] = result_payload["results"]
     await broadcast_vote_state(vote.meeting_id, snapshot)
-    await broadcast_vote_results(vote.meeting_id, vote.id, _build_vote_result(vote, session).model_dump())
+    await broadcast_vote_results(vote.meeting_id, vote.id, result_payload)
+
+
+async def _broadcast_vote_snapshot_safely(vote_id: int, session: Session) -> None:
+    try:
+        await _broadcast_vote_snapshot(vote_id, session)
+    except Exception:
+        logger.exception("投票广播失败，但数据库状态已提交: vote_id=%s", vote_id)
 
 
 @router.post("/", response_model=VoteRead)
@@ -399,7 +411,7 @@ async def start_vote(vote_id: int, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(vote)
 
-    await _broadcast_vote_snapshot(vote.id, session)
+    await _broadcast_vote_snapshot_safely(vote.id, session)
     return {"success": True, "vote_id": vote.id}
 
 
@@ -415,7 +427,7 @@ async def close_vote(vote_id: int, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(vote)
 
-    await _broadcast_vote_snapshot(vote.id, session)
+    await _broadcast_vote_snapshot_safely(vote.id, session)
     return {"success": True, "vote_id": vote.id}
 
 
@@ -450,7 +462,7 @@ async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends
         session.rollback()
         raise HTTPException(status_code=400, detail="您已投过票")
 
-    await _broadcast_vote_snapshot(vote.id, session)
+    await _broadcast_vote_snapshot_safely(vote.id, session)
     return {"success": True}
 
 

@@ -6,9 +6,11 @@ import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -33,36 +35,39 @@ class VoteDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(VoteDetailUiState())
     val uiState = _uiState.asStateFlow()
     
-    // Timer job
-    private var timerJob: kotlinx.coroutines.Job? = null
+    private var timerJob: Job? = null
 
     init {
         observeSocketEvents()
     }
 
     private fun observeSocketEvents() {
-        // Listen for vote updates (e.g. real-time result changes if we want to show them)
         viewModelScope.launch {
-            socketManager.voteUpdateEvent.collect { update ->
+            socketManager.voteStateChangeEvent.collect { vote ->
                 val currentVote = _uiState.value.vote
-                if (currentVote != null && update.vote_id == currentVote.id) {
-                    // Update results dynamically
-                     val result = repository.getVoteResult(currentVote.id)
-                     _uiState.update { it.copy(voteResult = result) }
+                if (currentVote != null && vote.id == currentVote.id) {
+                    loadVote(currentVote.id)
                 }
             }
         }
 
-        // Listen for vote end
         viewModelScope.launch {
-             socketManager.voteEndEvent.collect {
-                 val currentVote = _uiState.value.vote
-                 // The event payload might be just ID or object, check usage
-                 // Assuming endInfo matches current vote
-                 if (currentVote != null) {
-                     loadVote(currentVote.id) // Reload to get final status and results
-                 }
-             }
+            socketManager.voteUpdateEvent.collect { update ->
+                val currentVote = _uiState.value.vote
+                if (currentVote != null && update.vote_id == currentVote.id && _uiState.value.hasVoted) {
+                    val result = repository.getVoteResult(currentVote.id)
+                    _uiState.update { it.copy(voteResult = result) }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            socketManager.voteEndEvent.collect { data ->
+                val currentVote = _uiState.value.vote
+                if (currentVote != null && data.vote_id == currentVote.id) {
+                    loadVote(currentVote.id)
+                }
+            }
         }
     }
 
@@ -73,92 +78,77 @@ class VoteDetailViewModel @Inject constructor(
                 val userId = userPreferences.getUserId()
                 val validUserId = if (userId != -1) userId else null
 
-                // 1. Get Vote Details
                 val vote = repository.getVote(voteId, validUserId)
                 if (vote == null) {
                     _uiState.update { it.copy(isLoading = false, error = "投票不存在") }
                     return@launch
                 }
 
-                // 2. Fetch Result if closed
                 var result: VoteResult? = null
                 if (vote.status == "closed" || vote.user_voted) {
-                     result = repository.getVoteResult(voteId)
+                    result = repository.getVoteResult(voteId)
                 }
-                
-                // Initialize timers
-                // Parse started_at for accurate sync
-                val startedAtStr = vote.started_at
-                var startedAt: java.time.LocalDateTime? = null
-                if (startedAtStr != null) {
-                    try {
-                        startedAt = java.time.LocalDateTime.parse(startedAtStr)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-                
-                // If we failed to parse, fallback to returned seconds
-                // But generally we should have startedAt if active/active-wait
-                
+
                 _uiState.update { 
                     it.copy(
                         isLoading = false, 
                         vote = vote,
                         voteResult = result,
-                        hasVoted = vote.status == "closed" || vote.user_voted
+                        hasVoted = vote.status == "closed" || vote.user_voted,
+                        selectedOptionIds = emptySet(),
+                        waitLeft = (vote.wait_seconds ?: 0).coerceAtLeast(0),
+                        timeLeft = (vote.remaining_seconds ?: 0).coerceAtLeast(0)
                     ) 
                 }
-                
-                startTimer(startedAt, vote.duration_seconds)
+
+                startTimer(vote)
                 
             } catch (e: Exception) {
-                 _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
         }
     }
     
-    private fun startTimer(startedAt: java.time.LocalDateTime?, durationSeconds: Int) {
+    private fun startTimer(vote: Vote) {
         timerJob?.cancel()
+        if (vote.status !in setOf("countdown", "active")) {
+            return
+        }
+
         timerJob = viewModelScope.launch {
-            while (true) {
-                // Synchronization logic:
-                // If we have startedAt, calc diff from NOW
-                // active status logic in Backend:
-                // started_at = creation + 10s (Wait period)
-                // So:
-                // If NOW < startedAt: Waiting. waitLeft = startedAt - NOW
-                // If NOW >= startedAt: Voting. timeLeft = duration - (NOW - startedAt)
-                
-                var newWait = 0
-                var newTime = 0
-                
-                if (startedAt != null) {
-                    val now = java.time.LocalDateTime.now()
-                    val diffSeconds = java.time.temporal.ChronoUnit.SECONDS.between(now, startedAt)
-                    
-                    if (diffSeconds > 0) {
-                        // Waiting to start
-                        newWait = diffSeconds.toInt()
-                        newTime = durationSeconds // Full duration remains
-                    } else {
-                        // Started
-                        newWait = 0
-                        val elapsed = -diffSeconds // diff is negative
-                        newTime = (durationSeconds - elapsed).toInt().coerceAtLeast(0)
+            val voteId = vote.id
+            var waitLeft = (vote.wait_seconds ?: 0).coerceAtLeast(0)
+            var timeLeft = (vote.remaining_seconds ?: 0).coerceAtLeast(0)
+
+            while (isActive) {
+                kotlinx.coroutines.delay(1000)
+
+                if (waitLeft > 0) {
+                    waitLeft -= 1
+                    _uiState.update { state ->
+                        if (state.vote?.id != voteId) state else state.copy(waitLeft = waitLeft, timeLeft = 0)
                     }
-                }
-                
-                _uiState.update { state ->
-                    // Auto-refresh if time is up and we think it's still active
-                    if (state.vote?.status == "active" && newTime == 0 && newWait == 0 && (state.timeLeft > 0 || state.waitLeft > 0)) {
-                         // Just hit zero, refresh to check if closed
-                         // loadVote(state.vote.id) // Optional: heavy refresh?
+                    if (waitLeft == 0) {
+                        loadVote(voteId)
+                        break
                     }
-                    state.copy(waitLeft = newWait, timeLeft = newTime)
+                    continue
                 }
-                
-                kotlinx.coroutines.delay(500) // update twice a second for smoothness
+
+                if (timeLeft > 0) {
+                    timeLeft -= 1
+                    _uiState.update { state ->
+                        if (state.vote?.id != voteId) state else state.copy(waitLeft = 0, timeLeft = timeLeft)
+                    }
+                    if (timeLeft == 0) {
+                        loadVote(voteId)
+                        break
+                    }
+                    continue
+                }
+
+                loadVote(voteId)
+                break
             }
         }
     }
@@ -167,7 +157,6 @@ class VoteDetailViewModel @Inject constructor(
         val current = _uiState.value
         val vote = current.vote ?: return
         
-        // Block if waiting or closed or voted
         if (current.waitLeft > 0) return 
         if (vote.status != "active" || current.hasVoted) return
 
@@ -212,9 +201,7 @@ class VoteDetailViewModel @Inject constructor(
                 
                 repository.submitVote(vote.id, userId, optionIds)
                 
-                // Success
-                // Fetch latest result
-                 val result = repository.getVoteResult(vote.id)
+                val result = repository.getVoteResult(vote.id)
                  
                 _uiState.update { 
                     it.copy(
@@ -224,15 +211,13 @@ class VoteDetailViewModel @Inject constructor(
                     ) 
                 }
             } catch (e: Exception) {
-                // If 400 and says "Already voted", we should handle it
                 if (e.message?.contains("已投过") == true) {
-                     // Fetch result and set hasVoted
-                     val result = repository.getVoteResult(vote.id)
-                     _uiState.update { 
+                    val result = repository.getVoteResult(vote.id)
+                    _uiState.update { 
                         it.copy(
                             hasVoted = true,
                             voteResult = result,
-                            error = "您已参与过投票" // Show as info?
+                            error = "您已参与过投票"
                         ) 
                     }
                 } else {
