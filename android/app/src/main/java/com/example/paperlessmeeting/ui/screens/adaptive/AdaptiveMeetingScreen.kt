@@ -90,6 +90,7 @@ fun AdaptiveMeetingScreen(
     var isDetailLoading by remember { mutableStateOf(false) }
     var isDetailRefreshing by remember { mutableStateOf(false) }
     var showCheckInHint by rememberSaveable { mutableStateOf(false) }
+    var appliedInitialMeetingId by rememberSaveable { mutableStateOf<Int?>(null) }
 
     suspend fun refreshSelectedMeeting(
         meetingId: Int,
@@ -135,8 +136,9 @@ fun AdaptiveMeetingScreen(
     }
 
     LaunchedEffect(initialMeetingId) {
-        if (initialMeetingId != null) {
+        if (initialMeetingId != null && appliedInitialMeetingId != initialMeetingId) {
             viewModel.selectMeeting(initialMeetingId)
+            appliedInitialMeetingId = initialMeetingId
         }
     }
 
