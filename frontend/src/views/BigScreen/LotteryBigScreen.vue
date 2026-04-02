@@ -175,8 +175,8 @@
             <h3>参与人员管理</h3>
             <p>{{ participantDialogSubtitle }}</p>
           </div>
-          <span class="participant-dialog-status" :class="{ 'is-locked': isParticipantManagementLocked }">
-            {{ isParticipantManagementLocked ? '抽签进行中，暂不可调整' : '当前可调整参与池' }}
+          <span class="participant-dialog-status is-admin">
+            管理员可随时调整参与池
           </span>
         </div>
       </template>
@@ -198,8 +198,8 @@
       </div>
 
       <template v-else>
-        <div v-if="isParticipantManagementLocked" class="participant-lock-tip">
-          抽签滚动过程中仅可查看名单，开始后请等待本轮结束再调整参与池。
+        <div class="participant-lock-tip">
+          普通参与者会在抽签开始后锁定是否参与；管理员可按现场需要继续加入或移出人员。
         </div>
 
         <div class="participant-manage-grid">
@@ -226,7 +226,7 @@
                   size="small"
                   plain
                   type="danger"
-                  :disabled="isParticipantManagementLocked || isParticipantPending(participant.user_id)"
+                  :disabled="isParticipantPending(participant.user_id)"
                   :loading="isParticipantPending(participant.user_id)"
                   @click="removeParticipantFromPool(participant)"
                 >
@@ -260,7 +260,7 @@
                   size="small"
                   type="primary"
                   plain
-                  :disabled="isParticipantManagementLocked || isParticipantPending(attendee.user_id)"
+                  :disabled="isParticipantPending(attendee.user_id)"
                   :loading="isParticipantPending(attendee.user_id)"
                   @click="addParticipantToPool(attendee)"
                 >
@@ -315,6 +315,7 @@ const fallbackMeetingId = activeMeetingId
 const createEmptySession = () => ({
   meeting_id: fallbackMeetingId,
   session_status: 'idle',
+  self_service_open: true,
   current_round_id: null,
   current_round: null,
   next_round_id: null,
@@ -395,6 +396,7 @@ const buildSessionSnapshot = (payload = {}) => {
   return {
     meeting_id: Number(payload.meeting_id) || fallbackMeetingId,
     session_status: payload.session_status || 'idle',
+    self_service_open: payload.self_service_open ?? ['idle', 'collecting', 'ready'].includes(payload.session_status || 'idle'),
     current_round_id: currentRound?.id ?? payload.current_round_id ?? null,
     current_round: currentRound,
     next_round_id: nextRound?.id ?? payload.next_round_id ?? null,
@@ -412,6 +414,7 @@ const cloneParticipant = (participant) => ({ ...participant })
 const cloneSession = (snapshot) => ({
   meeting_id: snapshot.meeting_id,
   session_status: snapshot.session_status,
+  self_service_open: snapshot.self_service_open,
   current_round_id: snapshot.current_round_id,
   current_round: snapshot.current_round ? cloneRound(snapshot.current_round) : null,
   next_round_id: snapshot.next_round_id,
@@ -454,6 +457,7 @@ const createInitialMockSession = () => {
   return buildSessionSnapshot({
     meeting_id: fallbackMeetingId,
     session_status: 'idle',
+    self_service_open: true,
     current_round_id: null,
     current_round: null,
     next_round_id: rounds[0]?.id ?? null,
@@ -474,6 +478,7 @@ const hydrateMockSession = (draft) => {
   return buildSessionSnapshot({
     meeting_id: draft.meeting_id,
     session_status: draft.session_status,
+    self_service_open: draft.self_service_open,
     current_round_id: currentRound?.id ?? null,
     current_round: currentRound,
     next_round_id: nextRound?.id ?? null,
@@ -541,9 +546,8 @@ const currentRoundResultSummary = computed(() => `本轮共抽出 ${currentWinne
 const resultRounds = computed(() => rounds.value.filter(item => Array.isArray(item.winners) && item.winners.length > 0).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
 const participantDialogSubtitle = computed(() => {
   const meetingTitle = meetingDetail.value.title || '当前会议'
-  return `${meetingTitle} · 已加入 ${joinedParticipants.value.length} 人 · 当前状态：${stageStateLabel.value}`
+  return `${meetingTitle} · 已加入 ${joinedParticipants.value.length} 人 · 当前状态：${stageStateLabel.value} · 管理员调整即时生效`
 })
-const isParticipantManagementLocked = computed(() => session.value.session_status === 'rolling')
 const joinedParticipantIdSet = computed(() => new Set(joinedParticipants.value.map(item => Number(item.user_id)).filter(value => Number.isFinite(value))))
 const joinedParticipants = computed(() => participants.value.map(normalizeParticipant))
 const availableAttendees = computed(() => (meetingDetail.value.attendees || [])
@@ -651,6 +655,7 @@ const startMockRoll = () => {
     targetRound.status = 'ready'
     draft.current_round_id = targetRound.id
     draft.session_status = 'rolling'
+    draft.self_service_open = false
     draft.winners = []
   })
 }
@@ -708,7 +713,7 @@ const addParticipantToPool = async (attendee) => {
       ElMessage.success(`已将 ${attendee.name} 加入抽签池`)
       return
     }
-    const payload = await request.post(`/lottery/${activeMeetingId}/participants/join`, { user_id: userId })
+    const payload = await request.post(`/lottery/${activeMeetingId}/participants/admin/add`, { user_id: userId })
     applySnapshot(payload)
     ElMessage.success(`已将 ${attendee.name} 加入抽签池`)
   } catch (error) {
@@ -731,7 +736,7 @@ const removeParticipantFromPool = async (participant) => {
       ElMessage.success(`已将 ${participant.name} 移出抽签池`)
       return
     }
-    const payload = await request.post(`/lottery/${activeMeetingId}/participants/quit`, { user_id: userId })
+    const payload = await request.post(`/lottery/${activeMeetingId}/participants/admin/remove`, { user_id: userId })
     applySnapshot(payload)
     ElMessage.success(`已将 ${participant.name} 移出抽签池`)
   } catch (error) {
@@ -859,7 +864,7 @@ onUnmounted(disconnectSocket)
 .participant-dialog-header h3 { margin: 0; color: #f8fafc; font-size: 26px; }
 .participant-dialog-header p { margin: 8px 0 0; color: #94a3b8; font-size: 14px; }
 .participant-dialog-status { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 999px; background: rgba(34, 197, 94, 0.16); color: #86efac; font-size: 13px; font-weight: 700; white-space: nowrap; }
-.participant-dialog-status.is-locked { background: rgba(245, 158, 11, 0.16); color: #fde68a; }
+.participant-dialog-status.is-admin { background: rgba(14, 165, 233, 0.16); color: #7dd3fc; }
 .participant-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
 .participant-search { max-width: 360px; }
 .participant-toolbar-meta { color: #94a3b8; font-size: 13px; white-space: nowrap; }

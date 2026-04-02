@@ -198,6 +198,13 @@
                     退出抽签池
                   </el-button>
                   <el-button
+                    v-else-if="lotteryReadonlyLabel"
+                    plain
+                    disabled
+                  >
+                    {{ lotteryReadonlyLabel }}
+                  </el-button>
+                  <el-button
                     v-if="interactionOverview.lottery.winners?.length"
                     plain
                     @click="showLotteryWinners = !showLotteryWinners"
@@ -379,6 +386,7 @@ const interactionOverview = reactive({
   vote: { active: null, items: [], draft_count: 0, closed_count: 0 },
   lottery: {
     session_status: 'idle',
+    self_service_open: true,
     current_round: null,
     participants: [],
     participants_count: 0,
@@ -409,9 +417,10 @@ const canJoinLottery = computed(() => {
   return Boolean(
     selectedMeetingId.value &&
     displayLotteryRound.value &&
+    lottery.self_service_open !== false &&
     !lottery.joined &&
     !lottery.all_rounds_finished &&
-    ['collecting', 'ready'].includes(lottery.session_status)
+    ['idle', 'collecting', 'ready'].includes(lottery.session_status)
   )
 })
 
@@ -419,15 +428,24 @@ const canQuitLottery = computed(() => {
   const lottery = interactionOverview.lottery
   return Boolean(
     selectedMeetingId.value &&
+    lottery.self_service_open !== false &&
     lottery.joined &&
-    ['collecting', 'ready', 'idle', 'result'].includes(lottery.session_status)
+    ['idle', 'collecting', 'ready'].includes(lottery.session_status)
   )
+})
+
+const lotteryReadonlyLabel = computed(() => {
+  const lottery = interactionOverview.lottery
+  if (!selectedMeetingId.value || canJoinLottery.value || canQuitLottery.value) return ''
+  if (lottery.self_service_open === false) return lottery.joined ? '已参与' : '未参与'
+  return ''
 })
 
 const resetInteractionOverview = () => {
   interactionOverview.vote = { active: null, items: [], draft_count: 0, closed_count: 0 }
   interactionOverview.lottery = {
     session_status: 'idle',
+    self_service_open: true,
     current_round: null,
     participants: [],
     participants_count: 0,
@@ -598,6 +616,8 @@ const joinLottery = async () => {
     })
     interactionOverview.lottery = payload
     ElMessage.success('已加入抽签池')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.detail || '加入抽签池失败')
   } finally {
     lotteryActionLoading.value = false
   }
@@ -612,6 +632,8 @@ const quitLottery = async () => {
     })
     interactionOverview.lottery = payload
     ElMessage.success('已退出抽签池')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.detail || '退出抽签池失败')
   } finally {
     lotteryActionLoading.value = false
   }

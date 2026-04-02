@@ -20,8 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class WinnerAnnouncementData(
-    val roundTitle: String,
-    val userName: String
+    val title: String,
+    val message: String
 )
 
 @HiltViewModel
@@ -46,7 +46,6 @@ class LotteryViewModel @Inject constructor(
 
     private var meetingId: Int = 0
     private var userId: Int = 0
-    private var userName: String = ""
     private var listenersStarted = false
 
     fun init(meetingId: Int) {
@@ -55,7 +54,6 @@ class LotteryViewModel @Inject constructor(
         val previousMeetingId = this.meetingId
         this.meetingId = meetingId
         this.userId = userPreferences.getUserId()
-        this.userName = userPreferences.getUserName() ?: "未知用户"
 
         if (!listenersStarted) {
             listenersStarted = true
@@ -131,8 +129,8 @@ class LotteryViewModel @Inject constructor(
         if (shouldAnnounceWinner(previousState, session)) {
             _winnerAnnouncement.tryEmit(
                 WinnerAnnouncementData(
-                    roundTitle = session.current_round?.let { "${it.roundOrderLabel()} ${it.title}" } ?: "当前轮次",
-                    userName = userName
+                    title = session.current_round?.let { "${it.roundOrderLabel()}中签提醒" } ?: "中签提醒",
+                    message = "你已进入本轮中签名单。"
                 )
             )
         }

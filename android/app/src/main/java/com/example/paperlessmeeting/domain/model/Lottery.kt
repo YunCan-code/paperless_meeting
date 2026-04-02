@@ -46,6 +46,7 @@ data class LotteryParticipant(
 data class LotterySession(
     val meeting_id: Int = 0,
     val session_status: String = "idle",
+    val self_service_open: Boolean = true,
     val current_round_id: Int? = null,
     val current_round: LotteryRound? = null,
     val next_round_id: Int? = null,

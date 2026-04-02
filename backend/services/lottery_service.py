@@ -47,7 +47,11 @@ def ensure_lottery_session(meeting_id: int, session: Session) -> LotterySession:
     if lottery_session:
         return lottery_session
 
-    lottery_session = LotterySession(meeting_id=meeting_id, session_status=LOTTERY_SESSION_IDLE)
+    lottery_session = LotterySession(
+        meeting_id=meeting_id,
+        session_status=LOTTERY_SESSION_IDLE,
+        self_service_locked=False,
+    )
     session.add(lottery_session)
     session.commit()
     session.refresh(lottery_session)
@@ -183,6 +187,23 @@ def build_participant_payload(participant: LotteryParticipant) -> dict:
     }
 
 
+def is_self_service_locked(
+    lottery_session: LotterySession,
+    rounds: Optional[List[Lottery]] = None,
+) -> bool:
+    if getattr(lottery_session, "self_service_locked", False):
+        return True
+
+    effective_rounds = rounds if rounds is not None else []
+    if lottery_session.session_status in {
+        LOTTERY_SESSION_ROLLING,
+        LOTTERY_SESSION_RESULT,
+        LOTTERY_SESSION_COMPLETED,
+    }:
+        return True
+    return any(round_status(round_item) == LOTTERY_ROUND_FINISHED for round_item in effective_rounds)
+
+
 def build_session_snapshot(meeting_id: int, session: Session, user_id: Optional[int] = None) -> dict:
     ensure_meeting_or_404(meeting_id, session)
     lottery_session = ensure_lottery_session(meeting_id, session)
@@ -199,6 +220,7 @@ def build_session_snapshot(meeting_id: int, session: Session, user_id: Optional[
 
     if current_round and round_status(current_round) == LOTTERY_ROUND_READY and session_status in {LOTTERY_SESSION_IDLE, LOTTERY_SESSION_COLLECTING}:
         session_status = LOTTERY_SESSION_READY if joined_participants else LOTTERY_SESSION_COLLECTING
+    self_service_open = not is_self_service_locked(lottery_session, rounds)
 
     return {
         "meeting_id": meeting_id,
@@ -211,6 +233,7 @@ def build_session_snapshot(meeting_id: int, session: Session, user_id: Optional[
         "participants_count": len(joined_participants),
         "winners": deserialize_winners(lottery_session.last_result),
         "joined": any(item.user_id == user_id for item in joined_participants) if user_id else False,
+        "self_service_open": self_service_open,
         "all_rounds_finished": all_finished,
         "rounds": [build_round_payload(round_item, round_order_map.get(round_item.id)) for round_item in rounds],
     }

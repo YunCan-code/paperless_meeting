@@ -44,6 +44,7 @@ class LotteryPresentationTest {
         )
         val session = LotterySession(
             session_status = "result",
+            self_service_open = false,
             current_round = round,
             current_round_id = 3
         )
@@ -56,6 +57,7 @@ class LotteryPresentationTest {
     fun `actionState 在已入池且可退出时返回退出按钮`() {
         val session = LotterySession(
             session_status = "ready",
+            self_service_open = true,
             joined = true,
             current_round = LotteryRound(
                 id = 1,
@@ -69,6 +71,28 @@ class LotteryPresentationTest {
 
         assertEquals("退出抽签池", actionState.secondaryLabel)
         assertEquals(true, actionState.secondaryEnabled)
+        assertEquals(LotteryChipTone.Success, actionState.tone)
+    }
+
+    @Test
+    fun `actionState 在抽签开始后返回只读已参与状态`() {
+        val session = LotterySession(
+            session_status = "result",
+            self_service_open = false,
+            joined = true,
+            current_round = LotteryRound(
+                id = 1,
+                title = "第一轮",
+                sort_order = 1,
+                status = "finished"
+            ),
+            winners = listOf(LotteryWinner(user_id = 1, user_name = "张三"))
+        )
+
+        val actionState = session.actionState()
+
+        assertEquals(null, actionState.primaryLabel)
+        assertEquals(null, actionState.secondaryLabel)
         assertEquals(LotteryChipTone.Success, actionState.tone)
     }
 

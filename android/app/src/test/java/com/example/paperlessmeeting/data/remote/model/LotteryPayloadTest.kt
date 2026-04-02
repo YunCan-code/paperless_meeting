@@ -30,6 +30,7 @@ class LotteryPayloadTest {
         assertEquals(null, session.next_round_id)
         assertEquals(null, session.next_round)
         assertFalse(session.joined)
+        assertTrue(session.self_service_open)
         assertFalse(session.all_rounds_finished)
     }
 
@@ -38,6 +39,7 @@ class LotteryPayloadTest {
         val payload = LotterySessionPayload(
             meeting_id = 9,
             session_status = "result",
+            self_service_open = false,
             current_round_id = 3,
             current_round = LotteryRoundPayload(
                 id = 3,
@@ -99,6 +101,7 @@ class LotteryPayloadTest {
         assertEquals("王五", session.participants.first().name)
         assertEquals("张三", session.winners.first().user_name)
         assertTrue(session.joined)
+        assertFalse(session.self_service_open)
         assertTrue(session.all_rounds_finished)
         assertEquals(2, session.rounds.size)
     }

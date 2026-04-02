@@ -79,8 +79,13 @@ export function getLotteryRoundHint(round, session = {}) {
 
 export function getLotteryMobileDescription(session = {}) {
   const displayRound = getLotteryDisplayRound(session)
-  if (session.session_status === 'rolling') return '抽签正在滚动中，当前无法加入或退出。'
+  if (session.session_status === 'rolling') return '抽签进行中，普通参与者当前不能加入或退出抽签池。'
+  if (session.self_service_open === false) {
+    return session.joined
+      ? '抽签已开始，你已参与本场抽签，当前仅可查看状态与结果。'
+      : '抽签已开始，当前不能再加入抽签池，可继续查看现场结果。'
+  }
   if (Array.isArray(session.winners) && session.winners.length) return `本轮已产生 ${session.winners.length} 位中签人员。`
-  if (displayRound) return `${formatLotteryRoundOrder(displayRound.sort_order)}为「${displayRound.title}」，可根据状态加入或退出抽签池。`
+  if (displayRound) return `${formatLotteryRoundOrder(displayRound.sort_order)}为「${displayRound.title}」，抽签开始前可自由加入或退出抽签池。`
   return '主持人准备轮次后，这里会开放加入入口。'
 }

@@ -172,7 +172,7 @@ def _ensure_compatible_vote_schema():
 
 def _ensure_compatible_lottery_schema():
     """
-    兼容旧库中的抽签状态枚举值和轮次顺序字段。
+    兼容旧库中的抽签状态枚举值、轮次顺序字段和会话锁定字段。
     """
     try:
         inspector = inspect(engine)
@@ -186,17 +186,58 @@ def _ensure_compatible_lottery_schema():
                 connection.execute(text("ALTER TABLE lottery ADD COLUMN sort_order INTEGER DEFAULT 0"))
                 print("[INFO] Added lottery.sort_order column")
 
+            session_table_name = "lotterysession"
+            if session_table_name in inspector.get_table_names():
+                session_columns = {column["name"] for column in inspector.get_columns(session_table_name)}
+                if "self_service_locked" not in session_columns:
+                    if "sqlite" in DATABASE_URL:
+                        connection.execute(text("ALTER TABLE lotterysession ADD COLUMN self_service_locked BOOLEAN DEFAULT 0"))
+                    else:
+                        connection.execute(text("ALTER TABLE lotterysession ADD COLUMN self_service_locked BOOLEAN DEFAULT FALSE"))
+                    print("[INFO] Added lotterysession.self_service_locked column")
+
+                connection.execute(
+                    text(
+                        "UPDATE lotterysession SET self_service_locked = 1 "
+                        "WHERE session_status IN ('rolling', 'result', 'completed')"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "UPDATE lotterysession SET self_service_locked = 1 "
+                        "WHERE EXISTS ("
+                        "  SELECT 1 FROM lottery "
+                        "  WHERE lottery.meeting_id = lotterysession.meeting_id "
+                        "    AND lottery.status = 'finished'"
+                        ")"
+                    )
+                )
+
             connection.execute(
                 text("UPDATE lottery SET status = 'draft' WHERE status IN ('pending', 'waiting', 'active')")
             )
 
             rows = connection.execute(
-                text("SELECT id FROM lottery ORDER BY CASE WHEN sort_order IS NULL OR sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id")
+                text(
+                    "SELECT meeting_id, id FROM lottery "
+                    "ORDER BY meeting_id, "
+                    "CASE WHEN sort_order IS NULL OR sort_order = 0 THEN 1 ELSE 0 END, "
+                    "sort_order, created_at, id"
+                )
             ).fetchall()
-            for index, row in enumerate(rows, start=1):
+            current_meeting_id = None
+            meeting_order = 0
+            for row in rows:
+                meeting_id = row[0]
+                lottery_id = row[1]
+                if meeting_id != current_meeting_id:
+                    current_meeting_id = meeting_id
+                    meeting_order = 1
+                else:
+                    meeting_order += 1
                 connection.execute(
                     text("UPDATE lottery SET sort_order = :sort_order WHERE id = :lottery_id"),
-                    {"sort_order": index, "lottery_id": row[0]},
+                    {"sort_order": meeting_order, "lottery_id": lottery_id},
                 )
 
         print("[INFO] Normalized lottery status values")

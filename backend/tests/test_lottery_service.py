@@ -88,6 +88,36 @@ class LotteryServiceTestCase(unittest.TestCase):
         self.assertEqual("第二轮", snapshot["next_round"]["title"])
         self.assertEqual([first_round.id, second_round.id], [item["id"] for item in snapshot["rounds"]])
         self.assertTrue(snapshot["joined"])
+        self.assertTrue(snapshot["self_service_open"])
+
+    def test_build_session_snapshot_returns_closed_self_service_after_roll_started(self):
+        with Session(self.engine) as session:
+            meeting = self._create_meeting(session)
+            round_item = Lottery(
+                meeting_id=meeting.id,
+                title="第一轮",
+                count=1,
+                allow_repeat=False,
+                sort_order=1,
+                status="finished",
+            )
+            session.add(round_item)
+            session.commit()
+            session.refresh(round_item)
+
+            lottery_session = LotterySession(
+                meeting_id=meeting.id,
+                session_status="result",
+                current_round_id=round_item.id,
+                self_service_locked=True,
+            )
+            session.add(lottery_session)
+            session.commit()
+
+            snapshot = build_session_snapshot(meeting.id, session)
+
+        self.assertFalse(snapshot["self_service_open"])
+        self.assertEqual("result", snapshot["session_status"])
 
     def test_recalculate_participant_winner_flags_clears_removed_winner_round(self):
         with Session(self.engine) as session:

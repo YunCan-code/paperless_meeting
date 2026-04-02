@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -41,10 +42,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -82,6 +88,13 @@ fun LotteryListScreen(
     viewModel: LotteryListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var winnerAnnouncement by remember { mutableStateOf<WinnerAnnouncementData?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.winnerAnnouncement.collect { announcement ->
+            winnerAnnouncement = announcement
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -207,6 +220,31 @@ fun LotteryListScreen(
                     LotteryHistoryGroupCard(history = history)
                 }
             }
+        }
+
+        winnerAnnouncement?.let { announcement ->
+            AlertDialog(
+                onDismissRequest = { winnerAnnouncement = null },
+                title = {
+                    Text(
+                        text = announcement.title,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = announcement.message,
+                        color = TextSecondary,
+                        lineHeight = 21.sp
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { winnerAnnouncement = null }) {
+                        Text("知道了", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
         }
     }
 }

@@ -28,6 +28,7 @@ from services.lottery_service import (
     ensure_round_or_404,
     get_joined_participants,
     get_rounds,
+    is_self_service_locked,
     lottery_now,
     normalize_round_orders,
     recalculate_participant_winner_flags,
@@ -69,6 +70,72 @@ async def _broadcast_snapshot(meeting_id: int, session: Session) -> dict:
     snapshot = build_session_snapshot(meeting_id, session)
     await broadcast_lottery_session_change(meeting_id, snapshot)
     return snapshot
+
+
+def _sync_session_after_participant_change(
+    meeting_id: int,
+    lottery_session,
+    session: Session,
+) -> None:
+    current_round = session.get(Lottery, lottery_session.current_round_id) if lottery_session.current_round_id else None
+    current_round_finished = bool(current_round and round_status(current_round) == LOTTERY_ROUND_FINISHED)
+    locked = is_self_service_locked(lottery_session, get_rounds(meeting_id, session))
+
+    if lottery_session.session_status == LOTTERY_SESSION_ROLLING:
+        pass
+    elif locked and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}:
+        pass
+    else:
+        lottery_session.session_status = resolve_session_status(
+            meeting_id,
+            session,
+            has_current_round=bool(lottery_session.current_round_id and not current_round_finished),
+        )
+
+    lottery_session.updated_at = lottery_now()
+    session.add(lottery_session)
+
+
+def _upsert_participant(
+    meeting_id: int,
+    user_id: int,
+    session: Session,
+) -> LotteryParticipant:
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    participant = session.get(LotteryParticipant, (meeting_id, user_id))
+    if not participant:
+        participant = LotteryParticipant(
+            meeting_id=meeting_id,
+            user_id=user.id,
+            user_name=user.name,
+            avatar=None,
+            department=user.department,
+            status="joined",
+            is_winner=False,
+            winning_lottery_id=None,
+        )
+    else:
+        participant.status = "joined"
+        participant.user_name = user.name
+        participant.department = user.department
+    session.add(participant)
+    return participant
+
+
+def _mark_participant_left(
+    meeting_id: int,
+    user_id: int,
+    session: Session,
+) -> LotteryParticipant:
+    participant = session.get(LotteryParticipant, (meeting_id, user_id))
+    if not participant:
+        raise HTTPException(status_code=404, detail="参与者不存在")
+    participant.status = "left"
+    session.add(participant)
+    return participant
 
 
 @router.get("/{meeting_id}/history")
@@ -210,41 +277,11 @@ async def join_lottery_pool(
 ):
     ensure_meeting_or_404(meeting_id, session)
     lottery_session = ensure_lottery_session(meeting_id, session)
-    if lottery_session.session_status == LOTTERY_SESSION_ROLLING:
-        raise HTTPException(status_code=400, detail="抽签进行中，暂时不能加入")
+    if is_self_service_locked(lottery_session, get_rounds(meeting_id, session)):
+        raise HTTPException(status_code=400, detail="抽签已开始，当前不能加入抽签池")
 
-    user = session.get(User, request.user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-
-    participant = session.get(LotteryParticipant, (meeting_id, request.user_id))
-    if not participant:
-        participant = LotteryParticipant(
-            meeting_id=meeting_id,
-            user_id=user.id,
-            user_name=user.name,
-            avatar=None,
-            department=user.department,
-            status="joined",
-            is_winner=False,
-            winning_lottery_id=None,
-        )
-    else:
-        participant.status = "joined"
-        participant.user_name = user.name
-        participant.department = user.department
-
-    session.add(participant)
-
-    current_round = session.get(Lottery, lottery_session.current_round_id) if lottery_session.current_round_id else None
-    if not (current_round and round_status(current_round) == LOTTERY_ROUND_FINISHED and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}):
-        lottery_session.session_status = resolve_session_status(
-            meeting_id,
-            session,
-            has_current_round=bool(lottery_session.current_round_id),
-        )
-    lottery_session.updated_at = lottery_now()
-    session.add(lottery_session)
+    _upsert_participant(meeting_id, request.user_id, session)
+    _sync_session_after_participant_change(meeting_id, lottery_session, session)
     session.commit()
 
     return await _broadcast_snapshot(meeting_id, session)
@@ -258,26 +295,43 @@ async def quit_lottery_pool(
 ):
     ensure_meeting_or_404(meeting_id, session)
     lottery_session = ensure_lottery_session(meeting_id, session)
-    if lottery_session.session_status == LOTTERY_SESSION_ROLLING:
-        raise HTTPException(status_code=400, detail="抽签进行中，暂时不能退出")
+    if is_self_service_locked(lottery_session, get_rounds(meeting_id, session)):
+        raise HTTPException(status_code=400, detail="抽签已开始，当前不能退出抽签池")
 
-    participant = session.get(LotteryParticipant, (meeting_id, request.user_id))
-    if not participant:
-        raise HTTPException(status_code=404, detail="参与者不存在")
+    _mark_participant_left(meeting_id, request.user_id, session)
+    _sync_session_after_participant_change(meeting_id, lottery_session, session)
+    session.commit()
 
-    participant.status = "left"
-    session.add(participant)
+    return await _broadcast_snapshot(meeting_id, session)
 
-    joined_count_after = max(0, len(get_joined_participants(meeting_id, session)) - 1)
-    current_round = session.get(Lottery, lottery_session.current_round_id) if lottery_session.current_round_id else None
-    if current_round and round_status(current_round) == LOTTERY_ROUND_FINISHED and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}:
-        lottery_session.session_status = lottery_session.session_status
-    elif lottery_session.current_round_id:
-        lottery_session.session_status = LOTTERY_SESSION_READY if joined_count_after > 0 else LOTTERY_SESSION_COLLECTING
-    else:
-        lottery_session.session_status = LOTTERY_SESSION_IDLE if joined_count_after == 0 else LOTTERY_SESSION_COLLECTING
-    lottery_session.updated_at = lottery_now()
-    session.add(lottery_session)
+
+@router.post("/{meeting_id}/participants/admin/add")
+async def admin_add_lottery_participant(
+    meeting_id: int,
+    request: LotteryParticipantActionRequest,
+    session: Session = Depends(get_session),
+):
+    ensure_meeting_or_404(meeting_id, session)
+    lottery_session = ensure_lottery_session(meeting_id, session)
+
+    _upsert_participant(meeting_id, request.user_id, session)
+    _sync_session_after_participant_change(meeting_id, lottery_session, session)
+    session.commit()
+
+    return await _broadcast_snapshot(meeting_id, session)
+
+
+@router.post("/{meeting_id}/participants/admin/remove")
+async def admin_remove_lottery_participant(
+    meeting_id: int,
+    request: LotteryParticipantActionRequest,
+    session: Session = Depends(get_session),
+):
+    ensure_meeting_or_404(meeting_id, session)
+    lottery_session = ensure_lottery_session(meeting_id, session)
+
+    _mark_participant_left(meeting_id, request.user_id, session)
+    _sync_session_after_participant_change(meeting_id, lottery_session, session)
     session.commit()
 
     return await _broadcast_snapshot(meeting_id, session)
@@ -377,6 +431,7 @@ async def start_lottery_roll(meeting_id: int, session: Session = Depends(get_ses
 
     lottery_session.current_round_id = round_item.id
     lottery_session.session_status = LOTTERY_SESSION_ROLLING
+    lottery_session.self_service_locked = True
     lottery_session.updated_at = lottery_now()
     round_item.status = LOTTERY_ROUND_READY
     session.add(round_item)
@@ -469,6 +524,7 @@ async def reset_lottery_session(meeting_id: int, session: Session = Depends(get_
 
     lottery_session.session_status = LOTTERY_SESSION_IDLE
     lottery_session.current_round_id = None
+    lottery_session.self_service_locked = False
     lottery_session.last_result = None
     lottery_session.updated_at = lottery_now()
     session.add(lottery_session)

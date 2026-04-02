@@ -398,6 +398,7 @@ class LotterySession(SQLModel, table=True):
     meeting_id: int = Field(foreign_key="meeting.id", primary_key=True)
     session_status: str = Field(default="idle")  # idle/collecting/ready/rolling/result/completed
     current_round_id: Optional[int] = Field(default=None, foreign_key="lottery.id")
+    self_service_locked: bool = Field(default=False)  # 普通参与者是否已失去自助进退权限
     last_result: Optional[str] = None  # JSON 字符串
     updated_at: datetime = Field(default_factory=datetime.now)
 

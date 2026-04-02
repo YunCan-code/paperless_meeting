@@ -117,12 +117,10 @@ fun LotterySession.remainingRoundsCount(): Int {
 
 fun LotterySession.statusLabel(): String {
     return when (session_status) {
-        "idle" -> "空闲"
-        "collecting" -> "收集中"
-        "ready" -> "准备就绪"
-        "rolling" -> "滚动中"
+        "idle", "collecting", "ready" -> "待开始"
+        "rolling" -> "抽签进行中"
         "result" -> "当前结果"
-        "completed" -> "全部完成"
+        "completed" -> "抽签结束"
         else -> session_status
     }
 }
@@ -147,65 +145,61 @@ fun LotterySession.headerState(): LotteryHeaderState {
         "rolling" -> LotteryChipTone.Primary
         "result" -> LotteryChipTone.Warning
         "completed" -> LotteryChipTone.Neutral
-        "ready" -> LotteryChipTone.Primary
-        "collecting" -> LotteryChipTone.Warning
+        "ready", "collecting", "idle" -> LotteryChipTone.Warning
         else -> LotteryChipTone.Neutral
     }
     val attendeeTone = when {
-        joined && session_status != "rolling" -> LotteryChipTone.Success
-        joined && session_status == "rolling" -> LotteryChipTone.Success
-        session_status in setOf("collecting", "ready") -> LotteryChipTone.Warning
-        session_status == "completed" -> LotteryChipTone.Neutral
+        joined -> LotteryChipTone.Success
+        self_service_open -> LotteryChipTone.Warning
         else -> LotteryChipTone.Neutral
-    }
-    val attendeeLabel = when {
-        joined -> "已入池"
-        session_status in setOf("collecting", "ready") -> "未入池"
-        session_status == "rolling" -> "抽签进行中"
-        currentResultRound() != null -> "结果展示中"
-        all_rounds_finished || session_status == "completed" -> "已结束"
-        else -> "等待开始"
     }
 
     return LotteryHeaderState(
         lifecycleLabel = statusLabel(),
         lifecycleTone = lifecycleTone,
-        attendeeLabel = attendeeLabel,
+        attendeeLabel = if (joined) "已参与" else "未参与",
         attendeeTone = attendeeTone,
         supportingText = roundSummaryLine()
     )
 }
 
 fun LotterySession.actionState(): LotteryActionState {
-    val joinEnabled = session_status in setOf("collecting", "ready")
     return when {
         all_rounds_finished || session_status == "completed" -> LotteryActionState(
-            message = "所有轮次已完成，可继续查看结果记录。",
-            tone = LotteryChipTone.Neutral
+            message = if (joined) "抽签已结束，你已参与本场抽签，可继续查看结果记录。" else "抽签已结束，你未参与本场抽签，可继续查看结果记录。",
+            tone = if (joined) LotteryChipTone.Success else LotteryChipTone.Neutral
         )
         session_status == "rolling" -> LotteryActionState(
-            message = "抽签进行中，当前不能加入或退出抽签池。",
+            message = if (joined) "抽签进行中，你已在抽签池内，当前不能退出。" else "抽签进行中，当前不能再加入抽签池。",
             tone = LotteryChipTone.Primary
         )
         currentResultRound() != null -> LotteryActionState(
-            message = "本轮结果展示中，等待主持人开始下一轮。",
-            tone = LotteryChipTone.Warning
+            message = if (self_service_open) "本轮结果展示中，如未开始下一轮，仍可在开抽前调整是否参与。" else if (joined) "本轮结果展示中，你已参与本场抽签，等待后续轮次或最终结果。" else "本轮结果展示中，当前不能再加入本场抽签。",
+            tone = if (joined && !self_service_open) LotteryChipTone.Success else LotteryChipTone.Warning
         )
         displayRound() == null -> LotteryActionState(
             message = "暂未设置可抽取轮次，请等待主持人开始抽签。",
             tone = LotteryChipTone.Neutral
         )
-        joined -> LotteryActionState(
-            message = "你已进入当前抽签池，可在抽签开始前退出。",
+        self_service_open && joined -> LotteryActionState(
+            message = "抽签尚未开始，你已加入抽签池，如需调整可在开始前退出。",
             tone = LotteryChipTone.Success,
             secondaryLabel = "退出抽签池",
-            secondaryEnabled = joinEnabled
+            secondaryEnabled = true
+        )
+        self_service_open && !joined -> LotteryActionState(
+            message = "抽签尚未开始，可决定是否加入抽签池。",
+            tone = LotteryChipTone.Warning,
+            primaryLabel = "加入抽签池",
+            primaryEnabled = true
+        )
+        joined -> LotteryActionState(
+            message = "抽签已开始，你已参与本场抽签，当前仅可查看状态与结果。",
+            tone = LotteryChipTone.Success
         )
         else -> LotteryActionState(
-            message = if (joinEnabled) "当前轮次已开放参与，可立即加入抽签池。" else "当前状态暂不可加入抽签池。",
-            tone = if (joinEnabled) LotteryChipTone.Warning else LotteryChipTone.Neutral,
-            primaryLabel = "加入抽签池",
-            primaryEnabled = joinEnabled
+            message = "抽签已开始，当前不能再加入抽签池。",
+            tone = LotteryChipTone.Neutral
         )
     }
 }

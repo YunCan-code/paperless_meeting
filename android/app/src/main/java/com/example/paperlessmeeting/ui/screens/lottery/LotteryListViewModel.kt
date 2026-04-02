@@ -2,19 +2,25 @@ package com.example.paperlessmeeting.ui.screens.lottery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.UserPreferences
+import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LotteryHistoryResponse
 import com.example.paperlessmeeting.domain.model.LotteryRound
 import com.example.paperlessmeeting.domain.model.LotterySession
+import com.example.paperlessmeeting.domain.model.LotteryWinner
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -37,15 +43,23 @@ data class LotteryListUiState(
 @HiltViewModel
 class LotteryListViewModel @Inject constructor(
     private val repository: MeetingRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val socketManager: SocketManager,
+    private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LotteryListUiState())
     val uiState: StateFlow<LotteryListUiState> = _uiState.asStateFlow()
 
+    private val _winnerAnnouncement = MutableSharedFlow<WinnerAnnouncementData>(extraBufferCapacity = 1)
+    val winnerAnnouncement: SharedFlow<WinnerAnnouncementData> = _winnerAnnouncement.asSharedFlow()
+
     private var currentUserId: Int? = null
+    private var listenersStarted = false
+    private var subscribedMeetingId: Int? = null
 
     init {
+        initSocketListener()
         loadData()
     }
 
@@ -72,6 +86,7 @@ class LotteryListViewModel @Inject constructor(
                 val history = loadHistoryForMeetings(recentMeetings)
                 val displayItem = selectCurrentDisplayMeeting(todayItems)
                 val displayHistory = history.firstOrNull { it.meeting_id == displayItem?.meeting?.id }
+                bindCurrentDisplayMeeting(displayItem?.meeting?.id)
 
                 _uiState.value = _uiState.value.copy(
                     currentDisplayMeeting = displayItem?.meeting,
@@ -134,9 +149,88 @@ class LotteryListViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             currentDisplaySession = session,
             currentDisplayResultRound = resolveCurrentDisplayResultRound(session, history),
+            historyLotteries = mergeSessionIntoHistory(_uiState.value.historyLotteries, session),
             actionInProgress = false,
             currentActionError = null
         )
+    }
+
+    private fun initSocketListener() {
+        if (listenersStarted) return
+        listenersStarted = true
+        socketManager.connect(appSettingsState.getSocketBaseUrl())
+
+        viewModelScope.launch {
+            socketManager.lotterySessionEvent.collect { session ->
+                if (session.meeting_id == _uiState.value.currentDisplayMeeting?.id) {
+                    handleRealtimeSessionUpdate(session)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            socketManager.lotteryErrorEvent.collect { errorMessage ->
+                _uiState.value = _uiState.value.copy(currentActionError = errorMessage)
+            }
+        }
+    }
+
+    private fun bindCurrentDisplayMeeting(meetingId: Int?) {
+        if (meetingId == null) {
+            subscribedMeetingId?.let(socketManager::leaveMeeting)
+            subscribedMeetingId = null
+            return
+        }
+        socketManager.connect(appSettingsState.getSocketBaseUrl())
+        if (subscribedMeetingId != null && subscribedMeetingId != meetingId) {
+            socketManager.leaveMeeting(subscribedMeetingId!!)
+        }
+        if (subscribedMeetingId != meetingId) {
+            socketManager.joinMeeting(meetingId)
+            subscribedMeetingId = meetingId
+        }
+    }
+
+    private fun handleRealtimeSessionUpdate(session: LotterySession) {
+        val previousSession = _uiState.value.currentDisplaySession
+        if (shouldAnnounceWinner(previousSession, session)) {
+            val roundLabel = session.current_round?.roundOrderLabel() ?: "本轮"
+            _winnerAnnouncement.tryEmit(
+                WinnerAnnouncementData(
+                    title = "${roundLabel}中签提醒",
+                    message = "你已进入本轮中签名单。"
+                )
+            )
+        }
+        updateCurrentDisplaySession(session)
+    }
+
+    private fun shouldAnnounceWinner(previousState: LotterySession?, newState: LotterySession): Boolean {
+        if (previousState?.session_status != "rolling") return false
+        if (newState.session_status !in setOf("result", "completed")) return false
+        val currentUserIdValue = currentUserId ?: userPreferences.getUserId().takeIf { it > 0 } ?: return false
+        return newState.winners.any { winnerMatchesUser(it, currentUserIdValue) }
+    }
+
+    private fun winnerMatchesUser(winner: LotteryWinner, userId: Int): Boolean {
+        return winner.user_id == userId || winner.id == userId
+    }
+
+    private fun mergeSessionIntoHistory(
+        historyList: List<LotteryHistoryResponse>,
+        session: LotterySession
+    ): List<LotteryHistoryResponse> {
+        val meeting = _uiState.value.currentDisplayMeeting
+        val finishedRounds = session.finishedRounds()
+        if (meeting == null || finishedRounds.isEmpty()) return historyList
+
+        val updatedHistory = LotteryHistoryResponse(
+            meeting_id = session.meeting_id,
+            meeting_title = meeting.title,
+            rounds = finishedRounds
+        )
+        val withoutCurrent = historyList.filterNot { it.meeting_id == session.meeting_id }
+        return listOf(updatedHistory) + withoutCurrent
     }
 
     private suspend fun loadSessionsForMeetings(
@@ -171,5 +265,10 @@ class LotteryListViewModel @Inject constructor(
                 }
             }
         }.awaitAll().filterNotNull()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        subscribedMeetingId?.let(socketManager::leaveMeeting)
     }
 }

@@ -48,6 +48,7 @@ data class LotteryParticipantPayload(
 data class LotterySessionPayload(
     val meeting_id: Int = 0,
     val session_status: String? = null,
+    val self_service_open: Boolean? = null,
     val current_round_id: Int? = null,
     val current_round: LotteryRoundPayload? = null,
     val next_round_id: Int? = null,
@@ -116,6 +117,7 @@ fun LotterySessionPayload.toDomain(): LotterySession {
     return LotterySession(
         meeting_id = meeting_id,
         session_status = session_status ?: "idle",
+        self_service_open = self_service_open ?: true,
         current_round_id = current_round_id,
         current_round = resolvedCurrentRound,
         next_round_id = next_round_id,
