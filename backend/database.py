@@ -172,17 +172,32 @@ def _ensure_compatible_vote_schema():
 
 def _ensure_compatible_lottery_schema():
     """
-    兼容旧库中的抽签状态枚举值。
+    兼容旧库中的抽签状态枚举值和轮次顺序字段。
     """
     try:
         inspector = inspect(engine)
         if "lottery" not in inspector.get_table_names():
             return
 
+        existing_columns = {column["name"] for column in inspector.get_columns("lottery")}
+
         with engine.begin() as connection:
+            if "sort_order" not in existing_columns:
+                connection.execute(text("ALTER TABLE lottery ADD COLUMN sort_order INTEGER DEFAULT 0"))
+                print("[INFO] Added lottery.sort_order column")
+
             connection.execute(
                 text("UPDATE lottery SET status = 'draft' WHERE status IN ('pending', 'waiting', 'active')")
             )
+
+            rows = connection.execute(
+                text("SELECT id FROM lottery ORDER BY CASE WHEN sort_order IS NULL OR sort_order = 0 THEN 1 ELSE 0 END, sort_order, created_at, id")
+            ).fetchall()
+            for index, row in enumerate(rows, start=1):
+                connection.execute(
+                    text("UPDATE lottery SET sort_order = :sort_order WHERE id = :lottery_id"),
+                    {"sort_order": index, "lottery_id": row[0]},
+                )
 
         print("[INFO] Normalized lottery status values")
     except Exception as e:

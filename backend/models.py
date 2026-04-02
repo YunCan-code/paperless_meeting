@@ -360,6 +360,7 @@ class Lottery(SQLModel, table=True):
     title: str 
     count: int = Field(default=1)  # 本轮中奖人数
     allow_repeat: bool = Field(default=False)  # 是否允许重复中奖
+    sort_order: int = Field(default=0, index=True)  # 会议内抽签顺序
     status: str = Field(default="draft")  # draft/ready/finished
     created_at: datetime = Field(default_factory=datetime.now)
     

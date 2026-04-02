@@ -197,21 +197,6 @@
                   </el-form-item>
                 </div>
               </el-form>
-
-              <div class="session-panel">
-                <div class="item-title">当前抽签会话</div>
-                <div class="item-meta block">
-                  <span>会话状态：{{ lotteryStatusLabel }}</span>
-                  <span>当前轮次：{{ currentLotteryRoundLabel }}</span>
-                  <span>参与池：{{ interactionOverview.lottery.participants_count || 0 }} 人</span>
-                </div>
-                <div class="panel-actions">
-                  <el-button plain @click="openLotteryBigScreen">打开大屏</el-button>
-                  <el-button type="primary" plain :disabled="!interactionOverview.lottery.current_round" @click="startLotteryRoll">开始滚动</el-button>
-                  <el-button type="danger" plain :disabled="interactionOverview.lottery.session_status !== 'rolling'" @click="stopLotteryRoll">停止抽签</el-button>
-                  <el-button plain @click="resetLotterySession">重置会话</el-button>
-                </div>
-              </div>
             </el-card>
 
             <el-card class="side-card" shadow="hover">
@@ -219,26 +204,44 @@
                 <div class="section-header">
                   <div>
                     <h3>轮次与参与池</h3>
-                    <p>先准备轮次，再进入大屏控制。</p>
+                    <p>通过上移 / 下移调整抽签顺序，现场抽签控制统一在大屏进行。</p>
+                  </div>
+                  <div class="section-actions">
+                    <el-button plain @click="openLotteryBigScreen">打开大屏</el-button>
                   </div>
                 </div>
               </template>
 
+              <div v-if="interactionOverview.lottery.rounds.length > 0" class="lottery-round-guide">
+                <div class="guide-title">操作说明</div>
+                <div class="guide-text">1. 轮次按“第一轮、第二轮、第三轮”顺序依次抽取，可用“上移 / 下移”调整未抽取轮次的位置。</div>
+                <div class="guide-text">2. 后台仅负责编排轮次与查看参与池，开始抽签、停止抽签和重置会话统一在大屏操作。</div>
+              </div>
+
               <el-empty v-if="interactionOverview.lottery.rounds.length === 0" description="当前会议还没有抽签轮次" :image-size="72" />
               <div v-else class="item-list">
-                <div v-for="round in interactionOverview.lottery.rounds" :key="round.id" class="item-card">
+                <div v-for="round in interactionOverview.lottery.rounds" :key="round.id" class="item-card lottery-round-card">
                   <div class="item-head">
-                    <div>
-                      <div class="item-title">{{ round.title }}</div>
+                    <div class="item-main">
+                      <div class="lottery-round-title-row">
+                        <span class="round-order-badge">{{ formatLotteryRoundOrder(round.sort_order) }}</span>
+                        <div class="item-title">{{ round.title }}</div>
+                        <span class="lottery-round-state" :class="getLotteryRoundDisplay(round).className">{{ getLotteryRoundDisplay(round).label }}</span>
+                      </div>
                       <div class="item-meta">
-                        <el-tag size="small" :type="getLotteryRoundTagType(round.status)">{{ getLotteryRoundStatusLabel(round.status) }}</el-tag>
                         <span>抽取 {{ round.count }} 人</span>
+                        <span v-if="round.allow_repeat">允许重复中签</span>
+                        <span>{{ getLotteryRoundStatusLabel(round.status) }}</span>
+                      </div>
+                      <div class="lottery-round-hint">
+                        {{ getLotteryRoundHint(round) }}
                       </div>
                     </div>
-                    <div class="item-actions">
-                      <el-button v-if="round.status !== 'finished'" text @click="fillLotteryRoundForm(round)">编辑</el-button>
-                      <el-button v-if="round.status !== 'finished'" text type="primary" @click="prepareLotteryRound(round)">准备</el-button>
-                      <el-button v-if="round.status !== 'finished'" text type="danger" @click="deleteLotteryRound(round)">删除</el-button>
+                    <div class="lottery-round-actions">
+                      <el-button text :disabled="!canEditLotteryRound(round)" @click="fillLotteryRoundForm(round)">编辑</el-button>
+                      <el-button text :disabled="!canMoveLotteryRound(round, 'up')" @click="moveLotteryRound(round, 'up')">上移</el-button>
+                      <el-button text :disabled="!canMoveLotteryRound(round, 'down')" @click="moveLotteryRound(round, 'down')">下移</el-button>
+                      <el-button text type="danger" :disabled="!canDeleteLotteryRound(round)" @click="deleteLotteryRound(round)">删除</el-button>
                     </div>
                   </div>
                   <div v-if="round.winners?.length" class="chip-list">
@@ -305,7 +308,7 @@ const voteResult = ref(null)
 
 const interactionOverview = reactive({
   vote: { active: null, items: [], draft_count: 0, closed_count: 0 },
-  lottery: { session_status: 'idle', current_round: null, participants: [], participants_count: 0, winners: [], rounds: [] }
+  lottery: { session_status: 'idle', current_round: null, next_round: null, participants: [], participants_count: 0, winners: [], rounds: [] }
 })
 
 const voteForm = reactive({
@@ -334,7 +337,18 @@ const historyCount = computed(() => interactionOverview.vote.items.length + inte
 const activeVoteLabel = computed(() => interactionOverview.vote.active ? getVoteStatusLabel(interactionOverview.vote.active.status) : '无')
 const voteSummaryLabel = computed(() => interactionOverview.vote.active ? `${interactionOverview.vote.active.title} · ${interactionOverview.vote.active.total_voters || 0} 人已参与` : '当前没有活动投票')
 const lotteryStatusLabel = computed(() => getLotterySessionStatusLabel(interactionOverview.lottery.session_status))
-const currentLotteryRoundLabel = computed(() => interactionOverview.lottery.current_round?.title || '未准备轮次')
+const isLotteryRolling = computed(() => interactionOverview.lottery.session_status === 'rolling')
+const lotteryRoundNumberMap = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+const formatLotteryRoundOrder = (sortOrder) => {
+  const value = Number(sortOrder) || 0
+  if (value <= 0) return '未排轮次'
+  if (value < 10) return `第${lotteryRoundNumberMap[value]}轮`
+  if (value === 10) return '第十轮'
+  if (value < 20) return `第十${lotteryRoundNumberMap[value - 10]}轮`
+  const tens = Math.floor(value / 10)
+  const units = value % 10
+  return `第${lotteryRoundNumberMap[tens]}十${units ? lotteryRoundNumberMap[units] : ''}轮`
+}
 
 const fetchMeetings = async () => {
   loadingMeetings.value = true
@@ -513,10 +527,10 @@ const saveLotteryRound = async () => {
   }
 }
 
-const prepareLotteryRound = async (round) => {
+const moveLotteryRound = async (round, direction) => {
   try {
-    await request.post(`/lottery/${selectedMeetingId.value}/prepare`, { lottery_id: round.id })
-    ElMessage.success(`已准备轮次「${round.title}」`)
+    await request.post(`/lottery/round/${round.id}/move`, { direction })
+    ElMessage.success(direction === 'up' ? '轮次已上移' : '轮次已下移')
     await fetchOverview()
   } catch (error) {}
 }
@@ -531,31 +545,6 @@ const deleteLotteryRound = async (round) => {
   } catch (error) {}
 }
 
-const startLotteryRoll = async () => {
-  try {
-    await request.post(`/lottery/${selectedMeetingId.value}/roll`)
-    ElMessage.success('抽签已开始滚动')
-    await fetchOverview()
-  } catch (error) {}
-}
-
-const stopLotteryRoll = async () => {
-  try {
-    await request.post(`/lottery/${selectedMeetingId.value}/stop`)
-    ElMessage.success('抽签结果已生成')
-    await fetchOverview()
-  } catch (error) {}
-}
-
-const resetLotterySession = async () => {
-  try {
-    await ElMessageBox.confirm('确定重置当前会议的抽签会话吗？这会清空参与池和轮次结果。', '重置确认', { type: 'warning', confirmButtonText: '重置', cancelButtonText: '取消' })
-    await request.post(`/lottery/${selectedMeetingId.value}/reset`)
-    ElMessage.success('抽签会话已重置')
-    await fetchOverview()
-  } catch (error) {}
-}
-
 const openLotteryBigScreen = () => {
   const href = router.resolve({ name: 'LotteryBigScreen', params: { meetingId: selectedMeetingId.value } }).href
   window.open(href, '_blank')
@@ -563,10 +552,46 @@ const openLotteryBigScreen = () => {
 
 const getVoteStatusLabel = (status) => ({ draft: '草稿', countdown: '倒计时', active: '进行中', closed: '已结束' }[status] || status)
 const getVoteTagType = (status) => ({ draft: 'info', countdown: 'warning', active: 'success', closed: '' }[status] || 'info')
-const getLotteryRoundStatusLabel = (status) => ({ draft: '草稿', ready: '已准备', finished: '已完成' }[status] || status)
-const getLotteryRoundTagType = (status) => ({ draft: 'info', ready: 'warning', finished: 'success' }[status] || 'info')
+const getLotteryRoundIndex = (roundId) => interactionOverview.lottery.rounds.findIndex(item => item.id === roundId)
+const canEditLotteryRound = (round) => !isLotteryRolling.value && round.status !== 'finished' && interactionOverview.lottery.current_round?.id !== round.id
+const canDeleteLotteryRound = (round) => !isLotteryRolling.value && round.status !== 'finished' && interactionOverview.lottery.current_round?.id !== round.id
+const canMoveLotteryRound = (round, direction) => {
+  if (isLotteryRolling.value || round.status === 'finished' || interactionOverview.lottery.current_round?.id === round.id) {
+    return false
+  }
+  const index = getLotteryRoundIndex(round.id)
+  if (index < 0) return false
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  if (targetIndex < 0 || targetIndex >= interactionOverview.lottery.rounds.length) {
+    return false
+  }
+  const targetRound = interactionOverview.lottery.rounds[targetIndex]
+  if (!targetRound || targetRound.status === 'finished' || interactionOverview.lottery.current_round?.id === targetRound.id) {
+    return false
+  }
+  return true
+}
+const getLotteryRoundDisplay = (round) => {
+  if (interactionOverview.lottery.current_round?.id === round.id && ['result', 'completed'].includes(interactionOverview.lottery.session_status)) {
+    return { label: '已抽取', className: 'state-finished' }
+  }
+  if (interactionOverview.lottery.next_round?.id === round.id) {
+    return { label: '下一轮', className: 'state-next' }
+  }
+  if (round.status === 'finished') {
+    return { label: '已抽取', className: 'state-finished' }
+  }
+  return { label: '待抽取', className: 'state-pending' }
+}
+const getLotteryRoundHint = (round) => {
+  if (interactionOverview.lottery.current_round?.id === round.id && interactionOverview.lottery.session_status === 'rolling') return '当前正在抽取这一轮，主持人停止后会生成本轮结果。'
+  if (interactionOverview.lottery.current_round?.id === round.id && ['result', 'completed'].includes(interactionOverview.lottery.session_status)) return '这一轮已经抽取完成，结果会暂时保留在左侧展示。'
+  if (interactionOverview.lottery.next_round?.id === round.id) return '这一轮就是下一轮，左侧点击“开始下一轮”后会自动进入。'
+  if (round.status === 'finished') return '这一轮已经抽取完成，顺序固定，不再参与后续调整。'
+  return '这一轮尚未抽取，可通过上移 / 下移调整它在顺序中的位置。'
+}
+const getLotteryRoundStatusLabel = (status) => ({ draft: '已创建', ready: '待开始', finished: '已完成' }[status] || status)
 const getLotterySessionStatusLabel = (status) => ({ idle: '空闲', collecting: '收集中', ready: '准备就绪', rolling: '滚动中', result: '结果展示中', completed: '全部完成' }[status] || status)
-
 const formatDateTime = (value) => {
   if (!value) return '未设置时间'
   const date = new Date(value)
@@ -621,12 +646,12 @@ onBeforeUnmount(() => {
 .section-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .section-header h3 { margin: 0; font-size: 18px; color: var(--text-main); }
 .section-header p { margin: 4px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
-.section-actions, .panel-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.section-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .inline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .option-list, .item-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .option-row { display: flex; align-items: center; gap: 10px; }
 .option-index { width: 28px; height: 28px; border-radius: 8px; background: #e2e8f0; color: #475569; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-.item-card, .session-panel { padding: 16px; border-radius: 16px; border: 1px solid var(--border-color); background: var(--card-bg); }
+.item-card { padding: 16px; border-radius: 16px; border: 1px solid var(--border-color); background: var(--card-bg); }
 .item-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
 .item-main { flex: 1; min-width: 0; }
 .item-title { font-size: 16px; font-weight: 700; color: var(--text-main); }
@@ -635,6 +660,88 @@ onBeforeUnmount(() => {
 .item-description { margin-top: 12px; font-size: 13px; line-height: 1.7; color: var(--text-secondary); }
 .item-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex-shrink: 0; min-width: 208px; }
 .item-actions-top, .item-actions-bottom { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.lottery-round-guide {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+}
+.guide-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.guide-text {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.lottery-round-card .item-head {
+  align-items: flex-start;
+}
+.lottery-round-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.round-order-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lottery-round-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lottery-round-state.state-next {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+}
+.lottery-round-state.state-finished {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+.lottery-round-state.state-pending {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+}
+.lottery-round-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #94a3b8;
+}
+.lottery-round-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.lottery-round-actions :deep(.el-button) {
+  margin-left: 0;
+  padding: 4px 8px;
+}
+.lottery-round-actions :deep(.el-button.is-disabled) {
+  opacity: 0.45;
+}
 .action-link {
   height: 34px;
   margin: 0;
@@ -688,6 +795,6 @@ onBeforeUnmount(() => {
 .result-row-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--text-main); margin-bottom: 8px; }
 .voter-list { margin-top: 6px; font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
 @media (max-width: 1200px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .content-grid { grid-template-columns: 1fr; } }
-@media (max-width: 820px) { .page-header, .section-header, .item-head { flex-direction: column; align-items: stretch; } .header-actions { width: 100%; flex-direction: column; align-items: stretch; } .meeting-select { width: 100%; } .inline-grid { grid-template-columns: 1fr; } .item-actions { min-width: 0; align-items: stretch; } .item-actions-top, .item-actions-bottom { justify-content: flex-start; } }
+@media (max-width: 820px) { .page-header, .section-header, .item-head { flex-direction: column; align-items: stretch; } .header-actions { width: 100%; flex-direction: column; align-items: stretch; } .meeting-select { width: 100%; } .inline-grid { grid-template-columns: 1fr; } .item-actions { min-width: 0; align-items: stretch; } .item-actions-top, .item-actions-bottom, .lottery-round-actions { justify-content: flex-start; } .lottery-round-actions { margin-left: 0; } }
 @media (max-width: 640px) { .summary-grid { grid-template-columns: 1fr; } .option-row { flex-wrap: wrap; } }
 </style>
