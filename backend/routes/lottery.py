@@ -83,10 +83,14 @@ def _ensure_session(meeting_id: int, session: Session) -> LotterySession:
     return lottery_session
 
 
-def _normalize_round_status(round_item: Lottery) -> Lottery:
-    if round_item.status in {"pending", "waiting", "active"}:
-        round_item.status = LOTTERY_ROUND_DRAFT
-    return round_item
+def _normalized_round_status_value(status: Optional[str]) -> str:
+    if status in {"pending", "waiting", "active", None, ""}:
+        return LOTTERY_ROUND_DRAFT
+    return status
+
+
+def _round_status(round_item: Lottery) -> str:
+    return _normalized_round_status_value(round_item.status)
 
 
 def _sort_rounds(rounds: List[Lottery]) -> List[Lottery]:
@@ -115,7 +119,7 @@ def _get_next_round(rounds: List[Lottery], current_round_id: Optional[int] = Non
     if not rounds:
         return None
 
-    unfinished_rounds = [item for item in rounds if item.status != LOTTERY_ROUND_FINISHED]
+    unfinished_rounds = [item for item in rounds if _round_status(item) != LOTTERY_ROUND_FINISHED]
     if not unfinished_rounds:
         return None
     if current_round_id is None:
@@ -126,7 +130,7 @@ def _get_next_round(rounds: List[Lottery], current_round_id: Optional[int] = Non
         return unfinished_rounds[0]
 
     for item in rounds[current_index + 1:]:
-        if item.status != LOTTERY_ROUND_FINISHED:
+        if _round_status(item) != LOTTERY_ROUND_FINISHED:
             return item
 
     return next((item for item in unfinished_rounds if item.id != current_round_id), None)
@@ -134,7 +138,7 @@ def _get_next_round(rounds: List[Lottery], current_round_id: Optional[int] = Non
 
 def _resolve_round_for_roll(lottery_session: LotterySession, rounds: List[Lottery]) -> Optional[Lottery]:
     current_round = next((item for item in rounds if item.id == lottery_session.current_round_id), None) if lottery_session.current_round_id else None
-    if current_round and current_round.status != LOTTERY_ROUND_FINISHED:
+    if current_round and _round_status(current_round) != LOTTERY_ROUND_FINISHED:
         return current_round
     next_round = _get_next_round(rounds, current_round.id if current_round else None)
     return next_round
@@ -156,18 +160,6 @@ def _deserialize_winners(raw: Optional[str]) -> List[dict]:
 
 def _get_rounds(meeting_id: int, session: Session) -> List[Lottery]:
     rounds = session.exec(select(Lottery).where(Lottery.meeting_id == meeting_id)).all()
-    dirty = False
-    for round_item in rounds:
-        before = round_item.status
-        _normalize_round_status(round_item)
-        if before != round_item.status:
-            session.add(round_item)
-            dirty = True
-    if _normalize_round_orders(rounds, session):
-        dirty = True
-    if dirty:
-        session.commit()
-        rounds = session.exec(select(Lottery).where(Lottery.meeting_id == meeting_id)).all()
     return _sort_rounds(rounds)
 
 
@@ -186,14 +178,14 @@ def _resolve_session_status(meeting_id: int, session: Session, has_current_round
     return LOTTERY_SESSION_IDLE if joined_count == 0 else LOTTERY_SESSION_COLLECTING
 
 
-def _build_round_payload(round_item: Lottery) -> dict:
+def _build_round_payload(round_item: Lottery, display_sort_order: Optional[int] = None) -> dict:
     return {
         "id": round_item.id,
         "title": round_item.title,
         "count": round_item.count,
         "allow_repeat": round_item.allow_repeat,
-        "sort_order": round_item.sort_order,
-        "status": round_item.status,
+        "sort_order": display_sort_order if display_sort_order is not None else round_item.sort_order,
+        "status": _round_status(round_item),
         "created_at": round_item.created_at.isoformat() if round_item.created_at else None,
         "winners": [
             {
@@ -225,37 +217,61 @@ def _build_session_snapshot(meeting_id: int, session: Session, user_id: Optional
     _ensure_meeting_or_404(meeting_id, session)
     lottery_session = _ensure_session(meeting_id, session)
     rounds = _get_rounds(meeting_id, session)
+    round_order_map = {round_item.id: index for index, round_item in enumerate(rounds, start=1)}
     joined_participants = _get_joined_participants(meeting_id, session)
     current_round = next((item for item in rounds if item.id == lottery_session.current_round_id), None) if lottery_session.current_round_id else None
     next_round = _get_next_round(rounds, current_round.id if current_round else None)
 
     session_status = lottery_session.session_status
-    all_finished = bool(rounds) and all(round_item.status == LOTTERY_ROUND_FINISHED for round_item in rounds)
+    all_finished = bool(rounds) and all(_round_status(round_item) == LOTTERY_ROUND_FINISHED for round_item in rounds)
     if all_finished and session_status not in {LOTTERY_SESSION_ROLLING, LOTTERY_SESSION_RESULT}:
         session_status = LOTTERY_SESSION_COMPLETED
-        lottery_session.session_status = session_status
-        session.add(lottery_session)
-        session.commit()
-        session.refresh(lottery_session)
 
-    if current_round and current_round.status == LOTTERY_ROUND_READY and session_status in {LOTTERY_SESSION_IDLE, LOTTERY_SESSION_COLLECTING}:
+    if current_round and _round_status(current_round) == LOTTERY_ROUND_READY and session_status in {LOTTERY_SESSION_IDLE, LOTTERY_SESSION_COLLECTING}:
         session_status = LOTTERY_SESSION_READY if joined_participants else LOTTERY_SESSION_COLLECTING
 
     snapshot = {
         "meeting_id": meeting_id,
         "session_status": session_status,
         "current_round_id": current_round.id if current_round else None,
-        "current_round": _build_round_payload(current_round) if current_round else None,
+        "current_round": _build_round_payload(current_round, round_order_map.get(current_round.id)) if current_round else None,
         "next_round_id": next_round.id if next_round else None,
-        "next_round": _build_round_payload(next_round) if next_round else None,
+        "next_round": _build_round_payload(next_round, round_order_map.get(next_round.id)) if next_round else None,
         "participants": [_build_participant_payload(item) for item in joined_participants],
         "participants_count": len(joined_participants),
         "winners": _deserialize_winners(lottery_session.last_result),
         "joined": any(item.user_id == user_id for item in joined_participants) if user_id else False,
         "all_rounds_finished": all_finished,
-        "rounds": [_build_round_payload(round_item) for round_item in rounds],
+        "rounds": [_build_round_payload(round_item, round_order_map.get(round_item.id)) for round_item in rounds],
     }
     return snapshot
+
+
+def _recalculate_participant_winner_flags(meeting_id: int, session: Session, rounds: Optional[List[Lottery]] = None) -> bool:
+    effective_rounds = rounds if rounds is not None else _get_rounds(meeting_id, session)
+    round_ids = [round_item.id for round_item in effective_rounds if round_item.id is not None]
+    remaining_winners = []
+    if round_ids:
+        remaining_winners = session.exec(
+            select(LotteryWinner).where(LotteryWinner.lottery_id.in_(round_ids))
+        ).all()
+
+    latest_winning_round_by_user = {}
+    for winner in sorted(remaining_winners, key=lambda item: (item.winning_at or datetime.min, item.id or 0)):
+        if winner.user_id is not None:
+            latest_winning_round_by_user[winner.user_id] = winner.lottery_id
+
+    dirty = False
+    participants = session.exec(select(LotteryParticipant).where(LotteryParticipant.meeting_id == meeting_id)).all()
+    for participant in participants:
+        winning_lottery_id = latest_winning_round_by_user.get(participant.user_id)
+        is_winner = winning_lottery_id is not None
+        if participant.is_winner != is_winner or participant.winning_lottery_id != winning_lottery_id:
+            participant.is_winner = is_winner
+            participant.winning_lottery_id = winning_lottery_id
+            session.add(participant)
+            dirty = True
+    return dirty
 
 
 async def _broadcast_snapshot(meeting_id: int, session: Session) -> dict:
@@ -268,10 +284,11 @@ async def _broadcast_snapshot(meeting_id: int, session: Session) -> dict:
 def get_lottery_history(meeting_id: int, session: Session = Depends(get_session)):
     meeting = _ensure_meeting_or_404(meeting_id, session)
     rounds = _get_rounds(meeting_id, session)
+    round_order_map = {round_item.id: index for index, round_item in enumerate(rounds, start=1)}
     return {
         "meeting_id": meeting_id,
         "meeting_title": meeting.title,
-        "rounds": [_build_round_payload(round_item) for round_item in rounds],
+        "rounds": [_build_round_payload(round_item, round_order_map.get(round_item.id)) for round_item in rounds],
     }
 
 
@@ -279,7 +296,8 @@ def get_lottery_history(meeting_id: int, session: Session = Depends(get_session)
 def get_lottery_rounds(meeting_id: int, session: Session = Depends(get_session)):
     _ensure_meeting_or_404(meeting_id, session)
     rounds = _get_rounds(meeting_id, session)
-    return {"items": [_build_round_payload(round_item) for round_item in rounds]}
+    round_order_map = {round_item.id: index for index, round_item in enumerate(rounds, start=1)}
+    return {"items": [_build_round_payload(round_item, round_order_map.get(round_item.id)) for round_item in rounds]}
 
 
 @router.get("/{meeting_id}/session")
@@ -300,13 +318,17 @@ async def create_lottery_round(
         raise HTTPException(status_code=400, detail="中奖人数必须大于 0")
 
     existing_rounds = _get_rounds(meeting_id, session)
+    if _normalize_round_orders(existing_rounds, session):
+        session.commit()
+        existing_rounds = _get_rounds(meeting_id, session)
+    next_sort_order = max((round_item.sort_order for round_item in existing_rounds if isinstance(round_item.sort_order, int) and round_item.sort_order > 0), default=0) + 1
 
     round_item = Lottery(
         meeting_id=meeting_id,
         title=request.title.strip(),
         count=request.count,
         allow_repeat=request.allow_repeat,
-        sort_order=(existing_rounds[-1].sort_order + 1) if existing_rounds else 1,
+        sort_order=next_sort_order,
         status=LOTTERY_ROUND_DRAFT,
     )
     session.add(round_item)
@@ -324,8 +346,7 @@ async def update_lottery_round(
     session: Session = Depends(get_session),
 ):
     round_item = _ensure_round_or_404(lottery_id, session)
-    _normalize_round_status(round_item)
-    if round_item.status == LOTTERY_ROUND_FINISHED:
+    if _round_status(round_item) == LOTTERY_ROUND_FINISHED:
         raise HTTPException(status_code=400, detail="已完成轮次不允许编辑")
 
     payload = request.model_dump(exclude_unset=True)
@@ -366,7 +387,6 @@ async def delete_lottery_round(lottery_id: int, session: Session = Depends(get_s
         )
     ).all()
     for participant in participants:
-        participant.is_winner = False
         participant.winning_lottery_id = None
         session.add(participant)
 
@@ -380,7 +400,12 @@ async def delete_lottery_round(lottery_id: int, session: Session = Depends(get_s
     session.delete(round_item)
     session.commit()
     remaining_rounds = session.exec(select(Lottery).where(Lottery.meeting_id == meeting_id)).all()
+    dirty = False
     if _normalize_round_orders(remaining_rounds, session):
+        dirty = True
+    if _recalculate_participant_winner_flags(meeting_id, session, rounds=remaining_rounds):
+        dirty = True
+    if dirty:
         session.commit()
     await _broadcast_snapshot(meeting_id, session)
     return {"ok": True}
@@ -421,7 +446,7 @@ async def join_lottery_pool(
     session.add(participant)
 
     current_round = session.get(Lottery, lottery_session.current_round_id) if lottery_session.current_round_id else None
-    if not (current_round and current_round.status == LOTTERY_ROUND_FINISHED and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}):
+    if not (current_round and _round_status(current_round) == LOTTERY_ROUND_FINISHED and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}):
         lottery_session.session_status = _resolve_session_status(
             meeting_id,
             session,
@@ -454,7 +479,7 @@ async def quit_lottery_pool(
 
     joined_count_after = max(0, len(_get_joined_participants(meeting_id, session)) - 1)
     current_round = session.get(Lottery, lottery_session.current_round_id) if lottery_session.current_round_id else None
-    if current_round and current_round.status == LOTTERY_ROUND_FINISHED and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}:
+    if current_round and _round_status(current_round) == LOTTERY_ROUND_FINISHED and lottery_session.session_status in {LOTTERY_SESSION_RESULT, LOTTERY_SESSION_COMPLETED}:
         lottery_session.session_status = lottery_session.session_status
     elif lottery_session.current_round_id:
         lottery_session.session_status = LOTTERY_SESSION_READY if joined_count_after > 0 else LOTTERY_SESSION_COLLECTING
@@ -479,12 +504,11 @@ async def prepare_lottery_round(
     if round_item.meeting_id != meeting_id:
         raise HTTPException(status_code=400, detail="轮次与会议不匹配")
 
-    _normalize_round_status(round_item)
-    if round_item.status == LOTTERY_ROUND_FINISHED:
+    if _round_status(round_item) == LOTTERY_ROUND_FINISHED:
         raise HTTPException(status_code=400, detail="该轮次已完成")
 
     for candidate in _get_rounds(meeting_id, session):
-        if candidate.id != round_item.id and candidate.status == LOTTERY_ROUND_READY:
+        if candidate.id != round_item.id and _round_status(candidate) == LOTTERY_ROUND_READY:
             candidate.status = LOTTERY_ROUND_DRAFT
             session.add(candidate)
 
@@ -508,12 +532,11 @@ async def move_lottery_round(
     session: Session = Depends(get_session),
 ):
     round_item = _ensure_round_or_404(lottery_id, session)
-    _normalize_round_status(round_item)
     lottery_session = _ensure_session(round_item.meeting_id, session)
 
     if lottery_session.session_status == LOTTERY_SESSION_ROLLING:
         raise HTTPException(status_code=400, detail="抽签进行中，暂时不能调整顺序")
-    if round_item.status == LOTTERY_ROUND_FINISHED:
+    if _round_status(round_item) == LOTTERY_ROUND_FINISHED:
         raise HTTPException(status_code=400, detail="已完成轮次不允许调整顺序")
     if lottery_session.current_round_id == round_item.id:
         raise HTTPException(status_code=400, detail="当前轮次不允许调整顺序")
@@ -521,6 +544,9 @@ async def move_lottery_round(
         raise HTTPException(status_code=400, detail="移动方向无效")
 
     rounds = _get_rounds(round_item.meeting_id, session)
+    if _normalize_round_orders(rounds, session):
+        session.commit()
+        rounds = _get_rounds(round_item.meeting_id, session)
     current_index = next((index for index, item in enumerate(rounds) if item.id == round_item.id), None)
     if current_index is None:
         raise HTTPException(status_code=404, detail="轮次不存在")
@@ -530,7 +556,7 @@ async def move_lottery_round(
         raise HTTPException(status_code=400, detail="当前轮次已无法继续移动")
 
     target_round = rounds[target_index]
-    if target_round.status == LOTTERY_ROUND_FINISHED:
+    if _round_status(target_round) == LOTTERY_ROUND_FINISHED:
         raise HTTPException(status_code=400, detail="不能跨过已完成轮次调整顺序")
     if lottery_session.current_round_id == target_round.id:
         raise HTTPException(status_code=400, detail="不能跨过当前轮次调整顺序")
@@ -619,7 +645,7 @@ async def stop_lottery_roll(meeting_id: int, session: Session = Depends(get_sess
 
     remaining_rounds = [
         item for item in _get_rounds(meeting_id, session)
-        if item.id != round_item.id and item.status != LOTTERY_ROUND_FINISHED
+        if item.id != round_item.id and _round_status(item) != LOTTERY_ROUND_FINISHED
     ]
     lottery_session.last_result = _serialize_winners(winners_payload)
     lottery_session.session_status = LOTTERY_SESSION_COMPLETED if not remaining_rounds else LOTTERY_SESSION_RESULT

@@ -684,9 +684,7 @@ const stopMockRoll = () => {
 const openParticipantDialog = async () => {
   participantDialogVisible.value = true
   participantSearch.value = ''
-  if (!meetingDetail.value.title || !Array.isArray(meetingDetail.value.attendees) || !meetingDetail.value.attendees.length) {
-    await fetchMeetingDetail()
-  }
+  await fetchMeetingDetail()
 }
 
 const isParticipantPending = (userId) => Boolean(participantPendingMap.value[String(userId)])
