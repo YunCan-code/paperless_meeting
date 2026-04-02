@@ -155,6 +155,16 @@ def _get_user_voted(vote_id: int, user_id: Optional[int], session: Session) -> b
     )
 
 
+def _get_user_selected_option_ids(vote_id: int, user_id: Optional[int], session: Session) -> List[int]:
+    if not user_id:
+        return []
+    return session.exec(
+        select(UserVote.option_id)
+        .where(UserVote.vote_id == vote_id, UserVote.user_id == user_id)
+        .order_by(UserVote.option_id)
+    ).all()
+
+
 def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
     vote = _sync_vote_runtime_state(vote, session)
     total_voters = _get_total_voters(vote.id, session)
@@ -199,6 +209,7 @@ def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None
     vote = _sync_vote_runtime_state(vote, session)
     options = _get_vote_options(vote.id, session)
     total_voters = _get_total_voters(vote.id, session)
+    selected_option_ids = list(_get_user_selected_option_ids(vote.id, user_id, session) or [])
 
     now = _local_now()
     started_at = _resolve_runtime_datetime(vote.started_at, vote)
@@ -231,6 +242,7 @@ def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None
         remaining_seconds=remaining_seconds,
         wait_seconds=wait_seconds,
         countdown_remaining_seconds=countdown_remaining_seconds,
+        selected_option_ids=selected_option_ids,
         user_voted=_get_user_voted(vote.id, user_id, session),
         total_voters=total_voters,
     )

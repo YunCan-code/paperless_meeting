@@ -1,6 +1,7 @@
 package com.example.paperlessmeeting.data.repository
 
 import com.example.paperlessmeeting.data.remote.ApiService
+import com.example.paperlessmeeting.data.remote.model.toDomain
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.CheckInResponse
 import javax.inject.Inject
@@ -165,7 +166,7 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun getActiveVote(meetingId: Int): com.example.paperlessmeeting.domain.model.Vote? {
         return try {
-            api.getActiveVote(meetingId)
+            api.getActiveVote(meetingId)?.toDomain()
         } catch (e: Exception) {
             rethrowCancellation(e)
             e.printStackTrace()
@@ -175,7 +176,7 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun getVoteList(meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote> {
         return try {
-            api.getVoteList(meetingId)
+            api.getVoteList(meetingId).map { it.toDomain() }
         } catch (e: Exception) {
             rethrowCancellation(e)
             e.printStackTrace()
@@ -185,7 +186,7 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun getVote(voteId: Int, userId: Int?): com.example.paperlessmeeting.domain.model.Vote? {
         return try {
-            api.getVote(voteId, userId)
+            api.getVote(voteId, userId).toDomain()
         } catch (e: Exception) {
             rethrowCancellation(e)
             e.printStackTrace()
@@ -225,7 +226,7 @@ class MeetingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getVoteHistory(userId: Int, skip: Int, limit: Int): List<com.example.paperlessmeeting.domain.model.Vote> {
-        return api.getVoteHistory(userId, skip, limit)
+        return api.getVoteHistory(userId, skip, limit).map { it.toDomain() }
     }
 
     override suspend fun getUserLotteryHistory(userId: Int): List<com.example.paperlessmeeting.domain.model.LotteryHistoryResponse> {

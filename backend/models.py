@@ -293,6 +293,7 @@ class VoteRead(SQLModel):
     remaining_seconds: Optional[int] = None  # 计算剩余时间
     wait_seconds: Optional[int] = None # 兼容旧前端：距离开始还需等待的秒数
     countdown_remaining_seconds: Optional[int] = None
+    selected_option_ids: List[int] = []
     user_voted: bool = False # 当前用户是否已投票
     total_voters: int = 0
 

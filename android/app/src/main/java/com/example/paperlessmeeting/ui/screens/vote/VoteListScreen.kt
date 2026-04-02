@@ -2,6 +2,7 @@ package com.example.paperlessmeeting.ui.screens.vote
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.paperlessmeeting.domain.model.Vote
+import com.example.paperlessmeeting.domain.model.VoteOption
 import com.example.paperlessmeeting.domain.model.VoteOptionResult
 import com.example.paperlessmeeting.domain.model.VoteResult
 import com.example.paperlessmeeting.ui.components.vote.VoteChipTone
@@ -146,7 +148,14 @@ fun VoteListScreen(
                 uiState.currentDisplayVote?.let { vote ->
                     CurrentVoteSpotlightCard(
                         vote = vote,
-                        onClick = { navController.navigate("vote_detail/${vote.id}") }
+                        voteResult = uiState.currentDisplayVoteResult,
+                        voteResultError = uiState.currentDisplayVoteResultError,
+                        loadingResult = uiState.isLoading && vote.status == "closed" && uiState.currentDisplayVoteResult == null,
+                        selectedOptionIds = uiState.selectedCurrentVoteOptionIds,
+                        submitting = uiState.currentVoteSubmitting,
+                        actionError = uiState.currentVoteActionError,
+                        onOptionSelected = viewModel::toggleCurrentVoteOption,
+                        onSubmit = viewModel::submitCurrentVote
                     )
                 } ?: VoteEmptyStateCard(
                     icon = Icons.Default.HowToVote,
@@ -207,17 +216,43 @@ private fun VoteSectionHeader(title: String, subtitle: String? = null) {
 }
 
 @Composable
-private fun CurrentVoteSpotlightCard(vote: Vote, onClick: () -> Unit) {
+private fun CurrentVoteSpotlightCard(
+    vote: Vote,
+    voteResult: VoteResult?,
+    voteResultError: String?,
+    loadingResult: Boolean,
+    selectedOptionIds: Set<Int>,
+    submitting: Boolean,
+    actionError: String?,
+    onOptionSelected: (Int) -> Unit,
+    onSubmit: () -> Unit
+) {
     val statusVisual = resolveVoteStatusVisual(vote.status, vote.user_voted, vote.wait_seconds ?: 0)
+    val isVotingOpen = vote.status == "active" && !vote.user_voted
+    val isReadonlySelectionView = vote.status == "active" && vote.user_voted
+    val selectedOptionIdSet = when {
+        isVotingOpen -> selectedOptionIds
+        isReadonlySelectionView -> vote.selected_option_ids.toSet()
+        else -> emptySet()
+    }
+    val cornerStatusText = voteTimeChip(vote) ?: when {
+        vote.user_voted -> "已参与"
+        vote.status == "closed" -> "投票已结束"
+        vote.status == "active" -> "进行中"
+        else -> statusVisual.label
+    }
+    val cornerStatusTone = when {
+        vote.status == "closed" -> VoteChipTone.Neutral
+        vote.user_voted -> VoteChipTone.Success
+        vote.status == "draft" || vote.status == "countdown" || (vote.wait_seconds ?: 0) > 0 -> VoteChipTone.Warning
+        else -> VoteChipTone.Primary
+    }
 
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = CardBackground,
         border = BorderStroke(1.dp, VoteCardBorder),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
@@ -231,22 +266,38 @@ private fun CurrentVoteSpotlightCard(vote: Vote, onClick: () -> Unit) {
                 )
                 .padding(22.dp)
         ) {
-            Surface(
-                color = PrimaryBlue.copy(alpha = 0.08f),
-                shape = CircleShape,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(84.dp)
-            ) {}
-
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    VoteStatusPill(visual = statusVisual)
-                    VoteMetaChip(text = if (vote.is_multiple) "多选" else "单选", tone = VoteChipTone.Neutral)
-                    VoteMetaChip(text = if (vote.is_anonymous) "匿名" else "实名", tone = VoteChipTone.Neutral)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        VoteStatusPill(visual = statusVisual)
+                        VoteMetaChip(text = if (vote.is_multiple) "多选" else "单选", tone = VoteChipTone.Neutral)
+                        VoteMetaChip(text = if (vote.is_anonymous) "匿名" else "实名", tone = VoteChipTone.Neutral)
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    VoteMetaChip(
+                        text = cornerStatusText,
+                        tone = cornerStatusTone,
+                        leadingIcon = if (
+                            vote.status == "draft" ||
+                            vote.status == "countdown" ||
+                            (vote.wait_seconds ?: 0) > 0 ||
+                            (vote.status == "active" && !vote.user_voted && (vote.remaining_seconds ?: 0) > 0)
+                        ) {
+                            Icons.Default.AccessTime
+                        } else {
+                            null
+                        }
+                    )
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -272,39 +323,334 @@ private fun CurrentVoteSpotlightCard(vote: Vote, onClick: () -> Unit) {
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    voteTimeChip(vote)?.let {
-                        VoteMetaChip(
-                            text = it,
-                            tone = VoteChipTone.Warning,
-                            leadingIcon = Icons.Default.AccessTime
-                        )
-                    }
-                    if (vote.user_voted) {
-                        VoteMetaChip(text = "已参与", tone = VoteChipTone.Success)
-                    }
                     if (vote.is_multiple) {
                         VoteMetaChip(text = "最多 ${vote.max_selections} 项", tone = VoteChipTone.Neutral)
                     }
                 }
 
-                Row(
+                when {
+                    isVotingOpen -> {
+                        CurrentVoteSelectionSection(
+                            vote = vote,
+                            selectedOptionIds = selectedOptionIdSet,
+                            submitting = submitting,
+                            actionError = actionError,
+                            readonly = false,
+                            onOptionSelected = onOptionSelected,
+                            onSubmit = onSubmit
+                        )
+                    }
+
+                    isReadonlySelectionView -> {
+                        CurrentVoteSelectionSection(
+                            vote = vote,
+                            selectedOptionIds = selectedOptionIdSet,
+                            submitting = false,
+                            actionError = null,
+                            readonly = true,
+                            onOptionSelected = {},
+                            onSubmit = {}
+                        )
+                    }
+
+                    vote.status == "closed" -> {
+                        CurrentVoteResultSection(
+                            vote = vote,
+                            voteResult = voteResult,
+                            loadingResult = loadingResult,
+                            resultError = voteResultError,
+                            selectedOptionIds = vote.selected_option_ids.toSet()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrentVoteSelectionSection(
+    vote: Vote,
+    selectedOptionIds: Set<Int>,
+    submitting: Boolean,
+    actionError: String?,
+    readonly: Boolean,
+    onOptionSelected: (Int) -> Unit,
+    onSubmit: () -> Unit
+) {
+    val selectedCount = selectedOptionIds.size
+
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFFF8FBFF),
+        border = BorderStroke(1.dp, VoteCardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (!actionError.isNullOrBlank()) {
+                VoteInlineErrorCard(message = actionError)
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                vote.options
+                    .sortedBy { it.sort_order }
+                    .forEachIndexed { index, option ->
+                        CurrentVoteOptionCard(
+                            option = option,
+                            index = index,
+                            isSelected = selectedOptionIds.contains(option.id),
+                            enabled = !readonly,
+                            isMultiple = vote.is_multiple,
+                            onClick = { onOptionSelected(option.id) }
+                        )
+                    }
+            }
+
+            Text(
+                text = when {
+                    readonly && vote.is_multiple -> "你已选择 $selectedCount / ${vote.max_selections} 项"
+                    readonly -> "这是你已提交的选票内容"
+                    vote.is_multiple -> "已选 $selectedCount / ${vote.max_selections} 项"
+                    selectedCount > 0 -> "已选 1 项，提交后立即生效"
+                    else -> "请选择 1 个选项后提交"
+                },
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            if (!readonly) {
+                Button(
+                    onClick = onSubmit,
+                    enabled = selectedCount > 0 && !submitting,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    contentPadding = PaddingValues(vertical = 12.dp)
                 ) {
-                    Button(
-                        onClick = onClick,
-                        modifier = Modifier
-                            .height(40.dp)
-                            .widthIn(min = 72.dp, max = 96.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp)
-                    ) {
+                    if (submitting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
                         Text(
-                            text = currentVoteActionLabel(vote),
+                            text = "提交投票",
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrentVoteResultSection(
+    vote: Vote,
+    voteResult: VoteResult?,
+    loadingResult: Boolean,
+    resultError: String?,
+    selectedOptionIds: Set<Int>
+) {
+    val sortedResults = voteResult?.results?.sortedByDescending { it.count }.orEmpty()
+    val leadingCount = sortedResults.maxOfOrNull { it.count } ?: 0
+
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFFF8FBFF),
+        border = BorderStroke(1.dp, VoteCardBorder),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "结果概览",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "共 ${voteResult?.total_voters ?: 0} 人参与",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                VoteMetaChip(
+                    text = if (vote.is_multiple) "多选结果" else "单选结果",
+                    tone = VoteChipTone.Neutral
+                )
+                VoteMetaChip(
+                    text = if (vote.is_anonymous) "匿名统计" else "实名统计",
+                    tone = VoteChipTone.Neutral
+                )
+                if (selectedOptionIds.isNotEmpty()) {
+                    VoteMetaChip(
+                        text = if (vote.is_multiple) "我投了 ${selectedOptionIds.size} 项" else "我已投票",
+                        tone = VoteChipTone.Success
+                    )
+                }
+            }
+
+            when {
+                loadingResult -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = PrimaryBlue
+                        )
+                        Text(
+                            text = "正在加载结果...",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                !resultError.isNullOrBlank() -> {
+                    VoteInlineErrorCard(message = resultError)
+                }
+
+                voteResult != null && sortedResults.isNotEmpty() -> {
+                    Text(
+                        text = when {
+                            selectedOptionIds.isNotEmpty() -> "带“我的选择”标记的是你提交过的选项，当前窗口展示的是汇总统计结果。"
+                            vote.is_anonymous -> "这是一场匿名投票，顶部窗口仅展示聚合统计结果。"
+                            else -> "这是一场实名投票，顶部窗口当前展示汇总统计结果。"
+                        },
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 20.sp
+                    )
+
+                    sortedResults.forEachIndexed { index, result ->
+                        VoteRecordResultRow(
+                            result = result,
+                            rank = index + 1,
+                            isLeader = leadingCount > 0 && result.count == leadingCount,
+                            isUserChoice = result.option_id in selectedOptionIds
+                        )
+                    }
+                }
+
+                else -> {
+                    Text(
+                        text = "当前结果暂不可用，请稍后刷新查看。",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrentVoteOptionCard(
+    option: VoteOption,
+    index: Int,
+    isSelected: Boolean,
+    enabled: Boolean,
+    isMultiple: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) PrimaryBlue.copy(alpha = 0.06f) else CardBackground
+    val borderColor = if (isSelected) PrimaryBlue else VoteCardBorder
+    val titleColor = if (isSelected) PrimaryBlue else TextPrimary
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(
+                        color = if (isSelected) PrimaryBlue else Color(0xFFE8EEF7),
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = optionLabel(index),
+                    color = if (isSelected) Color.White else TextSecondary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = option.content,
+                    color = titleColor,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    lineHeight = 23.sp
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = if (isMultiple) "可多选，提交前可继续调整" else "点击即可选中该选项",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .background(
+                        color = if (isSelected) PrimaryBlue else Color.Transparent,
+                        shape = if (isMultiple) RoundedCornerShape(8.dp) else CircleShape
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        color = if (isSelected) PrimaryBlue else VoteCardBorder,
+                        shape = if (isMultiple) RoundedCornerShape(8.dp) else CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
                 }
             }
         }
@@ -509,14 +855,25 @@ private fun VoteRecordResultSection(
 private fun VoteRecordResultRow(
     result: VoteOptionResult,
     rank: Int,
-    isLeader: Boolean
+    isLeader: Boolean,
+    isUserChoice: Boolean = false
 ) {
     val highlightColor = if (isLeader) Color(0xFFEAB308) else PrimaryBlue
+    val borderColor = when {
+        isLeader -> Color(0xFFFDE68A)
+        isUserChoice -> PrimaryBlue.copy(alpha = 0.34f)
+        else -> VoteRecordBorder
+    }
+    val containerColor = when {
+        isLeader -> Color(0xFFFFFBEB)
+        isUserChoice -> PrimaryBlue.copy(alpha = 0.05f)
+        else -> Color(0xFFF8FAFD)
+    }
 
     Surface(
         shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFF8FAFD),
-        border = BorderStroke(1.dp, if (isLeader) Color(0xFFFDE68A) else VoteRecordBorder),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -559,6 +916,20 @@ private fun VoteRecordResultRow(
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            if (isLeader || isUserChoice) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isLeader) {
+                        VoteMetaChip(text = "当前领先", tone = VoteChipTone.Warning)
+                    }
+                    if (isUserChoice) {
+                        VoteMetaChip(text = "我的选择", tone = VoteChipTone.Primary)
+                    }
+                }
             }
 
             Text(
@@ -606,21 +977,14 @@ private fun voteTimeChip(vote: Vote): String? {
     }
 }
 
-private fun currentVoteActionLabel(vote: Vote): String {
-    return when {
-        vote.status == "draft" -> "查看"
-        (vote.wait_seconds ?: 0) > 0 || vote.status == "countdown" -> "查看"
-        vote.user_voted -> "状态"
-        else -> "参与"
-    }
-}
-
 private fun formatVoteDate(value: String?): String {
     if (value.isNullOrBlank()) return "时间未设置"
     return value.replace("T", " ").substringBefore(".").let {
         if (it.length >= 16) it.substring(0, 16) else it
     }
 }
+
+private fun optionLabel(index: Int): String = ('A'.code + index).toChar().toString()
 
 private fun formatDuration(seconds: Int): String {
     val safe = seconds.coerceAtLeast(0)

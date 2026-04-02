@@ -6,6 +6,8 @@ import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.remote.MeetingChangedData
 import com.example.paperlessmeeting.data.remote.SocketManager
+import com.example.paperlessmeeting.data.remote.VoteStartData
+import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.utils.Resource
@@ -38,7 +40,8 @@ class DetailViewModelTest {
     private val userPreferences = mockk<UserPreferences>()
     private val appSettingsState = mockk<AppSettingsState>()
 
-    private val voteStartEvent = MutableSharedFlow<com.example.paperlessmeeting.domain.model.Vote>()
+    private val voteStartEvent = MutableSharedFlow<VoteStartData>()
+    private val voteStateChangeEvent = MutableSharedFlow<Vote>()
     private val voteUpdateEvent = MutableSharedFlow<com.example.paperlessmeeting.data.remote.VoteUpdateData>()
     private val voteEndEvent = MutableSharedFlow<com.example.paperlessmeeting.data.remote.VoteEndData>()
     private val meetingChangedEvent = MutableSharedFlow<MeetingChangedData>()
@@ -83,6 +86,7 @@ class DetailViewModelTest {
         every { appSettingsState.getStaticBaseUrl() } returns "https://example.com/static/"
 
         every { socketManager.voteStartEvent } returns voteStartEvent
+        every { socketManager.voteStateChangeEvent } returns voteStateChangeEvent
         every { socketManager.voteUpdateEvent } returns voteUpdateEvent
         every { socketManager.voteEndEvent } returns voteEndEvent
         every { socketManager.meetingChangedEvent } returns meetingChangedEvent

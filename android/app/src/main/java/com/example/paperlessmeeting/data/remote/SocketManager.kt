@@ -1,6 +1,8 @@
 package com.example.paperlessmeeting.data.remote
 
 import android.util.Log
+import com.example.paperlessmeeting.data.remote.model.VotePayload
+import com.example.paperlessmeeting.data.remote.model.toDomain
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteOptionResult
 import com.google.gson.Gson
@@ -123,7 +125,7 @@ class SocketManager @Inject constructor(
             socket?.on("vote_state_change") { args ->
                 try {
                     val json = args[0] as JSONObject
-                    val vote = gson.fromJson(json.toString(), Vote::class.java)
+                    val vote = gson.fromJson(json.toString(), VotePayload::class.java).toDomain()
                     _voteStateChangeEvent.tryEmit(vote)
                     Log.d(TAG, "Received vote_state_change: id=${vote.id}, status=${vote.status}")
                 } catch (e: Exception) {

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import retrofit2.HttpException
 
 @HiltViewModel
 class VoteListViewModel @Inject constructor(
@@ -31,11 +33,16 @@ class VoteListViewModel @Inject constructor(
     data class VoteListUiState(
         val isLoading: Boolean = false,
         val currentDisplayVote: Vote? = null,
+        val currentDisplayVoteResult: VoteResult? = null,
+        val currentDisplayVoteResultError: String? = null,
         val myVoteHistory: List<Vote> = emptyList(),
         val expandedHistoryVoteId: Int? = null,
         val historyVoteResults: Map<Int, VoteResult> = emptyMap(),
         val loadingHistoryResultIds: Set<Int> = emptySet(),
         val historyResultErrors: Map<Int, String> = emptyMap(),
+        val selectedCurrentVoteOptionIds: Set<Int> = emptySet(),
+        val currentVoteSubmitting: Boolean = false,
+        val currentVoteActionError: String? = null,
         val error: String? = null
     )
 
@@ -78,11 +85,16 @@ class VoteListViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             currentDisplayVote = null,
+                            currentDisplayVoteResult = null,
+                            currentDisplayVoteResultError = null,
                             myVoteHistory = emptyList(),
                             expandedHistoryVoteId = null,
                             historyVoteResults = emptyMap(),
                             loadingHistoryResultIds = emptySet(),
                             historyResultErrors = emptyMap(),
+                            selectedCurrentVoteOptionIds = emptySet(),
+                            currentVoteSubmitting = false,
+                            currentVoteActionError = null,
                             error = "用户未登录"
                         )
                     }
@@ -97,17 +109,53 @@ class VoteListViewModel @Inject constructor(
                 }
                 val historyIds = myVoteHistory.map { it.id }.toSet()
                 val preservedExpandedId = _uiState.value.expandedHistoryVoteId?.takeIf { it in historyIds }
-                val currentDisplayVote = resolveCurrentDisplayVote(todayVotes)
+                val currentVoteCandidate = resolveCurrentDisplayVote(todayVotes)
+                val currentDisplayVote = currentVoteCandidate?.let { candidate ->
+                    repository.getVote(candidate.id, userId) ?: candidate
+                }
+                val currentDisplayVoteResult = if (currentDisplayVote?.status == "closed") {
+                    try {
+                        repository.getVoteResult(currentDisplayVote.id)
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
+                    null
+                }
+                val currentDisplayVoteResultError = if (
+                    currentDisplayVote?.status == "closed" && currentDisplayVoteResult == null
+                ) {
+                    "暂时无法获取投票结果"
+                } else {
+                    null
+                }
+                val previousVoteId = _uiState.value.currentDisplayVote?.id
+                val allowedOptionIds = currentDisplayVote?.options?.map { it.id }?.toSet().orEmpty()
+                val preservedSelectedOptionIds = if (
+                    currentDisplayVote != null &&
+                    currentDisplayVote.id == previousVoteId &&
+                    currentDisplayVote.status == "active" &&
+                    !currentDisplayVote.user_voted
+                ) {
+                    _uiState.value.selectedCurrentVoteOptionIds.filterTo(linkedSetOf(), allowedOptionIds::contains)
+                } else {
+                    emptySet()
+                }
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         currentDisplayVote = currentDisplayVote,
+                        currentDisplayVoteResult = currentDisplayVoteResult,
+                        currentDisplayVoteResultError = currentDisplayVoteResultError,
                         myVoteHistory = myVoteHistory,
                         expandedHistoryVoteId = preservedExpandedId,
                         historyVoteResults = it.historyVoteResults.filterKeys(historyIds::contains),
                         loadingHistoryResultIds = it.loadingHistoryResultIds.filterTo(linkedSetOf(), historyIds::contains),
                         historyResultErrors = it.historyResultErrors.filterKeys(historyIds::contains),
+                        selectedCurrentVoteOptionIds = preservedSelectedOptionIds,
+                        currentVoteSubmitting = false,
+                        currentVoteActionError = null,
                         error = null
                     )
                 }
@@ -131,6 +179,90 @@ class VoteListViewModel @Inject constructor(
 
     fun refresh() {
         loadData()
+    }
+
+    fun toggleCurrentVoteOption(optionId: Int) {
+        val currentState = _uiState.value
+        val vote = currentState.currentDisplayVote ?: return
+        if (vote.status != "active" || vote.user_voted) return
+
+        val updatedSelection = if (vote.is_multiple) {
+            val currentIds = currentState.selectedCurrentVoteOptionIds
+            when {
+                currentIds.contains(optionId) -> currentIds - optionId
+                currentIds.size < vote.max_selections -> currentIds + optionId
+                else -> {
+                    _uiState.update {
+                        it.copy(currentVoteActionError = "最多只能选择 ${vote.max_selections} 项")
+                    }
+                    return
+                }
+            }
+        } else {
+            setOf(optionId)
+        }
+
+        _uiState.update {
+            it.copy(
+                selectedCurrentVoteOptionIds = updatedSelection,
+                currentVoteActionError = null
+            )
+        }
+    }
+
+    fun submitCurrentVote() {
+        val currentState = _uiState.value
+        val vote = currentState.currentDisplayVote ?: return
+        if (vote.status != "active" || vote.user_voted) return
+
+        val optionIds = currentState.selectedCurrentVoteOptionIds.toList()
+        if (optionIds.isEmpty()) {
+            _uiState.update { it.copy(currentVoteActionError = "请至少选择一个选项") }
+            return
+        }
+        if (vote.is_multiple && optionIds.size > vote.max_selections) {
+            _uiState.update { it.copy(currentVoteActionError = "最多只能选择 ${vote.max_selections} 项") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(currentVoteSubmitting = true, currentVoteActionError = null)
+            }
+            try {
+                val userId = userPreferences.getUserId()
+                if (userId <= 0) {
+                    _uiState.update {
+                        it.copy(
+                            currentVoteSubmitting = false,
+                            currentVoteActionError = "用户未登录"
+                        )
+                    }
+                    return@launch
+                }
+
+                repository.submitVote(vote.id, userId, optionIds)
+                _uiState.update {
+                    it.copy(
+                        selectedCurrentVoteOptionIds = emptySet(),
+                        currentVoteSubmitting = false,
+                        currentVoteActionError = null
+                    )
+                }
+                loadData()
+            } catch (e: Exception) {
+                val errorMessage = extractErrorMessage(e)
+                _uiState.update {
+                    it.copy(
+                        currentVoteSubmitting = false,
+                        currentVoteActionError = errorMessage
+                    )
+                }
+                if (errorMessage.contains("已参与") || errorMessage.contains("已投过")) {
+                    loadData()
+                }
+            }
+        }
     }
 
     fun toggleHistoryVote(voteId: Int) {
@@ -181,7 +313,7 @@ class VoteListViewModel @Inject constructor(
 
     private fun resolveCurrentDisplayVote(votes: List<Vote>): Vote? {
         return votes
-            .filter { it.status in setOf("draft", "countdown", "active") }
+            .filter { it.status in setOf("draft", "countdown", "active", "closed") }
             .sortedWith(
                 compareByDescending<Vote> { voteStatusPriority(it.status) }
                     .thenByDescending { parseVoteDateTime(it.started_at ?: it.created_at) ?: LocalDateTime.MIN }
@@ -194,6 +326,7 @@ class VoteListViewModel @Inject constructor(
             "active" -> 3
             "countdown" -> 2
             "draft" -> 1
+            "closed" -> 0
             else -> 0
         }
     }
@@ -259,6 +392,22 @@ class VoteListViewModel @Inject constructor(
     private fun stopCurrentVoteTimer() {
         currentVoteTimerJob?.cancel()
         currentVoteTimerJob = null
+    }
+
+    private fun extractErrorMessage(exception: Exception): String {
+        if (exception is HttpException) {
+            val body = exception.response()?.errorBody()?.string()
+            if (!body.isNullOrBlank()) {
+                try {
+                    return JSONObject(body).optString("detail").takeIf { it.isNotBlank() }
+                        ?: "请求失败：HTTP ${exception.code()}"
+                } catch (_: Exception) {
+                    return body
+                }
+            }
+            return "请求失败：HTTP ${exception.code()}"
+        }
+        return exception.message ?: "操作失败，请稍后重试"
     }
 
     private fun fetchHistoryVoteResult(voteId: Int, forceRefresh: Boolean = false) {
