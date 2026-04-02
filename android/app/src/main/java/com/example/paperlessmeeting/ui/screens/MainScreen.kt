@@ -335,22 +335,6 @@ fun MainScreen(
                 }
 
                 composable(
-                    route = Screen.LotteryDetail.route,
-                    arguments = listOf(
-                        androidx.navigation.navArgument("meetingId") { type = androidx.navigation.NavType.IntType },
-                        androidx.navigation.navArgument("title") { type = androidx.navigation.NavType.StringType }
-                    )
-                ) { backStackEntry ->
-                    val meetingId = backStackEntry.arguments?.getInt("meetingId") ?: 0
-                    val title = backStackEntry.arguments?.getString("title") ?: "抽签"
-                    com.example.paperlessmeeting.ui.screens.lottery.LotteryDetailScreen(
-                        meetingId = meetingId,
-                        meetingTitle = title,
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
-                composable(
                     route = Screen.VoteDetail.route,
                     arguments = listOf(
                         androidx.navigation.navArgument("voteId") { type = androidx.navigation.NavType.IntType }

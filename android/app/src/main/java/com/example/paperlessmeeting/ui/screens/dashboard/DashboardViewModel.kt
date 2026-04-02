@@ -8,6 +8,7 @@ import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.utils.currentMeetingDate
 import com.example.paperlessmeeting.utils.currentMeetingDateTime
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +51,7 @@ class DashboardViewModel @Inject constructor(
     private var socketInitialized = false
     private var currentMeetingIds: Set<Int> = emptySet()
     private var reconnectJob: Job? = null
+    private var loadJob: Job? = null
 
     init {
         setupSocketIfNeeded()
@@ -86,7 +88,8 @@ class DashboardViewModel @Inject constructor(
     }
 
     private fun loadData() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             try {
                 val userName = userPreferences.getUserName() ?: "用户"
                 val userId = userPreferences.getUserId().takeIf { it > 0 }
@@ -138,6 +141,8 @@ class DashboardViewModel @Inject constructor(
 
                 currentMeetingIds = todayMeetings.map { it.id }.toSet()
                 joinMeetingRooms()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = DashboardUiState.Error(e.message ?: "Unknown error")
             }

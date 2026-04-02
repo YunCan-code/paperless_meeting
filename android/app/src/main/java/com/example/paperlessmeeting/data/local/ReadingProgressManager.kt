@@ -7,6 +7,7 @@ import com.example.paperlessmeeting.domain.model.ReadingProgressRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -70,6 +71,8 @@ class ReadingProgressManager @Inject constructor(
                             totalPages = total
                         )
                     )
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     // 网络失败时静默忽略，本地已保存
                     e.printStackTrace()
@@ -103,12 +106,16 @@ class ReadingProgressManager @Inject constructor(
                                     fileUrl = uniqueId
                                 )
                             )
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (fallbackException: Exception) {
                             android.util.Log.w("ReadingProgress", "deleteProgress: compat delete failed for $uniqueId", fallbackException)
                         }
                     } else {
                         android.util.Log.w("ReadingProgress", "deleteProgress: server delete failed for $uniqueId", e)
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     android.util.Log.w("ReadingProgress", "deleteProgress: server delete failed for $uniqueId", e)
                 }
@@ -155,6 +162,9 @@ class ReadingProgressManager @Inject constructor(
 
                 android.util.Log.d("ReadingProgress", "loadFromServer: mergedList.size=${mergedList.size}")
                 persistProgressList(mergedList)
+            } catch (e: CancellationException) {
+                android.util.Log.d("ReadingProgress", "loadFromServer cancelled")
+                throw e
             } catch (e: Exception) {
                 android.util.Log.e("ReadingProgress", "loadFromServer FAILED", e)
                 e.printStackTrace()

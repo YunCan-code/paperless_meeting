@@ -69,11 +69,6 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Refresh data
-    LaunchedEffect(Unit) {
-        viewModel.refreshData()
-    }
-    
     // Toast Handling
     val noticeController = LocalAppNoticeController.current
     LaunchedEffect(Unit) {
