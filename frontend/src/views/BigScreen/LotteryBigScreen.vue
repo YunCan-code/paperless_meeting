@@ -301,6 +301,11 @@ import { useRoute } from 'vue-router'
 import { io } from 'socket.io-client'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+import {
+  formatLotteryRoundOrder,
+  getLotteryDisplayRound,
+  getLotterySessionStatusLabel
+} from '@/utils/lotteryUi'
 
 const route = useRoute()
 const meetingId = Number(route.params.meetingId)
@@ -340,18 +345,6 @@ const isMockMode = computed(() => {
   if (Array.isArray(mockQuery)) return mockQuery.includes('1')
   return mockQuery === '1'
 })
-
-const lotteryRoundNumberMap = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
-const formatLotteryRoundOrder = (sortOrder) => {
-  const value = Number(sortOrder) || 0
-  if (value <= 0) return '待定'
-  if (value < 10) return `第${lotteryRoundNumberMap[value]}轮`
-  if (value === 10) return '第十轮'
-  if (value < 20) return `第十${lotteryRoundNumberMap[value - 10]}轮`
-  const tens = Math.floor(value / 10)
-  const units = value % 10
-  return `第${lotteryRoundNumberMap[tens]}十${units ? lotteryRoundNumberMap[units] : ''}轮`
-}
 
 const normalizeWinner = (winner = {}) => ({
   ...winner,
@@ -520,7 +513,7 @@ const getMockCandidatePool = (draft, round) => {
 
 const rounds = computed(() => Array.isArray(session.value.rounds) ? session.value.rounds : [])
 const participants = computed(() => Array.isArray(session.value.participants) ? session.value.participants : [])
-const currentDisplayRound = computed(() => session.value.current_round || session.value.next_round || null)
+const currentDisplayRound = computed(() => getLotteryDisplayRound(session.value))
 const currentRoundTitle = computed(() => currentDisplayRound.value?.title || '等待开始抽签')
 const currentRoundOrderLabel = computed(() => formatLotteryRoundOrder(currentDisplayRound.value?.sort_order || 0))
 const currentRoundPickCountLabel = computed(() => currentDisplayRound.value?.count ? `${currentDisplayRound.value.count} 人` : '--')
@@ -536,7 +529,7 @@ const canStartNextRound = computed(() => {
 })
 const startActionLabel = computed(() => session.value.winners?.length && session.value.next_round ? '开始下一轮' : '开始抽签')
 const stageCardTitle = computed(() => `${currentRoundOrderLabel.value} · ${currentRoundTitle.value}`)
-const stageStateLabel = computed(() => ({ idle: '待开始', collecting: '待开始', ready: '待开始', rolling: '抽签中', result: '已出结果', completed: '已完成' }[session.value.session_status] || '待开始'))
+const stageStateLabel = computed(() => getLotterySessionStatusLabel(session.value.session_status))
 const stageDescription = computed(() => {
   if (!rounds.value.length) return '创建轮次后，这里会直接展示抽签动画。'
   if (session.value.session_status === 'rolling') return '姓名正在持续滚动，现场可在右上角随时结束本轮抽签。'

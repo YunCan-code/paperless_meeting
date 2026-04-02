@@ -176,8 +176,8 @@
                 <p class="interaction-desc">{{ lotteryDescription }}</p>
                 <div class="interaction-meta">
                   <span>参与池 {{ interactionOverview.lottery.participants_count || 0 }} 人</span>
-                  <span v-if="interactionOverview.lottery.current_round">
-                    本轮抽取 {{ interactionOverview.lottery.current_round.count }} 人
+                  <span v-if="displayLotteryRound">
+                    本轮抽取 {{ displayLotteryRound.count }} 人
                   </span>
                 </div>
                 <div class="interaction-actions">
@@ -346,6 +346,11 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+import {
+  getLotteryDisplayRound,
+  getLotteryMobileDescription,
+  getLotterySessionStatusLabel
+} from '@/utils/lotteryUi'
 
 const router = useRouter()
 
@@ -391,31 +396,19 @@ const drawerSize = window.innerWidth < 900 ? '100%' : '62%'
 const latestClosedVote = computed(() => interactionOverview.vote.items.find(item => item.status === 'closed') || null)
 const displayVote = computed(() => interactionOverview.vote.active || latestClosedVote.value || null)
 const currentActiveVote = computed(() => interactionOverview.vote.active?.status === 'active' ? interactionOverview.vote.active : null)
+const displayLotteryRound = computed(() => getLotteryDisplayRound(interactionOverview.lottery))
 
-const lotteryStatusLabel = computed(() => ({
-  idle: '空闲',
-  collecting: '可加入',
-  ready: '待开始',
-  rolling: '滚动中',
-  result: '结果展示中',
-  completed: '全部完成'
-}[interactionOverview.lottery.session_status] || '暂无'))
+const lotteryStatusLabel = computed(() => getLotterySessionStatusLabel(interactionOverview.lottery.session_status))
 
-const lotteryRoundTitle = computed(() => interactionOverview.lottery.current_round?.title || '当前没有准备中的轮次')
+const lotteryRoundTitle = computed(() => displayLotteryRound.value?.title || '当前没有待抽取轮次')
 
-const lotteryDescription = computed(() => {
-  const lottery = interactionOverview.lottery
-  if (lottery.session_status === 'rolling') return '抽签正在滚动中，当前无法加入或退出。'
-  if (lottery.winners?.length) return `本轮已产生 ${lottery.winners.length} 位中签人员。`
-  if (lottery.current_round) return `本轮为「${lottery.current_round.title}」，可根据状态加入或退出抽签池。`
-  return '主持人准备轮次后，这里会开放加入入口。'
-})
+const lotteryDescription = computed(() => getLotteryMobileDescription(interactionOverview.lottery))
 
 const canJoinLottery = computed(() => {
   const lottery = interactionOverview.lottery
   return Boolean(
     selectedMeetingId.value &&
-    lottery.current_round &&
+    displayLotteryRound.value &&
     !lottery.joined &&
     !lottery.all_rounds_finished &&
     ['collecting', 'ready'].includes(lottery.session_status)

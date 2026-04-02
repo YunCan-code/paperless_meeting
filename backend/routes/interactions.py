@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from database import get_session
 from models import Meeting, Vote
-from routes.lottery import _build_session_snapshot
+from services.lottery_service import build_session_snapshot
 from routes.vote import _build_vote_read, _get_vote_or_404
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
@@ -28,7 +28,7 @@ def get_meeting_interaction_overview(
     votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
     vote_items = [_build_vote_read(_get_vote_or_404(vote.id, session), session, user_id=user_id).model_dump() for vote in votes]
     active_vote = next((item for item in vote_items if item["status"] in {"countdown", "active"}), None)
-    lottery_snapshot = _build_session_snapshot(meeting_id, session, user_id=user_id)
+    lottery_snapshot = build_session_snapshot(meeting_id, session, user_id=user_id)
 
     return {
         "meeting_id": meeting_id,

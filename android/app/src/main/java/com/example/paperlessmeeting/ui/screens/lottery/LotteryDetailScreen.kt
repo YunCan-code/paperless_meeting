@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -160,6 +161,8 @@ fun LotteryDetailScreen(
         ) {
             StatusHeroCard(currentState)
 
+            LotteryRoundSummaryCard(currentState)
+
             ActionArea(
                 session = currentState,
                 onJoin = viewModel::joinLottery,
@@ -202,7 +205,8 @@ fun LotteryDetailScreen(
 private fun StatusHeroCard(session: LotterySession) {
     val status = session.session_status
     val hasHistory = session.rounds.any { it.status == "finished" }
-    val currentTitle = session.current_round?.title
+    val displayRound = session.displayRound()
+    val currentTitle = displayRound?.let { "${it.roundOrderLabel()} · ${it.title}" }
 
     val backgroundBrush = when {
         status == "result" || status == "completed" -> Brush.linearGradient(
@@ -295,8 +299,93 @@ private fun StatusHeroCard(session: LotterySession) {
                         )
                     }
                 }
+
+                Text(
+                    text = session.roundSummaryLine(),
+                    color = contentColor.copy(alpha = 0.88f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun LotteryRoundSummaryCard(session: LotterySession) {
+    val displayRound = session.displayRound()
+    val finishedCount = session.finishedRounds().size
+    val nextRound = session.next_round
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "轮次概览",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SummaryChip("当前", displayRound?.roundOrderLabel() ?: "待定", Modifier.weight(1f))
+                SummaryChip("状态", session.statusLabel(), Modifier.weight(1f))
+                SummaryChip("剩余", "${session.remainingRoundsCount()} 轮", Modifier.weight(1f))
+            }
+
+            SummaryLine("当前轮次", displayRound?.title ?: "等待开始抽签")
+            SummaryLine("下一轮", nextRound?.let { "${it.roundOrderLabel()} ${it.title}" } ?: "暂无下一轮")
+            SummaryLine("已完成", "$finishedCount 轮")
+            SummaryLine("说明", session.stageDescription())
+        }
+    }
+}
+
+@Composable
+private fun SummaryChip(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(text = label, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            Text(text = value, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
+
+@Composable
+private fun SummaryLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.width(64.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -346,11 +435,11 @@ private fun ActionArea(
                         .fillMaxWidth()
                         .height(56.dp)
                 ) {
-                    Text("🎉 本轮已开奖")
+                    Text("🎉 本轮结果展示中")
                 }
             }
 
-            session.current_round == null -> {
+            session.displayRound() == null -> {
                 Button(
                     onClick = {},
                     enabled = false,
@@ -358,7 +447,7 @@ private fun ActionArea(
                         .fillMaxWidth()
                         .height(56.dp)
                 ) {
-                    Text("等待管理员准备轮次")
+                    Text("等待主持人开始抽签")
                 }
             }
 
@@ -422,7 +511,7 @@ private fun WinnerRoundCard(round: LotteryRound) {
                         modifier = Modifier.size(24.dp)
                     )
                     Text(
-                        text = round.title,
+                        text = "${round.roundOrderLabel()} · ${round.title}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

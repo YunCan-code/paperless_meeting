@@ -76,6 +76,14 @@ class LotteryListViewModel @Inject constructor(
             async {
                 repository.getLotteryHistory(meeting.id)?.takeIf { history ->
                     history.rounds.any { round -> round.status == "finished" || round.winners.isNotEmpty() }
+                }?.let { history ->
+                    history.copy(
+                        rounds = history.rounds.sortedWith(
+                            compareBy<com.example.paperlessmeeting.domain.model.LotteryRound> { if (it.sort_order > 0) 0 else 1 }
+                                .thenBy { it.sort_order }
+                                .thenBy { it.id }
+                        )
+                    )
                 }
             }
         }.awaitAll().filterNotNull()

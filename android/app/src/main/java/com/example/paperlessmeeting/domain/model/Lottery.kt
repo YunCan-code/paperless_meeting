@@ -19,6 +19,7 @@ data class LotteryRound(
     val title: String,
     val count: Int = 1,
     val allow_repeat: Boolean = false,
+    val sort_order: Int = 0,
     val status: String = "draft",
     val created_at: String? = null,
     val winners: List<LotteryWinner> = emptyList()
@@ -47,6 +48,8 @@ data class LotterySession(
     val session_status: String = "idle",
     val current_round_id: Int? = null,
     val current_round: LotteryRound? = null,
+    val next_round_id: Int? = null,
+    val next_round: LotteryRound? = null,
     val participants: List<LotteryParticipant> = emptyList(),
     val participants_count: Int = 0,
     val winners: List<LotteryWinner> = emptyList(),

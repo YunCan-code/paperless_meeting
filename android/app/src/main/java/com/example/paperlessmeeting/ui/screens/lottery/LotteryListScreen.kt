@@ -222,7 +222,9 @@ fun ActiveMeetingCard(meeting: Meeting, onClick: () -> Unit) {
 
 @Composable
 fun HistoryGroupCard(history: LotteryHistoryResponse, navController: NavController) {
-    val displayRounds = history.rounds.filter { it.status == "finished" || it.winners.isNotEmpty() }
+    val displayRounds = history.rounds
+        .filter { it.status == "finished" || it.winners.isNotEmpty() }
+        .sortedWith(compareBy<com.example.paperlessmeeting.domain.model.LotteryRound> { if (it.sort_order > 0) 0 else 1 }.thenBy { it.sort_order }.thenBy { it.id })
     if (displayRounds.isEmpty()) return
 
     Card(
@@ -262,13 +264,20 @@ fun HistoryRoundItem(round: com.example.paperlessmeeting.domain.model.LotteryRou
     ) {
          Column(modifier = Modifier.weight(1f)) {
              Text(
-                 text = "${round.title} (${round.count}人)",
+                 text = "${round.roundOrderLabel()} · ${round.title}",
                  style = MaterialTheme.typography.bodyMedium,
                  fontWeight = FontWeight.Medium
              )
+             Spacer(modifier = Modifier.height(4.dp))
+             Text(
+                 text = "${round.roundStatusLabel()} · 抽取 ${round.count} 人",
+                 style = MaterialTheme.typography.labelSmall,
+                 color = TextSecondary
+             )
              if (round.winners.isNotEmpty()) {
+                 Spacer(modifier = Modifier.height(4.dp))
                  Text(
-                     text = "中奖: ${round.winners.joinToString { it.name ?: it.user_name ?: "未知用户" }}",
+                     text = "中签: ${round.winners.joinToString(separator = "、") { it.name ?: it.user_name ?: "未知用户" }}",
                      style = MaterialTheme.typography.bodySmall,
                      color = TextSecondary,
                      maxLines = 1
@@ -277,14 +286,14 @@ fun HistoryRoundItem(round: com.example.paperlessmeeting.domain.model.LotteryRou
          }
          
          Surface(
-             color = if (round.status == "finished") Color.Green.copy(alpha=0.1f) else Color.Gray.copy(alpha=0.1f),
+             color = if (round.status == "finished") Color(0xFF16A34A).copy(alpha = 0.12f) else Color(0xFFF59E0B).copy(alpha = 0.12f),
              shape = RoundedCornerShape(4.dp)
          ) {
              Text(
-                 text = if(round.status == "finished") "已结束" else "未完成",
+                 text = round.roundStatusLabel(),
                  modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                  style = MaterialTheme.typography.labelSmall,
-                 color = if (round.status == "finished") Color.Green else Color.Gray
+                 color = if (round.status == "finished") Color(0xFF15803D) else Color(0xFFB45309)
              )
          }
     }

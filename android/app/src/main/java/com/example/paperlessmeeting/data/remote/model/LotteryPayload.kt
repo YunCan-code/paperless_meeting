@@ -21,6 +21,7 @@ data class LotteryRoundPayload(
     val title: String,
     val count: Int = 1,
     val allow_repeat: Boolean = false,
+    val sort_order: Int? = null,
     val status: String = "draft",
     val created_at: String? = null,
     val winners: List<LotteryWinnerPayload>? = null
@@ -49,6 +50,8 @@ data class LotterySessionPayload(
     val session_status: String? = null,
     val current_round_id: Int? = null,
     val current_round: LotteryRoundPayload? = null,
+    val next_round_id: Int? = null,
+    val next_round: LotteryRoundPayload? = null,
     val participants: List<LotteryParticipantPayload>? = null,
     val participants_count: Int? = null,
     val winners: List<LotteryWinnerPayload>? = null,
@@ -75,6 +78,7 @@ fun LotteryRoundPayload.toDomain(): LotteryRound {
         title = title,
         count = count,
         allow_repeat = allow_repeat,
+        sort_order = sort_order ?: 0,
         status = status,
         created_at = created_at,
         winners = winners?.map { it.toDomain() } ?: emptyList()
@@ -105,17 +109,22 @@ fun LotteryParticipantPayload.toDomain(): LotteryParticipant {
 }
 
 fun LotterySessionPayload.toDomain(): LotterySession {
+    val roundList = rounds?.map { it.toDomain() } ?: emptyList()
     val participantList = participants?.map { it.toDomain() } ?: emptyList()
+    val resolvedCurrentRound = current_round?.toDomain() ?: roundList.firstOrNull { it.id == current_round_id }
+    val resolvedNextRound = next_round?.toDomain() ?: roundList.firstOrNull { it.id == next_round_id }
     return LotterySession(
         meeting_id = meeting_id,
         session_status = session_status ?: "idle",
         current_round_id = current_round_id,
-        current_round = current_round?.toDomain(),
+        current_round = resolvedCurrentRound,
+        next_round_id = next_round_id,
+        next_round = resolvedNextRound,
         participants = participantList,
         participants_count = participants_count ?: participantList.size,
         winners = winners?.map { it.toDomain() } ?: emptyList(),
         joined = joined ?: false,
         all_rounds_finished = all_rounds_finished ?: false,
-        rounds = rounds?.map { it.toDomain() } ?: emptyList()
+        rounds = roundList
     )
 }

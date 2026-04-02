@@ -226,7 +226,7 @@
                       <div class="lottery-round-title-row">
                         <span class="round-order-badge">{{ formatLotteryRoundOrder(round.sort_order) }}</span>
                         <div class="item-title">{{ round.title }}</div>
-                        <span class="lottery-round-state" :class="getLotteryRoundDisplay(round).className">{{ getLotteryRoundDisplay(round).label }}</span>
+                        <span class="lottery-round-state" :class="getLotteryRoundDisplay(round, interactionOverview.lottery).className">{{ getLotteryRoundDisplay(round, interactionOverview.lottery).label }}</span>
                       </div>
                       <div class="item-meta">
                         <span>抽取 {{ round.count }} 人</span>
@@ -234,7 +234,7 @@
                         <span>{{ getLotteryRoundStatusLabel(round.status) }}</span>
                       </div>
                       <div class="lottery-round-hint">
-                        {{ getLotteryRoundHint(round) }}
+                        {{ getLotteryRoundHint(round, interactionOverview.lottery) }}
                       </div>
                     </div>
                     <div class="lottery-round-actions">
@@ -292,6 +292,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleClose, DataAnalysis, Delete, Edit, Monitor } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { useSidebar } from '@/composables/useSidebar'
+import {
+  formatLotteryRoundOrder,
+  getLotteryRoundDisplay,
+  getLotteryRoundHint,
+  getLotteryRoundStatusLabel,
+  getLotterySessionStatusLabel
+} from '@/utils/lotteryUi'
 
 const router = useRouter()
 const { isCollapse, toggleSidebar } = useSidebar()
@@ -338,17 +345,6 @@ const activeVoteLabel = computed(() => interactionOverview.vote.active ? getVote
 const voteSummaryLabel = computed(() => interactionOverview.vote.active ? `${interactionOverview.vote.active.title} · ${interactionOverview.vote.active.total_voters || 0} 人已参与` : '当前没有活动投票')
 const lotteryStatusLabel = computed(() => getLotterySessionStatusLabel(interactionOverview.lottery.session_status))
 const isLotteryRolling = computed(() => interactionOverview.lottery.session_status === 'rolling')
-const lotteryRoundNumberMap = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
-const formatLotteryRoundOrder = (sortOrder) => {
-  const value = Number(sortOrder) || 0
-  if (value <= 0) return '未排轮次'
-  if (value < 10) return `第${lotteryRoundNumberMap[value]}轮`
-  if (value === 10) return '第十轮'
-  if (value < 20) return `第十${lotteryRoundNumberMap[value - 10]}轮`
-  const tens = Math.floor(value / 10)
-  const units = value % 10
-  return `第${lotteryRoundNumberMap[tens]}十${units ? lotteryRoundNumberMap[units] : ''}轮`
-}
 
 const fetchMeetings = async () => {
   loadingMeetings.value = true
@@ -571,27 +567,6 @@ const canMoveLotteryRound = (round, direction) => {
   }
   return true
 }
-const getLotteryRoundDisplay = (round) => {
-  if (interactionOverview.lottery.current_round?.id === round.id && ['result', 'completed'].includes(interactionOverview.lottery.session_status)) {
-    return { label: '已抽取', className: 'state-finished' }
-  }
-  if (interactionOverview.lottery.next_round?.id === round.id) {
-    return { label: '下一轮', className: 'state-next' }
-  }
-  if (round.status === 'finished') {
-    return { label: '已抽取', className: 'state-finished' }
-  }
-  return { label: '待抽取', className: 'state-pending' }
-}
-const getLotteryRoundHint = (round) => {
-  if (interactionOverview.lottery.current_round?.id === round.id && interactionOverview.lottery.session_status === 'rolling') return '当前正在抽取这一轮，主持人停止后会生成本轮结果。'
-  if (interactionOverview.lottery.current_round?.id === round.id && ['result', 'completed'].includes(interactionOverview.lottery.session_status)) return '这一轮已经抽取完成，结果会暂时保留在左侧展示。'
-  if (interactionOverview.lottery.next_round?.id === round.id) return '这一轮就是下一轮，左侧点击“开始下一轮”后会自动进入。'
-  if (round.status === 'finished') return '这一轮已经抽取完成，顺序固定，不再参与后续调整。'
-  return '这一轮尚未抽取，可通过上移 / 下移调整它在顺序中的位置。'
-}
-const getLotteryRoundStatusLabel = (status) => ({ draft: '已创建', ready: '待开始', finished: '已完成' }[status] || status)
-const getLotterySessionStatusLabel = (status) => ({ idle: '空闲', collecting: '收集中', ready: '准备就绪', rolling: '滚动中', result: '结果展示中', completed: '全部完成' }[status] || status)
 const formatDateTime = (value) => {
   if (!value) return '未设置时间'
   const date = new Date(value)
@@ -712,6 +687,14 @@ onBeforeUnmount(() => {
 .lottery-round-state.state-next {
   background: rgba(245, 158, 11, 0.14);
   color: #fcd34d;
+}
+.lottery-round-state.state-current {
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+.lottery-round-state.state-result {
+  background: rgba(59, 130, 246, 0.16);
+  color: #bfdbfe;
 }
 .lottery-round-state.state-finished {
   background: rgba(148, 163, 184, 0.14);

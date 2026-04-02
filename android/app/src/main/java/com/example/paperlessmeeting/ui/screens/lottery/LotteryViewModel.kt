@@ -131,14 +131,14 @@ class LotteryViewModel @Inject constructor(
         if (shouldAnnounceWinner(previousState, session)) {
             _winnerAnnouncement.tryEmit(
                 WinnerAnnouncementData(
-                    roundTitle = session.current_round?.title ?: "当前轮次",
+                    roundTitle = session.current_round?.let { "${it.roundOrderLabel()} ${it.title}" } ?: "当前轮次",
                     userName = userName
                 )
             )
         }
 
         _uiState.value = session
-        _history.value = session.rounds.filter { it.status == "finished" }
+        _history.value = session.finishedRounds()
     }
 
     private fun shouldAnnounceWinner(
