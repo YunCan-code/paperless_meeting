@@ -2,7 +2,6 @@
 自动检测并关闭过期投票的后台任务
 """
 import asyncio
-from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
 from models import Vote
 from database import engine
@@ -16,49 +15,33 @@ async def auto_close_expired_votes():
             with Session(engine) as session:
                 stmt = select(Vote).where(Vote.status.in_(["countdown", "active"]))
                 runtime_votes = session.exec(stmt).all()
-                now = datetime.now(timezone.utc)
+                from routes.vote import _build_public_vote_snapshot, _build_vote_result, _resolve_effective_vote_state
 
                 for vote in runtime_votes:
-                    if not vote.started_at:
+                    effective_status, _, effective_closed_at = _resolve_effective_vote_state(vote)
+                    if effective_status == vote.status and effective_closed_at == vote.closed_at:
                         continue
 
-                    started = vote.started_at
-                    if started.tzinfo is None:
-                        started = started.replace(tzinfo=timezone.utc)
+                    previous_status = vote.status
+                    vote.status = effective_status
+                    vote.closed_at = effective_closed_at
+                    session.add(vote)
+                    session.commit()
+                    session.refresh(vote)
 
-                    if vote.status == "countdown" and now >= started:
-                        vote.status = "active"
-                        session.add(vote)
-                        session.commit()
-                        session.refresh(vote)
-                        try:
-                            from routes.vote import _build_vote_read, _build_vote_result
-                            snapshot = _build_vote_read(vote, session).model_dump()
-                            snapshot["results"] = _build_vote_result(vote, session).model_dump()["results"]
-                            await broadcast_vote_state(vote.meeting_id, snapshot)
-                            await broadcast_vote_results(vote.meeting_id, vote.id, _build_vote_result(vote, session).model_dump())
-                        except Exception as e:
-                            print(f"[AUTO-CLOSE] Failed to broadcast vote activation: {e}")
-                        continue
+                    try:
+                        result_payload = _build_vote_result(vote, session).model_dump(mode="json")
+                        snapshot = _build_public_vote_snapshot(vote, session)
+                        snapshot["results"] = result_payload["results"]
+                        await broadcast_vote_state(vote.meeting_id, snapshot)
+                        await broadcast_vote_results(vote.meeting_id, vote.id, result_payload)
+                    except Exception as e:
+                        print(f"[AUTO-CLOSE] Failed to broadcast vote state change: {e}")
 
-                    if vote.status == "active":
-                        end_time = started + timedelta(seconds=vote.duration_seconds)
-                        if now >= end_time:
-                            print(f"[AUTO-CLOSE] Closing expired vote {vote.id} ('{vote.title}')")
-                            vote.status = "closed"
-                            vote.closed_at = now
-                            session.add(vote)
-                            session.commit()
-                            session.refresh(vote)
-
-                            try:
-                                from routes.vote import _build_vote_read, _build_vote_result
-                                snapshot = _build_vote_read(vote, session).model_dump()
-                                snapshot["results"] = _build_vote_result(vote, session).model_dump()["results"]
-                                await broadcast_vote_state(vote.meeting_id, snapshot)
-                                await broadcast_vote_results(vote.meeting_id, vote.id, _build_vote_result(vote, session).model_dump())
-                            except Exception as e:
-                                print(f"[AUTO-CLOSE] Failed to broadcast vote end: {e}")
+                    if previous_status == "countdown" and effective_status == "active":
+                        print(f"[AUTO-CLOSE] Activated vote {vote.id} ('{vote.title}')")
+                    elif effective_status == "closed":
+                        print(f"[AUTO-CLOSE] Closing expired vote {vote.id} ('{vote.title}')")
 
         except Exception as e:
             print(f"[AUTO-CLOSE] Error in auto_close_expired_votes: {e}")

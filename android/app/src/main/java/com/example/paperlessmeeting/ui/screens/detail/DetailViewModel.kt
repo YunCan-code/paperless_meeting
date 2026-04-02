@@ -241,10 +241,14 @@ class DetailViewModel @Inject constructor(
         val id = meetingId?.toIntOrNull() ?: return
         viewModelScope.launch {
             try {
-                val vote = repository.getActiveVote(id)
+                val vote = repository.getActiveVote(id, currentUserIdOrNull())
                 if (vote != null) {
                     _currentVote.value = vote
+                    _hasVoted.value = vote.user_voted
                     _showVoteSheet.value = true
+                } else {
+                    _currentVote.value = null
+                    _hasVoted.value = false
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -259,11 +263,12 @@ class DetailViewModel @Inject constructor(
                     val currentMeetingId = meetingId?.toIntOrNull() ?: return@collectLatest
                     if (vote.meeting_id != currentMeetingId) return@collectLatest
 
-                    _currentVote.value = vote
-                    _hasVoted.value = vote.user_voted
+                    val mergedVote = mergePublicVoteState(vote)
+                    _currentVote.value = mergedVote
+                    _hasVoted.value = mergedVote.user_voted
 
-                    if (vote.status == "closed") {
-                        fetchVoteResult(vote.id)
+                    if (mergedVote.status == "closed") {
+                        fetchVoteResult(mergedVote.id)
                     } else {
                         _voteResult.value = null
                         _showVoteSheet.value = true
@@ -320,7 +325,8 @@ class DetailViewModel @Inject constructor(
                 val userId = userPreferences.getUserId()
                 if (userId != -1) {
                     repository.submitVote(voteId, userId, optionIds)
-                    _hasVoted.value = true
+                    applyOptimisticVoteSubmission(optionIds)
+                    refreshCurrentVoteFromServer(voteId)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -350,6 +356,46 @@ class DetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun mergePublicVoteState(incoming: Vote): Vote {
+        val previousVote = _currentVote.value
+        if (previousVote == null || previousVote.id != incoming.id) {
+            return incoming
+        }
+
+        val preservedUserVoted = previousVote.user_voted || _hasVoted.value
+        val preservedSelectedIds = when {
+            incoming.selected_option_ids.isNotEmpty() -> incoming.selected_option_ids
+            previousVote.selected_option_ids.isNotEmpty() -> previousVote.selected_option_ids
+            else -> emptyList()
+        }
+
+        return incoming.copy(
+            user_voted = incoming.user_voted || preservedUserVoted,
+            selected_option_ids = preservedSelectedIds
+        )
+    }
+
+    private fun applyOptimisticVoteSubmission(optionIds: List<Int>) {
+        _hasVoted.value = true
+        _currentVote.value = _currentVote.value?.copy(
+            user_voted = true,
+            selected_option_ids = optionIds
+        )
+    }
+
+    private suspend fun refreshCurrentVoteFromServer(voteId: Int) {
+        val userId = currentUserIdOrNull() ?: return
+        try {
+            repository.getVote(voteId, userId)?.let { refreshedVote ->
+                val mergedVote = mergePublicVoteState(refreshedVote)
+                _currentVote.value = mergedVote
+                _hasVoted.value = mergedVote.user_voted
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

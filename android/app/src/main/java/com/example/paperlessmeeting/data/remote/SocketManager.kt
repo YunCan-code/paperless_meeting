@@ -1,6 +1,7 @@
 package com.example.paperlessmeeting.data.remote
 
 import android.util.Log
+import com.example.paperlessmeeting.data.remote.model.LotterySessionPayload
 import com.example.paperlessmeeting.data.remote.model.VotePayload
 import com.example.paperlessmeeting.data.remote.model.toDomain
 import com.example.paperlessmeeting.domain.model.Vote
@@ -12,7 +13,6 @@ import android.os.Looper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
 import io.socket.client.Socket
-import io.socket.emitter.Emitter
 import okhttp3.OkHttpClient
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -255,62 +255,23 @@ class SocketManager @Inject constructor(
     }
 
     // Lottery Events
-    private val _lotteryStateEvent = MutableSharedFlow<com.example.paperlessmeeting.domain.model.LotteryState>(extraBufferCapacity = 1)
-    val lotteryStateEvent: SharedFlow<com.example.paperlessmeeting.domain.model.LotteryState> = _lotteryStateEvent.asSharedFlow()
-
-    private val _lotteryPlayersEvent = MutableSharedFlow<JSONObject>(extraBufferCapacity = 1)
-    val lotteryPlayersEvent: SharedFlow<JSONObject> = _lotteryPlayersEvent.asSharedFlow()
+    private val _lotterySessionEvent = MutableSharedFlow<com.example.paperlessmeeting.domain.model.LotterySession>(extraBufferCapacity = 1)
+    val lotterySessionEvent: SharedFlow<com.example.paperlessmeeting.domain.model.LotterySession> = _lotterySessionEvent.asSharedFlow()
 
     private val _lotteryErrorEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val lotteryErrorEvent: SharedFlow<String> = _lotteryErrorEvent.asSharedFlow()
 
-    fun emitLotteryAction(data: JSONObject) {
-        socket?.emit("lottery_action", data)
-    }
-
-    fun getLotteryState(meetingId: Int, userId: Int) {
-        val data = JSONObject()
-        data.put("meeting_id", meetingId)
-        data.put("user_id", userId)
-        socket?.emit("get_lottery_state", data)
-    }
-
     private fun setupLotteryListeners() {
-         socket?.on("lottery_state_change") { args ->
+         socket?.on("lottery_session_change") { args ->
             try {
                 if (args.isNotEmpty()) {
                     val data = args[0] as JSONObject
-                    Log.d(TAG, "State change received: $data")
-                    val state = gson.fromJson(data.toString(), com.example.paperlessmeeting.domain.model.LotteryState::class.java)
-                    _lotteryStateEvent.tryEmit(state)
+                    Log.d(TAG, "Lottery session received: $data")
+                    val session = gson.fromJson(data.toString(), LotterySessionPayload::class.java).toDomain()
+                    _lotterySessionEvent.tryEmit(session)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error parsing lottery_state_change", e)
-            }
-        }
-
-        socket?.on("lottery_state_sync") { args ->
-            try {
-                if (args.isNotEmpty()) {
-                    val data = args[0] as JSONObject
-                    Log.d(TAG, "State sync received: $data")
-                    val state = gson.fromJson(data.toString(), com.example.paperlessmeeting.domain.model.LotteryState::class.java)
-                    _lotteryStateEvent.tryEmit(state)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing lottery_state_sync", e)
-            }
-        }
-
-        socket?.on("lottery_players_update") { args ->
-            try {
-                if (args.isNotEmpty()) {
-                    val data = args[0] as JSONObject
-                    Log.d(TAG, "Players update received: $data")
-                    _lotteryPlayersEvent.tryEmit(data)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing lottery_players_update", e)
+                Log.e(TAG, "Error parsing lottery_session_change", e)
             }
         }
 

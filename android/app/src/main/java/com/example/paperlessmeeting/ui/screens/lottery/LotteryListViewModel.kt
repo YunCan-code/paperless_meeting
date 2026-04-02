@@ -2,19 +2,21 @@ package com.example.paperlessmeeting.ui.screens.lottery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paperlessmeeting.data.local.UserPreferences
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LotteryHistoryResponse
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class LotteryListUiState(
-    val activeLotteries: List<Meeting> = emptyList(), // Meetings with potential active lotteries (simplified for now to just meetings)
+    val activeLotteries: List<Meeting> = emptyList(),
     val historyLotteries: List<LotteryHistoryResponse> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null
@@ -22,8 +24,7 @@ data class LotteryListUiState(
 
 @HiltViewModel
 class LotteryListViewModel @Inject constructor(
-    private val repository: MeetingRepository,
-    private val userPreferences: UserPreferences
+    private val repository: MeetingRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LotteryListUiState())
@@ -37,21 +38,22 @@ class LotteryListViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                // 1. Get Active Meetings (for "Active" tab)
-                // We'll trust the repository's logic for today's meetings or "active" meetings
                 val todayStr = java.time.LocalDate.now().toString()
-                val meetings = repository.getMeetings(
-                    limit = 20, 
-                    startDate = todayStr, 
+                val activeMeetings = repository.getMeetings(
+                    limit = 20,
+                    startDate = todayStr,
                     endDate = todayStr
                 )
-                
-                // 2. Get History (for "History" tab)
-                val userId = userPreferences.getUserId()
-                val history = repository.getUserLotteryHistory(userId)
-                
+
+                val recentMeetings = repository.getMeetings(
+                    limit = 20,
+                    sort = "desc"
+                ).distinctBy { it.id }
+
+                val history = loadHistoryForMeetings(recentMeetings)
+
                 _uiState.value = _uiState.value.copy(
-                    activeLotteries = meetings,
+                    activeLotteries = activeMeetings,
                     historyLotteries = history,
                     isLoading = false
                 )
@@ -64,8 +66,18 @@ class LotteryListViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun refresh() {
         loadData()
+    }
+
+    private suspend fun loadHistoryForMeetings(meetings: List<Meeting>): List<LotteryHistoryResponse> = coroutineScope {
+        meetings.map { meeting ->
+            async {
+                repository.getLotteryHistory(meeting.id)?.takeIf { history ->
+                    history.rounds.any { round -> round.status == "finished" || round.winners.isNotEmpty() }
+                }
+            }
+        }.awaitAll().filterNotNull()
     }
 }

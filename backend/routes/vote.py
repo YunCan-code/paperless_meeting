@@ -4,7 +4,7 @@
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -104,33 +104,27 @@ def _validate_vote_payload(
             raise HTTPException(status_code=400, detail="单选投票最多只能选择 1 项")
 
 
-def _sync_vote_runtime_state(vote: Vote, session: Session) -> Vote:
+def _resolve_effective_vote_state(vote: Vote) -> Tuple[str, Optional[datetime], Optional[datetime]]:
     now = _local_now()
     started_at = _resolve_runtime_datetime(vote.started_at, vote)
+    status = vote.status
+    closed_at = vote.closed_at if vote.status == "closed" else None
 
-    if vote.status == "countdown" and started_at and now >= started_at:
-        vote.status = "active"
-        session.add(vote)
-        session.commit()
-        session.refresh(vote)
-        started_at = _resolve_runtime_datetime(vote.started_at, vote)
+    if status == "countdown" and started_at and now >= started_at:
+        status = "active"
 
-    if vote.status == "active" and started_at:
-        if now >= started_at + timedelta(seconds=vote.duration_seconds):
-            vote.status = "closed"
-            vote.closed_at = now
-            session.add(vote)
-            session.commit()
-            session.refresh(vote)
+    if status == "active" and started_at and now >= started_at + timedelta(seconds=vote.duration_seconds):
+        status = "closed"
+        closed_at = closed_at or now
 
-    return vote
+    return status, started_at, closed_at
 
 
 def _get_vote_or_404(vote_id: int, session: Session) -> Vote:
     vote = session.get(Vote, vote_id)
     if not vote:
         raise HTTPException(status_code=404, detail="投票不存在")
-    return _sync_vote_runtime_state(vote, session)
+    return vote
 
 
 def _get_vote_options(vote_id: int, session: Session) -> List[VoteOption]:
@@ -166,7 +160,7 @@ def _get_user_selected_option_ids(vote_id: int, user_id: Optional[int], session:
 
 
 def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
-    vote = _sync_vote_runtime_state(vote, session)
+    status, _, _ = _resolve_effective_vote_state(vote)
     total_voters = _get_total_voters(vote.id, session)
     options = _get_vote_options(vote.id, session)
 
@@ -179,7 +173,7 @@ def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
         percent = round((count_value / total_voters * 100) if total_voters > 0 else 0, 1)
 
         voters: List[str] = []
-        if vote.status == "closed" and not vote.is_anonymous:
+        if status == "closed" and not vote.is_anonymous:
             voters = session.exec(
                 select(User.name)
                 .join(UserVote, User.id == UserVote.user_id)
@@ -206,21 +200,20 @@ def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
 
 
 def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None) -> VoteRead:
-    vote = _sync_vote_runtime_state(vote, session)
+    status, started_at, closed_at = _resolve_effective_vote_state(vote)
     options = _get_vote_options(vote.id, session)
     total_voters = _get_total_voters(vote.id, session)
     selected_option_ids = list(_get_user_selected_option_ids(vote.id, user_id, session) or [])
 
     now = _local_now()
-    started_at = _resolve_runtime_datetime(vote.started_at, vote)
     remaining_seconds: Optional[int] = None
     countdown_remaining_seconds: Optional[int] = None
     wait_seconds: Optional[int] = None
 
-    if vote.status == "countdown" and started_at:
+    if status == "countdown" and started_at:
         countdown_remaining_seconds = max(0, int((started_at - now).total_seconds()))
         wait_seconds = countdown_remaining_seconds
-    elif vote.status == "active" and started_at:
+    elif status == "active" and started_at:
         remaining_seconds = max(0, int((started_at + timedelta(seconds=vote.duration_seconds) - now).total_seconds()))
         wait_seconds = 0
 
@@ -234,9 +227,9 @@ def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None
         max_selections=vote.max_selections,
         duration_seconds=vote.duration_seconds,
         countdown_seconds=vote.countdown_seconds,
-        status=vote.status,
+        status=status,
         started_at=vote.started_at,
-        closed_at=vote.closed_at,
+        closed_at=closed_at,
         created_at=vote.created_at,
         options=[VoteOptionRead(id=o.id, content=o.content, sort_order=o.sort_order) for o in options],
         remaining_seconds=remaining_seconds,
@@ -248,11 +241,17 @@ def _build_vote_read(vote: Vote, session: Session, user_id: Optional[int] = None
     )
 
 
+def _build_public_vote_snapshot(vote: Vote, session: Session) -> dict:
+    snapshot = _build_vote_read(vote, session).model_dump(mode="json")
+    snapshot["user_voted"] = False
+    snapshot["selected_option_ids"] = []
+    return snapshot
+
+
 async def _broadcast_vote_snapshot(vote_id: int, session: Session) -> None:
     vote = _get_vote_or_404(vote_id, session)
-    vote_read = _build_vote_read(vote, session)
     vote_result = _build_vote_result(vote, session)
-    snapshot = vote_read.model_dump(mode="json")
+    snapshot = _build_public_vote_snapshot(vote, session)
     result_payload = vote_result.model_dump(mode="json")
     snapshot["results"] = result_payload["results"]
     await broadcast_vote_state(vote.meeting_id, snapshot)
@@ -374,22 +373,29 @@ def get_active_vote(meeting_id: int, user_id: Optional[int] = None, session: Ses
         .order_by(Vote.created_at.desc())
     ).all()
     for vote in votes:
-        vote = _sync_vote_runtime_state(vote, session)
-        if vote.status in {"countdown", "active"}:
+        status, _, _ = _resolve_effective_vote_state(vote)
+        if status in {"countdown", "active"}:
             return _build_vote_read(vote, session, user_id=user_id)
     return None
 
 
 @router.get("/history", response_model=List[VoteRead])
 def get_vote_history(user_id: int, skip: int = 0, limit: int = 20, session: Session = Depends(get_session)):
-    vote_ids = session.exec(
-        select(UserVote.vote_id).where(UserVote.user_id == user_id).distinct().offset(skip).limit(limit)
+    history_rows = session.exec(
+        select(UserVote.vote_id, func.max(UserVote.voted_at))
+        .where(UserVote.user_id == user_id)
+        .group_by(UserVote.vote_id)
+        .order_by(func.max(UserVote.voted_at).desc(), UserVote.vote_id.desc())
+        .offset(skip)
+        .limit(limit)
     ).all()
+    vote_ids = [int(row[0]) for row in history_rows]
     if not vote_ids:
         return []
 
-    votes = session.exec(select(Vote).where(Vote.id.in_(vote_ids)).order_by(Vote.created_at.desc())).all()
-    return [_build_vote_read(vote, session, user_id=user_id) for vote in votes]
+    votes = session.exec(select(Vote).where(Vote.id.in_(vote_ids))).all()
+    vote_map = {vote.id: vote for vote in votes}
+    return [_build_vote_read(vote_map[vote_id], session, user_id=user_id) for vote_id in vote_ids if vote_id in vote_map]
 
 
 @router.get("/{vote_id}", response_model=VoteRead)

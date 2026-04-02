@@ -1,50 +1,56 @@
 package com.example.paperlessmeeting.domain.model
 
-data class StartLotteryRequest(
-    val meetingId: Int,
-    val count: Int
+data class LotteryParticipantActionRequest(
+    val user_id: Int
 )
 
 data class LotteryWinner(
-    val id: Int,
-    val user_name: String,
-    val winning_at: String
+    val id: Int = 0,
+    val user_id: Int? = null,
+    val user_name: String? = null,
+    val name: String? = null,
+    val department: String? = null,
+    val avatar: String? = null,
+    val winning_at: String? = null
 )
 
 data class LotteryRound(
     val id: Int,
     val title: String,
-    val count: Int,
-    val status: String, // pending, active, finished
-    val winners: List<LotteryWinner>
+    val count: Int = 1,
+    val allow_repeat: Boolean = false,
+    val status: String = "draft",
+    val created_at: String? = null,
+    val winners: List<LotteryWinner> = emptyList()
 )
 
 data class LotteryHistoryResponse(
-    val meeting_id: Int,
-    val meeting_title: String,
-    val rounds: List<LotteryRound>
-)
-
-// Socket State Models
-data class LotteryState(
-    val status: String,
-    val participants: List<LotteryParticipant>? = null,
-    val current_title: String? = null,
-    val current_count: Int = 1,
-    val winners: List<LotteryWinnerMap>? = null,
-    val participant_count: Int = 0,
-    val is_joined: Boolean = false // 用户是否已加入
+    val meeting_id: Int = 0,
+    val meeting_title: String = "",
+    val rounds: List<LotteryRound> = emptyList()
 )
 
 data class LotteryParticipant(
-    val id: Any, // Can be int or string
-    val name: String,
-    val sid: String?,
-    val avatar: String?,
-    val department: String?
+    val id: Int = 0,
+    val user_id: Int = id,
+    val name: String = "",
+    val avatar: String? = null,
+    val department: String? = null,
+    val status: String = "joined",
+    val is_winner: Boolean = false,
+    val winning_lottery_id: Int? = null,
+    val created_at: String? = null
 )
 
-data class LotteryWinnerMap(
-    val id: Any, // ID from map might be different format
-    val name: String
+data class LotterySession(
+    val meeting_id: Int = 0,
+    val session_status: String = "idle",
+    val current_round_id: Int? = null,
+    val current_round: LotteryRound? = null,
+    val participants: List<LotteryParticipant> = emptyList(),
+    val participants_count: Int = 0,
+    val winners: List<LotteryWinner> = emptyList(),
+    val joined: Boolean = false,
+    val all_rounds_finished: Boolean = false,
+    val rounds: List<LotteryRound> = emptyList()
 )

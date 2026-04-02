@@ -1,6 +1,7 @@
 ﻿package com.example.paperlessmeeting.data.remote
 
 import com.example.paperlessmeeting.data.remote.model.VotePayload
+import com.example.paperlessmeeting.data.remote.model.VoteResultPayload
 import com.example.paperlessmeeting.domain.model.Meeting
 import retrofit2.http.GET
 
@@ -77,7 +78,10 @@ interface ApiService {
 
     // Vote API
     @GET("vote/meeting/{meetingId}/active")
-    suspend fun getActiveVote(@retrofit2.http.Path("meetingId") meetingId: Int): VotePayload?
+    suspend fun getActiveVote(
+        @retrofit2.http.Path("meetingId") meetingId: Int,
+        @retrofit2.http.Query("user_id") userId: Int? = null
+    ): VotePayload?
 
     @retrofit2.http.POST("vote/{voteId}/submit")
     suspend fun submitVote(
@@ -86,7 +90,7 @@ interface ApiService {
     ): Map<String, Any>
 
     @GET("vote/{voteId}/result")
-    suspend fun getVoteResult(@retrofit2.http.Path("voteId") voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult
+    suspend fun getVoteResult(@retrofit2.http.Path("voteId") voteId: Int): VoteResultPayload
 
     @GET("vote/meeting/{meetingId}/list")
     suspend fun getVoteList(@retrofit2.http.Path("meetingId") meetingId: Int): List<VotePayload>
@@ -98,7 +102,27 @@ interface ApiService {
     ): VotePayload
 
     @GET("lottery/{meetingId}/history")
-    suspend fun getLotteryHistory(@retrofit2.http.Path("meetingId") meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse
+    suspend fun getLotteryHistory(
+        @retrofit2.http.Path("meetingId") meetingId: Int
+    ): com.example.paperlessmeeting.data.remote.model.LotteryHistoryResponsePayload
+
+    @GET("lottery/{meetingId}/session")
+    suspend fun getLotterySession(
+        @retrofit2.http.Path("meetingId") meetingId: Int,
+        @retrofit2.http.Query("user_id") userId: Int? = null
+    ): com.example.paperlessmeeting.data.remote.model.LotterySessionPayload
+
+    @retrofit2.http.POST("lottery/{meetingId}/participants/join")
+    suspend fun joinLotteryPool(
+        @retrofit2.http.Path("meetingId") meetingId: Int,
+        @retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.LotteryParticipantActionRequest
+    ): com.example.paperlessmeeting.data.remote.model.LotterySessionPayload
+
+    @retrofit2.http.POST("lottery/{meetingId}/participants/quit")
+    suspend fun quitLotteryPool(
+        @retrofit2.http.Path("meetingId") meetingId: Int,
+        @retrofit2.http.Body request: com.example.paperlessmeeting.domain.model.LotteryParticipantActionRequest
+    ): com.example.paperlessmeeting.data.remote.model.LotterySessionPayload
 
     @GET("vote/history")
     suspend fun getVoteHistory(
@@ -106,8 +130,6 @@ interface ApiService {
         @retrofit2.http.Query("skip") skip: Int = 0,
         @retrofit2.http.Query("limit") limit: Int = 20
     ): List<VotePayload>
-    @GET("lottery/history/user/{userId}")
-    suspend fun getUserLotteryHistory(@retrofit2.http.Path("userId") userId: Int): List<com.example.paperlessmeeting.domain.model.LotteryHistoryResponse>
 
     // Reading Progress API
     @retrofit2.http.POST("reading-progress/")

@@ -21,7 +21,6 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,10 +48,6 @@ fun LotteryListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedTabIndex by remember { mutableStateOf(0) }
-
-    LaunchedEffect(Unit) {
-        viewModel.loadData() // Refresh logic could check timestamp to avoid redundant loads
-    }
 
     Scaffold(
         topBar = {
@@ -227,7 +222,8 @@ fun ActiveMeetingCard(meeting: Meeting, onClick: () -> Unit) {
 
 @Composable
 fun HistoryGroupCard(history: LotteryHistoryResponse, navController: NavController) {
-    if (history.rounds.isEmpty()) return
+    val displayRounds = history.rounds.filter { it.status == "finished" || it.winners.isNotEmpty() }
+    if (displayRounds.isEmpty()) return
 
     Card(
         colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
@@ -243,11 +239,11 @@ fun HistoryGroupCard(history: LotteryHistoryResponse, navController: NavControll
             )
             Spacer(modifier = Modifier.height(8.dp))
             
-            history.rounds.forEach { round ->
+            displayRounds.forEach { round ->
                 HistoryRoundItem(round) {
                      navController.navigate(Screen.LotteryDetail.createRoute(history.meeting_id, history.meeting_title))
                 }
-                if (round != history.rounds.last()) {
+                if (round != displayRounds.last()) {
                     HorizontalDivider(color = LightBackground, thickness = 1.dp)
                 }
             }
@@ -272,7 +268,7 @@ fun HistoryRoundItem(round: com.example.paperlessmeeting.domain.model.LotteryRou
              )
              if (round.winners.isNotEmpty()) {
                  Text(
-                     text = "中奖: ${round.winners.joinToString { it.user_name }}",
+                     text = "中奖: ${round.winners.joinToString { it.name ?: it.user_name ?: "未知用户" }}",
                      style = MaterialTheme.typography.bodySmall,
                      color = TextSecondary,
                      maxLines = 1

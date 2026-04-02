@@ -55,5 +55,6 @@ data class VoteOptionResult(
     val option_id: Int,
     val content: String,
     val count: Int,
-    val percent: Float
+    val percent: Float,
+    val voters: List<String> = emptyList()
 )

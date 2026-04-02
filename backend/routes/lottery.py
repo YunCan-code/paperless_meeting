@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import Session, delete, select
+from sqlmodel import Session, select
 
 from database import get_session
 from models import Lottery, LotteryParticipant, LotterySession, LotteryWinner, Meeting, User
@@ -120,6 +120,13 @@ def _get_joined_participants(meeting_id: int, session: Session) -> List[LotteryP
         .where(LotteryParticipant.meeting_id == meeting_id, LotteryParticipant.status == "joined")
         .order_by(LotteryParticipant.created_at, LotteryParticipant.user_id)
     ).all()
+
+
+def _resolve_session_status(meeting_id: int, session: Session, has_current_round: bool) -> str:
+    joined_count = len(_get_joined_participants(meeting_id, session))
+    if has_current_round:
+        return LOTTERY_SESSION_READY if joined_count > 0 else LOTTERY_SESSION_COLLECTING
+    return LOTTERY_SESSION_IDLE if joined_count == 0 else LOTTERY_SESSION_COLLECTING
 
 
 def _build_round_payload(round_item: Lottery) -> dict:
@@ -301,7 +308,7 @@ async def delete_lottery_round(lottery_id: int, session: Session = Depends(get_s
 
     if lottery_session.current_round_id == round_item.id:
         lottery_session.current_round_id = None
-        lottery_session.session_status = LOTTERY_SESSION_IDLE
+        lottery_session.session_status = _resolve_session_status(meeting_id, session, has_current_round=False)
         lottery_session.last_result = None
         lottery_session.updated_at = _now()
         session.add(lottery_session)
@@ -346,10 +353,11 @@ async def join_lottery_pool(
 
     session.add(participant)
 
-    if lottery_session.current_round_id:
-        lottery_session.session_status = LOTTERY_SESSION_READY
-    else:
-        lottery_session.session_status = LOTTERY_SESSION_COLLECTING
+    lottery_session.session_status = _resolve_session_status(
+        meeting_id,
+        session,
+        has_current_round=bool(lottery_session.current_round_id),
+    )
     lottery_session.updated_at = _now()
     session.add(lottery_session)
     session.commit()
@@ -403,9 +411,14 @@ async def prepare_lottery_round(
     if round_item.status == LOTTERY_ROUND_FINISHED:
         raise HTTPException(status_code=400, detail="该轮次已完成")
 
+    for candidate in _get_rounds(meeting_id, session):
+        if candidate.id != round_item.id and candidate.status == LOTTERY_ROUND_READY:
+            candidate.status = LOTTERY_ROUND_DRAFT
+            session.add(candidate)
+
     round_item.status = LOTTERY_ROUND_READY
     lottery_session.current_round_id = round_item.id
-    lottery_session.session_status = LOTTERY_SESSION_READY if _get_joined_participants(meeting_id, session) else LOTTERY_SESSION_COLLECTING
+    lottery_session.session_status = _resolve_session_status(meeting_id, session, has_current_round=True)
     lottery_session.last_result = None
     lottery_session.updated_at = _now()
 

@@ -4,22 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.local.UserPreferences
-import com.example.paperlessmeeting.data.repository.MeetingRepository
-import com.example.paperlessmeeting.domain.model.LotteryState
 import com.example.paperlessmeeting.data.remote.SocketManager
-import com.google.gson.Gson
+import com.example.paperlessmeeting.data.repository.MeetingRepository
+import com.example.paperlessmeeting.domain.model.LotteryRound
+import com.example.paperlessmeeting.domain.model.LotterySession
+import com.example.paperlessmeeting.domain.model.LotteryWinner
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.launch
-import org.json.JSONObject
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
-// \u2b50 \u4e2d\u5956\u63d0\u793a\u6570\u636e\u7c7b
 data class WinnerAnnouncementData(
     val roundTitle: String,
     val userName: String
@@ -33,179 +32,132 @@ class LotteryViewModel @Inject constructor(
     private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<LotteryState?>(null)
-    val uiState: StateFlow<LotteryState?> = _uiState.asStateFlow()
-    
-    // History rounds
-    private val _history = MutableStateFlow<List<com.example.paperlessmeeting.domain.model.LotteryRound>>(emptyList())
-    val history: StateFlow<List<com.example.paperlessmeeting.domain.model.LotteryRound>> = _history.asStateFlow()
+    private val _uiState = MutableStateFlow<LotterySession?>(null)
+    val uiState: StateFlow<LotterySession?> = _uiState.asStateFlow()
+
+    private val _history = MutableStateFlow<List<LotteryRound>>(emptyList())
+    val history: StateFlow<List<LotteryRound>> = _history.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // ⭐ 中奖提示事件
     private val _winnerAnnouncement = MutableSharedFlow<WinnerAnnouncementData>(extraBufferCapacity = 1)
     val winnerAnnouncement: SharedFlow<WinnerAnnouncementData> = _winnerAnnouncement.asSharedFlow()
 
     private var meetingId: Int = 0
     private var userId: Int = 0
     private var userName: String = ""
+    private var listenersStarted = false
 
     fun init(meetingId: Int) {
+        if (meetingId <= 0) return
+
+        val previousMeetingId = this.meetingId
         this.meetingId = meetingId
         this.userId = userPreferences.getUserId()
         this.userName = userPreferences.getUserName() ?: "未知用户"
-        fetchHistory()
-        initSocketListener()
-        
-        // Ensure connection
+
+        if (!listenersStarted) {
+            listenersStarted = true
+            initSocketListener()
+        }
+
         socketManager.connect(appSettingsState.getSocketBaseUrl())
+        if (previousMeetingId != 0 && previousMeetingId != meetingId) {
+            socketManager.leaveMeeting(previousMeetingId)
+        }
         socketManager.joinMeeting(meetingId)
-        socketManager.getLotteryState(meetingId, userId)
+        refreshSession()
     }
 
-    fun getCurrentUserId(): Int = userId
-
-    private fun fetchHistory() {
+    fun joinLottery() {
+        if (meetingId == 0 || userId == 0) return
         viewModelScope.launch {
-            val response = repository.getLotteryHistory(meetingId)
-            _history.value = response?.rounds ?: emptyList()
+            val session = repository.joinLotteryPool(meetingId, userId)
+            if (session == null) {
+                _error.value = "加入抽签失败"
+            } else {
+                handleSessionUpdate(session)
+            }
+        }
+    }
+
+    fun quitLottery() {
+        if (meetingId == 0 || userId == 0) return
+        viewModelScope.launch {
+            val session = repository.quitLotteryPool(meetingId, userId)
+            if (session == null) {
+                _error.value = "退出抽签失败"
+            } else {
+                handleSessionUpdate(session)
+            }
+        }
+    }
+
+    fun clearError() {
+        _error.value = null
+    }
+
+    private fun refreshSession() {
+        if (meetingId == 0) return
+        viewModelScope.launch {
+            val session = repository.getLotterySession(meetingId, userId)
+            if (session == null) {
+                _error.value = "加载抽签状态失败"
+            } else {
+                handleSessionUpdate(session)
+            }
         }
     }
 
     private fun initSocketListener() {
         viewModelScope.launch {
-            socketManager.lotteryStateEvent.collect { state ->
-                val oldStatus = _uiState.value?.status
-                println("[Lottery] ========================================")
-                println("[Lottery] State change received:")
-                println("[Lottery]   Status: $oldStatus -> ${state.status}")
-                println("[Lottery]   Title: ${state.current_title}")
-                println("[Lottery]   Count: ${state.current_count}")
-                println("[Lottery]   Participants: ${state.participants?.size ?: 0}")
-                println("[Lottery]   IsJoined: ${state.is_joined}")
-                println("[Lottery] ========================================")
-                
-                // ⭐ 中奖检测:从ROLLING -> RESULT 且自己在中奖名单中
-                val isWinner = state.status == "RESULT" && 
-                               oldStatus == "ROLLING" &&
-                               state.winners?.any { it.id == userId } == true
-                
-                if (isWinner && state.current_title != null) {
-                    println("[Lottery] 🎉 YOU WON! Triggering winner announcement.")
-                    _winnerAnnouncement.tryEmit(
-                        WinnerAnnouncementData(
-                            roundTitle = state.current_title,
-                            userName = userName
-                        )
-                    )
+            socketManager.lotterySessionEvent.collect { session ->
+                if (session.meeting_id == meetingId) {
+                    handleSessionUpdate(session)
                 }
-                
-                _uiState.value = state
-
-                // Refresh history if round finished
-                if (state.status == "RESULT") {
-                    fetchHistory()
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            socketManager.lotteryPlayersEvent.collect { data ->
-                 try {
-                        println("[Lottery] Players update received: $data")
-
-                        // 解析参与者列表
-                        val participantsArray = data.optJSONArray("all_participants") ?: data.optJSONArray("participants")
-                        val participantsList = mutableListOf<com.example.paperlessmeeting.domain.model.LotteryParticipant>()
-
-                        if (participantsArray != null) {
-                            for (i in 0 until participantsArray.length()) {
-                                val p = participantsArray.getJSONObject(i)
-                                val sid = p.optString("sid").takeIf { it.isNotBlank() }
-                                val avatar = p.optString("avatar").takeIf { it.isNotBlank() }
-                                val department = p.optString("department").takeIf { it.isNotBlank() }
-                                participantsList.add(
-                                    com.example.paperlessmeeting.domain.model.LotteryParticipant(
-                                        id = p.opt("id") ?: 0,
-                                        name = p.optString("name", ""),
-                                        sid = sid,
-                                        avatar = avatar,
-                                        department = department
-                                    )
-                                )
-                            }
-                        }
-
-                        // ⭐ 关键修复: 根据参与者列表自动计算 is_joined
-                        val userId = userPreferences.getUserId()
-                        val isJoined = participantsList.any { it.id == userId }
-
-                        // 更新参与者数量和列表到当前状态
-                        val currentState = _uiState.value
-                        if (currentState != null) {
-                            val updatedState = currentState.copy(
-                                participant_count = data.optInt("participant_count", data.optInt("count", currentState.participant_count)),
-                                participants = participantsList,
-                                is_joined = isJoined  // ⭐ 更新 is_joined 状态
-                            )
-                            _uiState.value = updatedState
-                            println("[Lottery] Updated state: joined=$isJoined, count=${participantsList.size}")
-                        } else {
-                            // 如果当前状态为空，创建一个新的状态
-                            _uiState.value = LotteryState(
-                                status = "PREPARING",
-                                participants = participantsList,
-                                participant_count = data.optInt("participant_count", data.optInt("count", 0)),
-                                is_joined = isJoined  // ⭐ 设置 is_joined 状态
-                            )
-                        }
-                    } catch (e: Exception) {
-                        println("[Lottery] Error parsing players update: ${e.message}")
-                        e.printStackTrace()
-                    }
             }
         }
 
         viewModelScope.launch {
             socketManager.lotteryErrorEvent.collect { errorMsg ->
-                 println("[Lottery] Error received: $errorMsg")
-                 _error.value = errorMsg
+                _error.value = errorMsg
             }
         }
     }
-    
-    fun joinLottery() {
-        viewModelScope.launch {
-            println("[Lottery] Attempting to join - userId: $userId, userName: $userName, meetingId: $meetingId")
-            val data = JSONObject()
-            data.put("action", "join")
-            data.put("meeting_id", meetingId)
-            data.put("user_id", userId) 
-            data.put("user_name", userName)
-            data.put("department", "") 
-            data.put("avatar", "") 
-            println("[Lottery] Emitting lottery_action with data: $data")
-            socketManager.emitLotteryAction(data)
+
+    private fun handleSessionUpdate(session: LotterySession) {
+        val previousState = _uiState.value
+        if (shouldAnnounceWinner(previousState, session)) {
+            _winnerAnnouncement.tryEmit(
+                WinnerAnnouncementData(
+                    roundTitle = session.current_round?.title ?: "当前轮次",
+                    userName = userName
+                )
+            )
         }
+
+        _uiState.value = session
+        _history.value = session.rounds.filter { it.status == "finished" }
     }
-    
-    fun quitLottery() {
-        viewModelScope.launch {
-            val data = JSONObject()
-            data.put("action", "quit")
-            data.put("meeting_id", meetingId)
-            data.put("user_id", userId) 
-            socketManager.emitLotteryAction(data)
-        }
+
+    private fun shouldAnnounceWinner(
+        previousState: LotterySession?,
+        newState: LotterySession
+    ): Boolean {
+        if (previousState?.session_status != "rolling") return false
+        if (newState.session_status !in setOf("result", "completed")) return false
+        return newState.winners.any { winnerMatchesUser(it, userId) }
     }
-    
-    fun clearError() {
-        _error.value = null
+
+    private fun winnerMatchesUser(winner: LotteryWinner, currentUserId: Int): Boolean {
+        return winner.user_id == currentUserId || winner.id == currentUserId
     }
 
     override fun onCleared() {
         super.onCleared()
-        // Keep shared socket alive for other screens (dashboard/detail/vote).
+        if (meetingId != 0) {
+            socketManager.leaveMeeting(meetingId)
+        }
     }
 }

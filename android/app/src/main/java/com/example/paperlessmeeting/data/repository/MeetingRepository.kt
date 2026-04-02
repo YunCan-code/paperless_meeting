@@ -32,14 +32,16 @@ interface MeetingRepository {
     suspend fun updateSyncState(meetingId: Int, fileId: Int, pageNumber: Int, isSyncing: Boolean, fileUrl: String?): com.example.paperlessmeeting.domain.model.MeetingSyncState?
 
     // Vote methods
-    suspend fun getActiveVote(meetingId: Int): com.example.paperlessmeeting.domain.model.Vote?
+    suspend fun getActiveVote(meetingId: Int, userId: Int? = null): com.example.paperlessmeeting.domain.model.Vote?
     suspend fun getVoteList(meetingId: Int): List<com.example.paperlessmeeting.domain.model.Vote>
     suspend fun getVote(voteId: Int, userId: Int? = null): com.example.paperlessmeeting.domain.model.Vote?
     suspend fun submitVote(voteId: Int, userId: Int, optionIds: List<Int>)
     suspend fun getVoteResult(voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult?
     suspend fun getLotteryHistory(meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse?
+    suspend fun getLotterySession(meetingId: Int, userId: Int? = null): com.example.paperlessmeeting.domain.model.LotterySession?
+    suspend fun joinLotteryPool(meetingId: Int, userId: Int): com.example.paperlessmeeting.domain.model.LotterySession?
+    suspend fun quitLotteryPool(meetingId: Int, userId: Int): com.example.paperlessmeeting.domain.model.LotterySession?
     suspend fun getVoteHistory(userId: Int, skip: Int = 0, limit: Int = 20): List<com.example.paperlessmeeting.domain.model.Vote>
-    suspend fun getUserLotteryHistory(userId: Int): List<com.example.paperlessmeeting.domain.model.LotteryHistoryResponse>
     suspend fun checkIn(userId: Int, meetingId: Int): CheckInResponse
     suspend fun cancelCheckIn(checkinId: Int, userId: Int)
 }
@@ -164,9 +166,9 @@ class MeetingRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getActiveVote(meetingId: Int): com.example.paperlessmeeting.domain.model.Vote? {
+    override suspend fun getActiveVote(meetingId: Int, userId: Int?): com.example.paperlessmeeting.domain.model.Vote? {
         return try {
-            api.getActiveVote(meetingId)?.toDomain()
+            api.getActiveVote(meetingId, userId)?.toDomain()
         } catch (e: Exception) {
             rethrowCancellation(e)
             e.printStackTrace()
@@ -207,7 +209,7 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun getVoteResult(voteId: Int): com.example.paperlessmeeting.domain.model.VoteResult? {
         return try {
-            api.getVoteResult(voteId)
+            api.getVoteResult(voteId).toDomain()
         } catch (e: Exception) {
             rethrowCancellation(e)
             e.printStackTrace()
@@ -217,7 +219,52 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun getLotteryHistory(meetingId: Int): com.example.paperlessmeeting.domain.model.LotteryHistoryResponse? {
         return try {
-            api.getLotteryHistory(meetingId)
+            api.getLotteryHistory(meetingId).toDomain()
+        } catch (e: Exception) {
+            rethrowCancellation(e)
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override suspend fun getLotterySession(
+        meetingId: Int,
+        userId: Int?
+    ): com.example.paperlessmeeting.domain.model.LotterySession? {
+        return try {
+            api.getLotterySession(meetingId, userId).toDomain()
+        } catch (e: Exception) {
+            rethrowCancellation(e)
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override suspend fun joinLotteryPool(
+        meetingId: Int,
+        userId: Int
+    ): com.example.paperlessmeeting.domain.model.LotterySession? {
+        return try {
+            api.joinLotteryPool(
+                meetingId,
+                com.example.paperlessmeeting.domain.model.LotteryParticipantActionRequest(userId)
+            ).toDomain()
+        } catch (e: Exception) {
+            rethrowCancellation(e)
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override suspend fun quitLotteryPool(
+        meetingId: Int,
+        userId: Int
+    ): com.example.paperlessmeeting.domain.model.LotterySession? {
+        return try {
+            api.quitLotteryPool(
+                meetingId,
+                com.example.paperlessmeeting.domain.model.LotteryParticipantActionRequest(userId)
+            ).toDomain()
         } catch (e: Exception) {
             rethrowCancellation(e)
             e.printStackTrace()
@@ -227,16 +274,6 @@ class MeetingRepositoryImpl @Inject constructor(
 
     override suspend fun getVoteHistory(userId: Int, skip: Int, limit: Int): List<com.example.paperlessmeeting.domain.model.Vote> {
         return api.getVoteHistory(userId, skip, limit).map { it.toDomain() }
-    }
-
-    override suspend fun getUserLotteryHistory(userId: Int): List<com.example.paperlessmeeting.domain.model.LotteryHistoryResponse> {
-        return try {
-            api.getUserLotteryHistory(userId)
-        } catch (e: Exception) {
-            rethrowCancellation(e)
-            e.printStackTrace()
-            emptyList()
-        }
     }
 
     override suspend fun checkIn(userId: Int, meetingId: Int): CheckInResponse {

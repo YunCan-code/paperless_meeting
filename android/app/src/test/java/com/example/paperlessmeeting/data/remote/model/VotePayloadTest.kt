@@ -103,4 +103,53 @@ class VotePayloadTest {
 
         assertEquals(listOf(1, 2), payload.toDomain().selected_option_ids)
     }
+
+    @Test
+    fun `VoteResultPayload 的 voters 缺失时映射为空列表`() {
+        val payload = gson.fromJson(
+            """
+            {
+              "vote_id": 1,
+              "title": "结果",
+              "total_voters": 3,
+              "results": [
+                {
+                  "option_id": 10,
+                  "content": "选项A",
+                  "count": 2,
+                  "percent": 66.7
+                }
+              ]
+            }
+            """.trimIndent(),
+            VoteResultPayload::class.java
+        )
+
+        assertTrue(payload.toDomain().results.first().voters.isEmpty())
+    }
+
+    @Test
+    fun `VoteResultPayload 的 voters 有值时保持原样`() {
+        val payload = gson.fromJson(
+            """
+            {
+              "vote_id": 1,
+              "title": "结果",
+              "total_voters": 3,
+              "results": [
+                {
+                  "option_id": 10,
+                  "content": "选项A",
+                  "count": 2,
+                  "percent": 66.7,
+                  "voters": ["张三", "李四"]
+                }
+              ]
+            }
+            """.trimIndent(),
+            VoteResultPayload::class.java
+        )
+
+        assertEquals(listOf("张三", "李四"), payload.toDomain().results.first().voters)
+    }
 }

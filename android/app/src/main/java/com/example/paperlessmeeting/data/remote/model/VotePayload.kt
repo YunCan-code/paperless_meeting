@@ -2,6 +2,8 @@ package com.example.paperlessmeeting.data.remote.model
 
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteOption
+import com.example.paperlessmeeting.domain.model.VoteOptionResult
+import com.example.paperlessmeeting.domain.model.VoteResult
 
 data class VotePayload(
     val id: Int,
@@ -28,6 +30,21 @@ data class VoteOptionPayload(
     val sort_order: Int = 0,
     val vote_count: Int? = null,
     val percent: Float? = null
+)
+
+data class VoteResultPayload(
+    val vote_id: Int,
+    val title: String,
+    val total_voters: Int = 0,
+    val results: List<VoteOptionResultPayload>? = null
+)
+
+data class VoteOptionResultPayload(
+    val option_id: Int,
+    val content: String,
+    val count: Int = 0,
+    val percent: Float = 0f,
+    val voters: List<String>? = null
 )
 
 fun VotePayload.toDomain(): Vote {
@@ -58,5 +75,24 @@ fun VoteOptionPayload.toDomain(): VoteOption {
         sort_order = sort_order,
         vote_count = vote_count,
         percent = percent
+    )
+}
+
+fun VoteResultPayload.toDomain(): VoteResult {
+    return VoteResult(
+        vote_id = vote_id,
+        title = title,
+        total_voters = total_voters,
+        results = results?.map { it.toDomain() } ?: emptyList()
+    )
+}
+
+fun VoteOptionResultPayload.toDomain(): VoteOptionResult {
+    return VoteOptionResult(
+        option_id = option_id,
+        content = content,
+        count = count,
+        percent = percent,
+        voters = voters ?: emptyList()
     )
 }

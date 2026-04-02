@@ -1,28 +1,56 @@
 package com.example.paperlessmeeting.ui.screens.lottery
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.paperlessmeeting.domain.model.LotteryState
+import com.example.paperlessmeeting.domain.model.LotteryRound
+import com.example.paperlessmeeting.domain.model.LotterySession
+import com.example.paperlessmeeting.domain.model.LotteryWinner
 import com.example.paperlessmeeting.ui.components.notice.LocalAppNoticeController
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,7 +63,7 @@ fun LotteryDetailScreen(
 ) {
     val noticeController = LocalAppNoticeController.current
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(meetingId) {
         viewModel.init(meetingId)
     }
 
@@ -50,22 +78,19 @@ fun LotteryDetailScreen(
         }
     }
 
-    // \u2b50 \u4e2d\u5956\u63d0\u793a\u5bf9\u8bdd\u6846
     var winnerDialogData by remember { mutableStateOf<WinnerAnnouncementData?>(null) }
-    
-    LaunchedEffect(Unit) {
+    LaunchedEffect(viewModel) {
         viewModel.winnerAnnouncement.collect { data ->
             winnerDialogData = data
         }
     }
 
-    // \u663e\u793a\u4e2d\u5956\u5bf9\u8bdd\u6846
     winnerDialogData?.let { data ->
         AlertDialog(
             onDismissRequest = { winnerDialogData = null },
             confirmButton = {
                 Button(onClick = { winnerDialogData = null }) {
-                    Text("\u592a\u68d2\u4e86\uff01")
+                    Text("太棒了！")
                 }
             },
             title = {
@@ -73,20 +98,20 @@ fun LotteryDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("\ud83c\udf89")
-                    Text("\u606d\u559c\u4e2d\u5956!")
+                    Text("🎉")
+                    Text("恭喜中奖！")
                 }
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "\u3010${data.roundTitle}\u3011",
+                        text = "【${data.roundTitle}】",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Text("${data.userName},\u60a8\u5df2\u6210\u529f\u4e2d\u9009\uff01")
+                    Text("${data.userName}，您已成功中选！")
                     Text(
-                        text = "\u8bf7\u5728\u5927\u5c4f\u67e5\u770b\u8be6\u7ec6\u7ed3\u679c~",
+                        text = "请在大屏查看完整开奖结果。",
                         color = Color.Gray,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -107,10 +132,7 @@ fun LotteryDetailScreen(
             )
         }
     ) { paddingValues ->
-        // ⭐ 使用局部变量避免 smart cast 问题
         val currentState = uiState
-        
-        // ⭐ 加载状态:等待服务器返回初始状态
         if (currentState == null) {
             Box(
                 modifier = Modifier
@@ -129,7 +151,6 @@ fun LotteryDetailScreen(
             return@Scaffold
         }
 
-        // ⭐ 正常UI:已收到状态
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -137,29 +158,14 @@ fun LotteryDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Hero Status Card
-            val status = currentState.status
-            val isJoined = currentState.is_joined
-            val hasHistory = history.isNotEmpty()  // ⭐ 检查是否有历史记录
-            
-            StatusHeroCard(
-                status = status,
-                isJoined = isJoined,
-                participantCount = currentState.participant_count,
-                currentTitle = currentState.current_title,
-                hasHistory = hasHistory  // ⭐ 传递历史记录标志
-            )
+            StatusHeroCard(currentState)
 
-            // 2. Action Area
             ActionArea(
-                status = status,
-                isJoined = isJoined,
-                hasHistory = hasHistory,  // ⭐ 传递历史记录标志
-                onJoin = { viewModel.joinLottery() },
-                onQuit = { viewModel.quitLottery() }
+                session = currentState,
+                onJoin = viewModel::joinLottery,
+                onQuit = viewModel::quitLottery
             )
 
-            // 3. Winners List Header
             Text(
                 text = "抽签结果",
                 style = MaterialTheme.typography.titleMedium,
@@ -167,22 +173,24 @@ fun LotteryDetailScreen(
                 modifier = Modifier.padding(top = 8.dp)
             )
 
-            // 4. Winners List
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 if (history.isEmpty()) {
                     item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text("暂无中奖记录", color = Color.Gray)
                         }
                     }
                 } else {
                     items(history) { round ->
-                        if (round.status == "finished") {
-                            WinnerRoundCard(round)
-                        }
+                        WinnerRoundCard(round)
                     }
                 }
             }
@@ -191,39 +199,47 @@ fun LotteryDetailScreen(
 }
 
 @Composable
-fun StatusHeroCard(
-    status: String,
-    isJoined: Boolean,
-    participantCount: Int,
-    currentTitle: String?,
-    hasHistory: Boolean = false  // ⭐ 新增参数
-) {
-    // ⭐ 渐变背景配色方案
+private fun StatusHeroCard(session: LotterySession) {
+    val status = session.session_status
+    val hasHistory = session.rounds.any { it.status == "finished" }
+    val currentTitle = session.current_round?.title
+
     val backgroundBrush = when {
-        status == "RESULT" -> Brush.linearGradient(
-            colors = listOf(Color(0xFFFFD700), Color(0xFFFFAA00)) // 金色→琥珀色
+        status == "result" || status == "completed" -> Brush.linearGradient(
+            colors = listOf(Color(0xFFFFD700), Color(0xFFFFAA00))
         )
-        status == "ROLLING" -> Brush.linearGradient(
-            colors = listOf(Color(0xFFFF6B35), Color(0xFFFF9500)) // 红橙→橙色
+        status == "rolling" -> Brush.linearGradient(
+            colors = listOf(Color(0xFFFF6B35), Color(0xFFFF9500))
         )
-        isJoined && status == "PREPARING" -> Brush.linearGradient(
-            colors = listOf(Color(0xFF00BCD4), Color(0xFF2196F3)) // 青色→蓝色
+        session.joined && status in setOf("collecting", "ready") -> Brush.linearGradient(
+            colors = listOf(Color(0xFF00BCD4), Color(0xFF2196F3))
         )
-        // ⭐ IDLE状态:如果有历史记录,使用金色;否则使用灰色
-        status == "IDLE" && hasHistory -> Brush.linearGradient(
-            colors = listOf(Color(0xFFFFD700), Color(0xFFFFAA00)) // 金色→琥珀色(完成状态)
+        status == "idle" && hasHistory -> Brush.linearGradient(
+            colors = listOf(Color(0xFFFFD700), Color(0xFFFFAA00))
         )
         else -> Brush.linearGradient(
-            colors = listOf(Color(0xFF90A4AE), Color(0xFFB0BEC5)) // 蓝灰渐变
+            colors = listOf(Color(0xFF90A4AE), Color(0xFFB0BEC5))
         )
     }
 
-    val contentColor = if (status == "IDLE" && !hasHistory && !isJoined) Color.Black else Color.White
+    val contentColor = if (status == "idle" && !hasHistory && !session.joined) Color.Black else Color.White
+    val (statusText, statusIcon) = when {
+        status == "completed" || (status == "idle" && session.all_rounds_finished) -> "所有轮次已完成" to "✨"
+        status == "idle" -> "等待发起抽签" to "⏳"
+        status in setOf("collecting", "ready") && session.joined -> "已入池，等待好运" to "✅"
+        status == "ready" -> "轮次已准备" to "🎯"
+        status == "collecting" -> "抽签准备中" to "⏰"
+        status == "rolling" -> "抽签进行中..." to "🎲"
+        status == "result" -> "结果已出炉" to "🎉"
+        else -> "抽签进行中" to "🎲"
+    }
 
     Card(
         shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        modifier = Modifier.fillMaxWidth().height(200.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
     ) {
         Box(
             modifier = Modifier
@@ -236,35 +252,20 @@ fun StatusHeroCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (currentTitle != null && status != "IDLE") {
+                if (!currentTitle.isNullOrBlank() && status != "idle") {
                     Text(
-                        text = "正在进行:$currentTitle",
+                        text = "当前轮次：$currentTitle",
                         color = contentColor.copy(alpha = 0.9f),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium
                     )
                 }
-                
-                // 状态文本 + 图标
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val (statusText, statusIcon) = when {
-                        // ⭐ IDLE状态优化:区分"等待配置"和"全部完成"
-                        status == "IDLE" && hasHistory -> "所有轮次已完成" to "✨"
-                        status == "IDLE" -> "等待发起抽签" to "⏳"
-                        status == "PREPARING" && isJoined -> "已入池,等待好运" to "✅"
-                        status == "PREPARING" -> "抽签准备中" to "⏰"
-                        status == "ROLLING" -> "抽签进行中..." to "🎲"
-                        status == "RESULT" -> "结果已出炉" to "🎉"
-                        else -> "未知状态" to "❓"
-                    }
-                    
-                    Text(
-                        text = statusIcon,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    Text(text = statusIcon, style = MaterialTheme.typography.headlineMedium)
                     Text(
                         text = statusText,
                         style = MaterialTheme.typography.headlineSmall,
@@ -272,10 +273,9 @@ fun StatusHeroCard(
                         color = contentColor
                     )
                 }
-                
+
                 Spacer(Modifier.height(8.dp))
-                
-                // 参与者数量徽章
+
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = contentColor.copy(alpha = 0.25f),
@@ -286,12 +286,9 @@ fun StatusHeroCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Text(text = "👥", style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            text = "👥",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "$participantCount 人参与",
+                            text = "${session.participants_count} 人参与",
                             color = contentColor,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 16.sp
@@ -304,58 +301,89 @@ fun StatusHeroCard(
 }
 
 @Composable
-fun ActionArea(
-    status: String,
-    isJoined: Boolean,
-    hasHistory: Boolean = false,  // ⭐ 新增参数:是否有历史记录
+private fun ActionArea(
+    session: LotterySession,
     onJoin: () -> Unit,
     onQuit: () -> Unit
 ) {
+    val status = session.session_status
+    val joinEnabled = status in setOf("collecting", "ready")
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ⭐ 所有轮次完成(IDLE + 有历史记录)时显示完成状态
-        if (status == "IDLE" && hasHistory) {
-            Button(
-                onClick = {}, 
-                enabled = false, 
-                modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Text("✨ 所有轮次已完成")
+        when {
+            session.all_rounds_finished || status == "completed" -> {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("✨ 所有轮次已完成")
+                }
             }
-        }
-        // ⭐ ROLLING和RESULT状态不允许任何操作
-        else if (status == "ROLLING" || status == "RESULT") {
-            Button(
-                onClick = {}, 
-                enabled = false, 
-                modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Text(
-                    when (status) {
-                        "ROLLING" -> "🔒 抽签进行中,无法操作"
-                        "RESULT" -> "🎉 抽签已结束"
-                        else -> "无法操作"
-                    }
-                )
+
+            status == "rolling" -> {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("🔒 抽签进行中，无法操作")
+                }
             }
-        } else {
-            // Join/Quit Logic (only in IDLE without history or PREPARING)
-            if (!isJoined) {
+
+            status == "result" -> {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("🎉 本轮已开奖")
+                }
+            }
+
+            session.current_round == null -> {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("等待管理员准备轮次")
+                }
+            }
+
+            !session.joined -> {
                 Button(
                     onClick = onJoin,
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    enabled = status == "PREPARING" // Only allow join when PREPARING
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = joinEnabled
                 ) {
-                    Text(if (status == "IDLE") "等待管理员配置" else "立即参与")
+                    Text(if (joinEnabled) "立即参与" else "暂不可参与")
                 }
-            } else {
+            }
+
+            else -> {
                 OutlinedButton(
                     onClick = onQuit,
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    enabled = status == "PREPARING", // ⭐ 只在PREPARING时允许退出
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = joinEnabled,
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
                 ) {
                     Text("退出抽签")
                 }
@@ -364,14 +392,13 @@ fun ActionArea(
     }
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRound) {
-    // ⭐ 使用统一的优雅渐变色 - 柔和的蓝紫色调
+private fun WinnerRoundCard(round: LotteryRound) {
     val gradient = Brush.linearGradient(
-        colors = listOf(Color(0xFF6B9FFF), Color(0xFF4A90E2)) // 淡蓝渐变,协调不突兀
+        colors = listOf(Color(0xFF6B9FFF), Color(0xFF4A90E2))
     )
-    
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -384,14 +411,13 @@ fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRoun
                 .padding(20.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // 标题行
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        Icons.Default.Star, 
-                        contentDescription = null, 
+                        Icons.Default.Star,
+                        contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
@@ -402,9 +428,8 @@ fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRoun
                         color = Color.White
                     )
                 }
-                
-                // ⭐ 中奖者标签 - 移除外层Surface,直接显示白色徽章
-                androidx.compose.foundation.layout.FlowRow(
+
+                FlowRow(
                     modifier = Modifier.padding(top = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -420,12 +445,9 @@ fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRoun
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Text(text = "🎉", fontSize = 14.sp)
                                 Text(
-                                    text = "🎉",
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = winner.user_name,
+                                    text = winner.displayName(),
                                     fontWeight = FontWeight.Medium,
                                     color = Color(0xFF333333)
                                 )
@@ -438,4 +460,4 @@ fun WinnerRoundCard(round: com.example.paperlessmeeting.domain.model.LotteryRoun
     }
 }
 
-// Removed custom FlowRow wrapper, using standard Layout instead
+private fun LotteryWinner.displayName(): String = name ?: user_name ?: "未知用户"

@@ -77,6 +77,8 @@ class VoteListViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
+                val previousState = _uiState.value
+                val previousDisplayVote = previousState.currentDisplayVote
                 val userId = userPreferences.getUserId()
                 if (userId <= 0) {
                     stopCurrentVoteTimer()
@@ -108,11 +110,14 @@ class VoteListViewModel @Inject constructor(
                     if (vote.id in votedIds) vote.copy(user_voted = true) else vote
                 }
                 val historyIds = myVoteHistory.map { it.id }.toSet()
-                val preservedExpandedId = _uiState.value.expandedHistoryVoteId?.takeIf { it in historyIds }
+                val preservedExpandedId = previousState.expandedHistoryVoteId?.takeIf { it in historyIds }
                 val currentVoteCandidate = resolveCurrentDisplayVote(todayVotes)
-                val currentDisplayVote = currentVoteCandidate?.let { candidate ->
-                    repository.getVote(candidate.id, userId) ?: candidate
-                }
+                val currentDisplayVote = preserveCurrentVoteState(
+                    refreshedVote = currentVoteCandidate?.let { candidate ->
+                        repository.getVote(candidate.id, userId) ?: candidate
+                    },
+                    previousVote = previousDisplayVote
+                )
                 val currentDisplayVoteResult = if (currentDisplayVote?.status == "closed") {
                     try {
                         repository.getVoteResult(currentDisplayVote.id)
@@ -129,7 +134,7 @@ class VoteListViewModel @Inject constructor(
                 } else {
                     null
                 }
-                val previousVoteId = _uiState.value.currentDisplayVote?.id
+                val previousVoteId = previousDisplayVote?.id
                 val allowedOptionIds = currentDisplayVote?.options?.map { it.id }?.toSet().orEmpty()
                 val preservedSelectedOptionIds = if (
                     currentDisplayVote != null &&
@@ -137,7 +142,9 @@ class VoteListViewModel @Inject constructor(
                     currentDisplayVote.status == "active" &&
                     !currentDisplayVote.user_voted
                 ) {
-                    _uiState.value.selectedCurrentVoteOptionIds.filterTo(linkedSetOf(), allowedOptionIds::contains)
+                    previousState.selectedCurrentVoteOptionIds.filterTo(linkedSetOf()) { optionId ->
+                        allowedOptionIds.contains(optionId)
+                    }
                 } else {
                     emptySet()
                 }
@@ -150,9 +157,11 @@ class VoteListViewModel @Inject constructor(
                         currentDisplayVoteResultError = currentDisplayVoteResultError,
                         myVoteHistory = myVoteHistory,
                         expandedHistoryVoteId = preservedExpandedId,
-                        historyVoteResults = it.historyVoteResults.filterKeys(historyIds::contains),
-                        loadingHistoryResultIds = it.loadingHistoryResultIds.filterTo(linkedSetOf(), historyIds::contains),
-                        historyResultErrors = it.historyResultErrors.filterKeys(historyIds::contains),
+                        historyVoteResults = it.historyVoteResults.filterKeys { voteId -> historyIds.contains(voteId) },
+                        loadingHistoryResultIds = it.loadingHistoryResultIds.filterTo(linkedSetOf()) { voteId ->
+                            historyIds.contains(voteId)
+                        },
+                        historyResultErrors = it.historyResultErrors.filterKeys { voteId -> historyIds.contains(voteId) },
                         selectedCurrentVoteOptionIds = preservedSelectedOptionIds,
                         currentVoteSubmitting = false,
                         currentVoteActionError = null,
@@ -243,8 +252,13 @@ class VoteListViewModel @Inject constructor(
 
                 repository.submitVote(vote.id, userId, optionIds)
                 _uiState.update {
+                    val optimisticVote = it.currentDisplayVote?.copy(
+                        user_voted = true,
+                        selected_option_ids = optionIds
+                    )
                     it.copy(
-                        selectedCurrentVoteOptionIds = emptySet(),
+                        currentDisplayVote = optimisticVote,
+                        selectedCurrentVoteOptionIds = optionIds.toSet(),
                         currentVoteSubmitting = false,
                         currentVoteActionError = null
                     )
@@ -328,6 +342,34 @@ class VoteListViewModel @Inject constructor(
             "draft" -> 1
             "closed" -> 0
             else -> 0
+        }
+    }
+
+    private fun preserveCurrentVoteState(
+        refreshedVote: Vote?,
+        previousVote: Vote?
+    ): Vote? {
+        if (refreshedVote == null) return null
+        if (previousVote == null || previousVote.id != refreshedVote.id) return refreshedVote
+
+        return when {
+            previousVote.user_voted &&
+                previousVote.selected_option_ids.isNotEmpty() &&
+                refreshedVote.status == "active" &&
+                (!refreshedVote.user_voted || refreshedVote.selected_option_ids.isEmpty()) -> {
+                refreshedVote.copy(
+                    user_voted = true,
+                    selected_option_ids = previousVote.selected_option_ids
+                )
+            }
+
+            refreshedVote.user_voted &&
+                refreshedVote.selected_option_ids.isEmpty() &&
+                previousVote.selected_option_ids.isNotEmpty() -> {
+                refreshedVote.copy(selected_option_ids = previousVote.selected_option_ids)
+            }
+
+            else -> refreshedVote
         }
     }
 

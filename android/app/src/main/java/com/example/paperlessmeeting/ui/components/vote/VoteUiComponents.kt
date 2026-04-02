@@ -56,28 +56,28 @@ fun resolveVoteStatusVisual(
     return when {
         status == "closed" -> VoteStatusVisual(
             label = "已结束",
-            containerColor = Color(0xFFE2E8F0),
-            contentColor = Color(0xFF475569)
+            containerColor = Color(0xFFDCE6F4),
+            contentColor = Color(0xFF334155)
         )
         status == "draft" -> VoteStatusVisual(
             label = "待开始",
-            containerColor = Color(0xFFE8EEF7),
-            contentColor = Color(0xFF475569)
+            containerColor = Color(0xFFFFF4E0),
+            contentColor = Color(0xFFB45309)
         )
         waitLeft > 0 -> VoteStatusVisual(
             label = "即将开始",
-            containerColor = Color(0xFFFFF1D6),
+            containerColor = Color(0xFFFFE9C7),
             contentColor = Color(0xFFB45309)
         )
         hasVoted -> VoteStatusVisual(
             label = "已参与",
-            containerColor = SuccessGreen.copy(alpha = 0.12f),
+            containerColor = Color(0xFFDDF7E7),
             contentColor = Color(0xFF166534)
         )
         else -> VoteStatusVisual(
             label = "进行中",
-            containerColor = PrimaryBlue.copy(alpha = 0.12f),
-            contentColor = PrimaryBlue
+            containerColor = Color(0xFFDCEBFF),
+            contentColor = Color(0xFF1D6FD6)
         )
     }
 }
@@ -110,11 +110,11 @@ fun VoteMetaChip(
     modifier: Modifier = Modifier
 ) {
     val (container, content) = when (tone) {
-        VoteChipTone.Primary -> PrimaryBlue.copy(alpha = 0.1f) to PrimaryBlue
-        VoteChipTone.Success -> SuccessGreen.copy(alpha = 0.12f) to Color(0xFF166534)
-        VoteChipTone.Warning -> Color(0xFFFFF4E5) to Color(0xFFB45309)
+        VoteChipTone.Primary -> Color(0xFFDCEBFF) to Color(0xFF1D6FD6)
+        VoteChipTone.Success -> Color(0xFFDDF7E7) to Color(0xFF166534)
+        VoteChipTone.Warning -> Color(0xFFFFE9C7) to Color(0xFFB45309)
         VoteChipTone.Danger -> Color(0xFFFEE2E2) to Color(0xFFB91C1C)
-        VoteChipTone.Neutral -> BackgroundLayer to TextSecondary
+        VoteChipTone.Neutral -> Color(0xFFF1F5F9) to Color(0xFF475569)
     }
 
     Surface(

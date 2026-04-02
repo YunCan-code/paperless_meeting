@@ -12,6 +12,7 @@ import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.utils.Resource
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -80,6 +81,61 @@ class DetailViewModelTest {
         assertFalse(viewModel.isRefreshing.value)
     }
 
+    @Test
+    fun `首次检查活动投票时会携带当前用户ID`() = runTest {
+        stubCommonDependencies()
+        coEvery { repository.getMeetingById(7, 11) } returns Resource.Success(testMeeting(id = 7))
+
+        DetailViewModel(
+            repository = repository,
+            socketManager = socketManager,
+            userPreferences = userPreferences,
+            appSettingsState = appSettingsState,
+            savedStateHandle = SavedStateHandle(mapOf("meetingId" to "7"))
+        )
+
+        advanceUntilIdle()
+
+        coVerify { repository.getActiveVote(7, 11) }
+    }
+
+    @Test
+    fun `公共投票广播不会覆盖本地已投状态`() = runTest {
+        val votedVote = testVote(
+            id = 3,
+            meetingId = 7,
+            userVoted = true,
+            selectedOptionIds = listOf(9)
+        )
+
+        stubCommonDependencies()
+        coEvery { repository.getMeetingById(7, 11) } returns Resource.Success(testMeeting(id = 7))
+        coEvery { repository.getActiveVote(7, 11) } returns votedVote
+
+        val viewModel = DetailViewModel(
+            repository = repository,
+            socketManager = socketManager,
+            userPreferences = userPreferences,
+            appSettingsState = appSettingsState,
+            savedStateHandle = SavedStateHandle(mapOf("meetingId" to "7"))
+        )
+
+        advanceUntilIdle()
+
+        voteStateChangeEvent.emit(
+            testVote(
+                id = 3,
+                meetingId = 7,
+                userVoted = false,
+                selectedOptionIds = emptyList()
+            )
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.hasVoted.value)
+        assertEquals(listOf(9), viewModel.currentVote.value?.selected_option_ids)
+    }
+
     private fun stubCommonDependencies() {
         every { userPreferences.getUserId() } returns 11
         every { appSettingsState.getSocketBaseUrl() } returns "https://example.com"
@@ -94,7 +150,7 @@ class DetailViewModelTest {
         every { socketManager.connect(any()) } just runs
         every { socketManager.joinMeeting(any()) } just runs
 
-        coEvery { repository.getActiveVote(7) } returns null
+        coEvery { repository.getActiveVote(7, 11) } returns null
     }
 
     private fun testMeeting(id: Int): Meeting {
@@ -106,6 +162,32 @@ class DetailViewModelTest {
             endTime = "2026-03-27 10:00:00",
             location = "A100",
             host = "Host"
+        )
+    }
+
+    private fun testVote(
+        id: Int,
+        meetingId: Int,
+        userVoted: Boolean,
+        selectedOptionIds: List<Int>
+    ): Vote {
+        return Vote(
+            id = id,
+            meeting_id = meetingId,
+            title = "预算表决",
+            description = "说明",
+            is_multiple = false,
+            is_anonymous = false,
+            max_selections = 1,
+            duration_seconds = 60,
+            status = "active",
+            started_at = "2026-04-02T09:00:00",
+            created_at = "2026-04-02T08:55:00",
+            options = emptyList(),
+            remaining_seconds = 30,
+            wait_seconds = 0,
+            selected_option_ids = selectedOptionIds,
+            user_voted = userVoted
         )
     }
 }
