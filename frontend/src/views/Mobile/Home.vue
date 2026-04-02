@@ -406,7 +406,7 @@ const lotteryRoundTitle = computed(() => interactionOverview.lottery.current_rou
 const lotteryDescription = computed(() => {
   const lottery = interactionOverview.lottery
   if (lottery.session_status === 'rolling') return '抽签正在滚动中，当前无法加入或退出。'
-  if (lottery.winners?.length) return `本轮已产生 ${lottery.winners.length} 位中奖者。`
+  if (lottery.winners?.length) return `本轮已产生 ${lottery.winners.length} 位中签人员。`
   if (lottery.current_round) return `本轮为「${lottery.current_round.title}」，可根据状态加入或退出抽签池。`
   return '主持人准备轮次后，这里会开放加入入口。'
 })

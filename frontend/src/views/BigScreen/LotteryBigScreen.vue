@@ -57,7 +57,7 @@
               :loading="actionLoading"
               @click="stopRoll"
             >
-              停止开奖
+              停止抽签
             </el-button>
             <el-button plain size="large" :loading="actionLoading" @click="resetSession">
               重置会话
@@ -75,7 +75,7 @@
             <div class="rolling-card">
               <span class="rolling-label">{{ currentRoundTitle }}</span>
               <strong>{{ rollingDisplay }}</strong>
-              <p>主持人停止后立即生成本轮中奖结果</p>
+              <p>主持人停止后立即生成本轮抽签结果</p>
             </div>
           </div>
 
@@ -158,7 +158,7 @@
               </div>
             </div>
           </div>
-          <el-empty v-else description="尚未产生中奖结果" :image-size="80" />
+          <el-empty v-else description="尚未产生抽签结果" :image-size="80" />
         </section>
       </aside>
     </section>
@@ -212,10 +212,10 @@ const sessionSummary = computed(() => {
     return '先在后台创建轮次，再由现场大屏控制开始、停止与结果展示。'
   }
   if (session.value.session_status === 'rolling') {
-    return `当前正在滚动 ${currentRoundTitle.value}，主持人可随时停止并开奖。`
+    return `当前正在滚动 ${currentRoundTitle.value}，主持人可随时停止并确认本轮结果。`
   }
   if (session.value.winners?.length) {
-    return `本轮已产生 ${session.value.winners.length} 位中奖者，可继续准备下一轮或保留结果展示。`
+    return `本轮已产生 ${session.value.winners.length} 位中签人员，可继续准备下一轮或保留结果展示。`
   }
   return session.value.current_round
     ? `当前轮次将抽取 ${session.value.current_round.count} 人，等待主持控制开始。`
@@ -331,7 +331,7 @@ const stopRoll = async () => {
   try {
     const payload = await request.post(`/lottery/${meetingId}/stop`)
     applySnapshot(payload)
-    ElMessage.success('本轮开奖结果已生成')
+    ElMessage.success('本轮抽签结果已生成')
   } finally {
     actionLoading.value = false
   }
@@ -339,7 +339,7 @@ const stopRoll = async () => {
 
 const resetSession = async () => {
   try {
-    await ElMessageBox.confirm('确定重置当前会议的抽签会话吗？将清空参与池与轮次中奖结果。', '重置确认', {
+    await ElMessageBox.confirm('确定重置当前会议的抽签会话吗？将清空参与池与轮次抽签结果。', '重置确认', {
       type: 'warning',
       confirmButtonText: '重置',
       cancelButtonText: '取消'

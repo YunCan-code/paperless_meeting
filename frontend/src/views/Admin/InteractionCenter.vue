@@ -186,13 +186,13 @@
 
               <el-form label-position="top">
                 <el-form-item label="轮次名称">
-                  <el-input v-model="lotteryRoundForm.title" placeholder="如：一等奖 / 幸运奖" />
+                  <el-input v-model="lotteryRoundForm.title" placeholder="如：第一轮 / 第二轮 / 主席台抽签" />
                 </el-form-item>
                 <div class="inline-grid">
-                  <el-form-item label="中奖人数">
+                  <el-form-item label="抽取人数">
                     <el-input-number v-model="lotteryRoundForm.count" :min="1" :max="100" />
                   </el-form-item>
-                  <el-form-item label="重复中奖">
+                  <el-form-item label="允许重复中签">
                     <el-switch v-model="lotteryRoundForm.allow_repeat" inline-prompt active-text="允许" inactive-text="不允许" />
                   </el-form-item>
                 </div>
@@ -208,7 +208,7 @@
                 <div class="panel-actions">
                   <el-button plain @click="openLotteryBigScreen">打开大屏</el-button>
                   <el-button type="primary" plain :disabled="!interactionOverview.lottery.current_round" @click="startLotteryRoll">开始滚动</el-button>
-                  <el-button type="danger" plain :disabled="interactionOverview.lottery.session_status !== 'rolling'" @click="stopLotteryRoll">停止开奖</el-button>
+                  <el-button type="danger" plain :disabled="interactionOverview.lottery.session_status !== 'rolling'" @click="stopLotteryRoll">停止抽签</el-button>
                   <el-button plain @click="resetLotterySession">重置会话</el-button>
                 </div>
               </div>
