@@ -284,7 +284,8 @@ async def join_lottery_pool(
     _sync_session_after_participant_change(meeting_id, lottery_session, session)
     session.commit()
 
-    return await _broadcast_snapshot(meeting_id, session)
+    await _broadcast_snapshot(meeting_id, session)
+    return build_session_snapshot(meeting_id, session, user_id=request.user_id)
 
 
 @router.post("/{meeting_id}/participants/quit")
@@ -302,7 +303,8 @@ async def quit_lottery_pool(
     _sync_session_after_participant_change(meeting_id, lottery_session, session)
     session.commit()
 
-    return await _broadcast_snapshot(meeting_id, session)
+    await _broadcast_snapshot(meeting_id, session)
+    return build_session_snapshot(meeting_id, session, user_id=request.user_id)
 
 
 @router.post("/{meeting_id}/participants/admin/add")

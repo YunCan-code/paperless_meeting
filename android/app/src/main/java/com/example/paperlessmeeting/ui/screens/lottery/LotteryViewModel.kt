@@ -112,7 +112,12 @@ class LotteryViewModel @Inject constructor(
         viewModelScope.launch {
             socketManager.lotterySessionEvent.collect { session ->
                 if (session.meeting_id == meetingId) {
-                    handleSessionUpdate(session)
+                    handleSessionUpdate(
+                        session.mergePublicSessionUpdate(
+                            currentUserId = userId.takeIf { it > 0 },
+                            previousSession = _uiState.value
+                        )
+                    )
                 }
             }
         }

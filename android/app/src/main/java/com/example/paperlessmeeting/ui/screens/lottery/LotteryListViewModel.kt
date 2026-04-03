@@ -193,8 +193,9 @@ class LotteryListViewModel @Inject constructor(
 
     private fun handleRealtimeSessionUpdate(session: LotterySession) {
         val previousSession = _uiState.value.currentDisplaySession
-        if (shouldAnnounceWinner(previousSession, session)) {
-            val roundLabel = session.current_round?.roundOrderLabel() ?: "本轮"
+        val mergedSession = session.mergePublicSessionUpdate(resolveCurrentUserId(), previousSession)
+        if (shouldAnnounceWinner(previousSession, mergedSession)) {
+            val roundLabel = mergedSession.current_round?.roundOrderLabel() ?: "本轮"
             _winnerAnnouncement.tryEmit(
                 WinnerAnnouncementData(
                     title = "${roundLabel}中签提醒",
@@ -202,14 +203,18 @@ class LotteryListViewModel @Inject constructor(
                 )
             )
         }
-        updateCurrentDisplaySession(session)
+        updateCurrentDisplaySession(mergedSession)
     }
 
     private fun shouldAnnounceWinner(previousState: LotterySession?, newState: LotterySession): Boolean {
         if (previousState?.session_status != "rolling") return false
         if (newState.session_status !in setOf("result", "completed")) return false
-        val currentUserIdValue = currentUserId ?: userPreferences.getUserId().takeIf { it > 0 } ?: return false
+        val currentUserIdValue = resolveCurrentUserId() ?: return false
         return newState.winners.any { winnerMatchesUser(it, currentUserIdValue) }
+    }
+
+    private fun resolveCurrentUserId(): Int? {
+        return currentUserId ?: userPreferences.getUserId().takeIf { it > 0 }
     }
 
     private fun winnerMatchesUser(winner: LotteryWinner, userId: Int): Boolean {

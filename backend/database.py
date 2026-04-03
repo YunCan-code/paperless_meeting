@@ -56,16 +56,28 @@ def create_db_and_tables():
         # 如果甚至 "UniqueViolation" 等错误，通常意味着另一个 worker 已经创建了表
         print(f"[WARN] Database creation warning (likely race condition): {e}")
 
+
+def _table_exists(inspector, table_name: str) -> bool:
+    return table_name in inspector.get_table_names()
+
+
+def _get_column_names(inspector, table_name: str) -> set[str]:
+    try:
+        return {column["name"] for column in inspector.get_columns(table_name)}
+    except Exception as e:
+        print(f"[WARN] Failed to inspect columns for {table_name}: {e}")
+        return set()
+
 def _ensure_compatible_device_schema():
     """
     兼容旧库，补齐新增的设备版本号字段。
     """
     try:
         inspector = inspect(engine)
-        if "device" not in inspector.get_table_names():
+        if not _table_exists(inspector, "device"):
             return
 
-        existing_columns = {column["name"] for column in inspector.get_columns("device")}
+        existing_columns = _get_column_names(inspector, "device")
         if "app_version_code" in existing_columns:
             return
 
@@ -82,10 +94,10 @@ def _ensure_compatible_meeting_schema():
     """
     try:
         inspector = inspect(engine)
-        if "meeting" not in inspector.get_table_names():
+        if not _table_exists(inspector, "meeting"):
             return
 
-        existing_columns = {column["name"] for column in inspector.get_columns("meeting")}
+        existing_columns = _get_column_names(inspector, "meeting")
         statements = []
 
         if "manual_attendees" not in existing_columns:
@@ -141,10 +153,10 @@ def _ensure_compatible_vote_schema():
     """
     try:
         inspector = inspect(engine)
-        if "vote" not in inspector.get_table_names():
+        if not _table_exists(inspector, "vote"):
             return
 
-        existing_columns = {column["name"] for column in inspector.get_columns("vote")}
+        existing_columns = _get_column_names(inspector, "vote")
         statements = []
 
         if "countdown_seconds" not in existing_columns:
@@ -176,26 +188,26 @@ def _ensure_compatible_lottery_schema():
     """
     try:
         inspector = inspect(engine)
-        if "lottery" not in inspector.get_table_names():
+        if not _table_exists(inspector, "lottery"):
             return
 
-        existing_columns = {column["name"] for column in inspector.get_columns("lottery")}
+        existing_columns = _get_column_names(inspector, "lottery")
+        session_table_name = "lotterysession"
+        session_columns = _get_column_names(inspector, session_table_name) if _table_exists(inspector, session_table_name) else set()
 
         with engine.begin() as connection:
             if "sort_order" not in existing_columns:
-                connection.execute(text("ALTER TABLE lottery ADD COLUMN sort_order INTEGER DEFAULT 0"))
+                connection.execute(text("ALTER TABLE lottery ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0"))
                 print("[INFO] Added lottery.sort_order column")
 
-            session_table_name = "lotterysession"
-            if session_table_name in inspector.get_table_names():
-                session_columns = {column["name"] for column in inspector.get_columns(session_table_name)}
-                if "self_service_locked" not in session_columns:
-                    if "sqlite" in DATABASE_URL:
-                        connection.execute(text("ALTER TABLE lotterysession ADD COLUMN self_service_locked BOOLEAN DEFAULT 0"))
-                    else:
-                        connection.execute(text("ALTER TABLE lotterysession ADD COLUMN self_service_locked BOOLEAN DEFAULT FALSE"))
-                    print("[INFO] Added lotterysession.self_service_locked column")
+            if session_columns and "self_service_locked" not in session_columns:
+                if "sqlite" in DATABASE_URL:
+                    connection.execute(text("ALTER TABLE lotterysession ADD COLUMN self_service_locked BOOLEAN DEFAULT 0"))
+                else:
+                    connection.execute(text("ALTER TABLE lotterysession ADD COLUMN IF NOT EXISTS self_service_locked BOOLEAN DEFAULT FALSE"))
+                print("[INFO] Added lotterysession.self_service_locked column")
 
+            if session_columns or _table_exists(inspect(engine), session_table_name):
                 connection.execute(
                     text(
                         "UPDATE lotterysession SET self_service_locked = 1 "
@@ -243,6 +255,7 @@ def _ensure_compatible_lottery_schema():
         print("[INFO] Normalized lottery status values")
     except Exception as e:
         print(f"[WARN] Lottery schema compatibility check failed: {e}")
+        raise
 
 def get_session():
     """

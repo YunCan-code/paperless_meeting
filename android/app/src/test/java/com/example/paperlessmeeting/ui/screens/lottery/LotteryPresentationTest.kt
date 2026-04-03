@@ -1,6 +1,7 @@
 package com.example.paperlessmeeting.ui.screens.lottery
 
 import com.example.paperlessmeeting.domain.model.LotteryRound
+import com.example.paperlessmeeting.domain.model.LotteryParticipant
 import com.example.paperlessmeeting.domain.model.LotterySession
 import com.example.paperlessmeeting.domain.model.LotteryWinner
 import com.example.paperlessmeeting.domain.model.Meeting
@@ -211,5 +212,52 @@ class LotteryPresentationTest {
         val resultRound = resolveCurrentDisplayResultRound(session)
 
         assertNull(resultRound)
+    }
+
+    @Test
+    fun `mergePublicSessionUpdate 在参与池包含当前用户时回算为已参与`() {
+        val previousSession = LotterySession(
+            meeting_id = 85,
+            session_status = "collecting",
+            joined = true
+        )
+        val publicSession = LotterySession(
+            meeting_id = 85,
+            session_status = "collecting",
+            joined = false,
+            participants = listOf(
+                LotteryParticipant(
+                    id = 48,
+                    user_id = 48,
+                    name = "王洪文",
+                    status = "joined"
+                )
+            ),
+            participants_count = 1
+        )
+
+        val merged = publicSession.mergePublicSessionUpdate(currentUserId = 48, previousSession = previousSession)
+
+        assertEquals(true, merged.joined)
+    }
+
+    @Test
+    fun `mergePublicSessionUpdate 在参与池不包含当前用户时回算为未参与`() {
+        val previousSession = LotterySession(
+            meeting_id = 85,
+            session_status = "collecting",
+            joined = true
+        )
+        val publicSession = LotterySession(
+            meeting_id = 85,
+            session_status = "collecting",
+            joined = false,
+            participants = emptyList(),
+            participants_count = 0
+        )
+
+        val merged = publicSession.mergePublicSessionUpdate(currentUserId = 48, previousSession = previousSession)
+
+        assertEquals(false, merged.joined)
     }
 }

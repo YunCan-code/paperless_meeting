@@ -101,6 +101,21 @@ fun LotterySession.finishedRounds(): List<LotteryRound> {
     return sortedRounds().filter { it.status == "finished" || it.winners.isNotEmpty() }
 }
 
+fun LotterySession.mergePublicSessionUpdate(
+    currentUserId: Int?,
+    previousSession: LotterySession?
+): LotterySession {
+    val resolvedJoined = when {
+        currentUserId != null -> participants.any { participant ->
+            participant.user_id == currentUserId || participant.id == currentUserId
+        }
+        previousSession != null -> previousSession.joined
+        else -> joined
+    }
+
+    return copy(joined = resolvedJoined)
+}
+
 fun LotterySession.currentResultRound(): LotteryRound? {
     val round = current_round ?: return null
     if (winners.isEmpty() && round.winners.isEmpty()) return null
