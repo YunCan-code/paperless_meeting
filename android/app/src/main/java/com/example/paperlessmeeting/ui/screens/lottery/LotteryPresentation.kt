@@ -9,8 +9,6 @@ import com.example.paperlessmeeting.ui.components.lottery.LotteryChipTone
 import java.time.LocalDateTime
 
 private val lotteryRoundNumberMap = listOf("零", "一", "二", "三", "四", "五", "六", "七", "八", "九")
-private const val LotterySlotStageMinNames = 12
-
 enum class LotteryStageMode {
     Idle,
     Rolling,
@@ -133,19 +131,10 @@ fun LotterySession.stageMode(): LotteryStageMode {
 }
 
 fun LotterySession.slotMachineNames(): List<String> {
-    val baseNames = participants
+    return participants
         .mapNotNull { it.name?.trim() }
         .filter { it.isNotBlank() }
         .distinct()
-
-    if (baseNames.isEmpty()) return emptyList()
-    if (baseNames.size >= LotterySlotStageMinNames) return baseNames.take(LotterySlotStageMinNames)
-
-    val filled = mutableListOf<String>()
-    while (filled.size < LotterySlotStageMinNames) {
-        filled += baseNames
-    }
-    return filled.take(LotterySlotStageMinNames)
 }
 
 fun LotterySession.mergePublicSessionUpdate(

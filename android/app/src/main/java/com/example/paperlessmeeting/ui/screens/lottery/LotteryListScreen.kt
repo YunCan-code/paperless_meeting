@@ -5,24 +5,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +34,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +43,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,6 +54,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,8 +62,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -73,19 +78,19 @@ import com.example.paperlessmeeting.domain.model.LotteryHistoryResponse
 import com.example.paperlessmeeting.domain.model.LotteryRound
 import com.example.paperlessmeeting.domain.model.LotterySession
 import com.example.paperlessmeeting.domain.model.Meeting
-import com.example.paperlessmeeting.ui.components.lottery.LotteryActionBar
 import com.example.paperlessmeeting.ui.components.lottery.LotteryCardBorderColor
 import com.example.paperlessmeeting.ui.components.lottery.LotteryCardFrame
 import com.example.paperlessmeeting.ui.components.lottery.LotteryChipTone
 import com.example.paperlessmeeting.ui.components.lottery.LotteryEmptyStateCard
+import com.example.paperlessmeeting.ui.components.lottery.LotteryHelpMenuButton
 import com.example.paperlessmeeting.ui.components.lottery.LotteryInlineEmptyState
 import com.example.paperlessmeeting.ui.components.lottery.LotteryMetaChip
+import com.example.paperlessmeeting.ui.components.lottery.LotteryResultRoundCard
 import com.example.paperlessmeeting.ui.components.lottery.LotteryRoundRecordCard
 import com.example.paperlessmeeting.ui.components.lottery.LotterySectionHeader
 import com.example.paperlessmeeting.ui.components.lottery.LotterySlotMachineStage
 import com.example.paperlessmeeting.ui.components.lottery.LotteryStagePlaceholder
 import com.example.paperlessmeeting.ui.components.lottery.LotteryStatusPill
-import com.example.paperlessmeeting.ui.components.lottery.LotterySupportInfoRow
 import com.example.paperlessmeeting.ui.components.lottery.LotteryWinnerStage
 import com.example.paperlessmeeting.ui.theme.PrimaryBlue
 import com.example.paperlessmeeting.ui.theme.TextPrimary
@@ -93,6 +98,15 @@ import com.example.paperlessmeeting.ui.theme.TextSecondary
 
 private val LotteryPageBackground = Color(0xFFF3F6FB)
 private val LotteryRecordBorder = LotteryCardBorderColor
+private val LotteryOverviewWideBreakpoint = 720.dp
+private val LotteryPanelMinHeight = 320.dp
+private val LotteryWideResultViewportHeight = 560.dp
+internal const val LotteryWideResultListTestTag = "lottery_wide_result_list"
+internal const val LotteryCurrentPanelTestTag = "lottery_current_panel"
+internal const val LotteryResultPanelTestTag = "lottery_result_panel"
+internal const val LotteryHeaderHelpButtonTestTag = "lottery_header_help_button"
+internal const val LotteryHeaderActionButtonTestTag = "lottery_header_action_button"
+private const val LotteryActionHelpText = "抽签开始后，无法退出或加入"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,75 +199,11 @@ fun LotteryListScreen(
             }
 
             item {
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val isWideLayout = maxWidth >= 720.dp
-                    if (isWideLayout) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .weight(7f)
-                                    .fillMaxHeight(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                LotterySectionHeader(title = "当前抽签")
-                                CurrentLotteryPanel(
-                                    meeting = uiState.currentDisplayMeeting,
-                                    session = uiState.currentDisplaySession,
-                                    actionError = uiState.currentActionError,
-                                    actionInProgress = uiState.actionInProgress,
-                                    onJoin = viewModel::joinCurrentDisplayLottery,
-                                    onQuit = viewModel::quitCurrentDisplayLottery,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                )
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .weight(3f)
-                                    .fillMaxHeight(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                LotterySectionHeader(title = "中签结果")
-                                CurrentLotteryResultPanel(
-                                    meeting = uiState.currentDisplayMeeting,
-                                    resultRound = uiState.currentDisplayResultRound,
-                                    session = uiState.currentDisplaySession,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                )
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            LotterySectionHeader(title = "当前抽签")
-                            CurrentLotteryPanel(
-                                meeting = uiState.currentDisplayMeeting,
-                                session = uiState.currentDisplaySession,
-                                actionError = uiState.currentActionError,
-                                actionInProgress = uiState.actionInProgress,
-                                onJoin = viewModel::joinCurrentDisplayLottery,
-                                onQuit = viewModel::quitCurrentDisplayLottery
-                            )
-                            LotterySectionHeader(title = "中签结果")
-                            CurrentLotteryResultPanel(
-                                meeting = uiState.currentDisplayMeeting,
-                                resultRound = uiState.currentDisplayResultRound,
-                                session = uiState.currentDisplaySession
-                            )
-                        }
-                    }
-                }
+                LotteryOverviewSection(
+                    uiState = uiState,
+                    onJoin = viewModel::joinCurrentDisplayLottery,
+                    onQuit = viewModel::quitCurrentDisplayLottery
+                )
             }
 
             item {
@@ -306,6 +256,114 @@ fun LotteryListScreen(
     }
 }
 
+@Composable
+internal fun LotteryOverviewSection(
+    uiState: LotteryListUiState,
+    onJoin: () -> Unit,
+    onQuit: () -> Unit,
+    modifier: Modifier = Modifier,
+    forceWideLayout: Boolean? = null
+) {
+    var containerWidthPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    var currentLotteryPanelHeightPx by remember { mutableIntStateOf(0) }
+    val isWideLayout = forceWideLayout ?: with(density) {
+        containerWidthPx.toDp() >= LotteryOverviewWideBreakpoint
+    }
+    val wideResultPanelHeight = with(density) {
+        currentLotteryPanelHeightPx.takeIf { it > 0 }?.toDp()
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { size -> containerWidthPx = size.width }
+    ) {
+        if (isWideLayout) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(7f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    LotterySectionHeader(title = "当前抽签")
+                    Box(
+                        modifier = Modifier.onSizeChanged { size ->
+                            currentLotteryPanelHeightPx = size.height
+                        }
+                    ) {
+                        CurrentLotteryPanel(
+                            meeting = uiState.currentDisplayMeeting,
+                            session = uiState.currentDisplaySession,
+                            actionError = uiState.currentActionError,
+                            actionInProgress = uiState.actionInProgress,
+                            onJoin = onJoin,
+                            onQuit = onQuit
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.weight(3f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    LotterySectionHeader(title = "中签结果")
+                    CurrentLotteryResultPanel(
+                        meeting = uiState.currentDisplayMeeting,
+                        resultRound = uiState.currentDisplayResultRound,
+                        session = uiState.currentDisplaySession,
+                        isWideLayout = true,
+                        widePanelHeight = wideResultPanelHeight
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                LotterySectionHeader(title = "当前抽签")
+                CurrentLotteryPanel(
+                    meeting = uiState.currentDisplayMeeting,
+                    session = uiState.currentDisplaySession,
+                    actionError = uiState.currentActionError,
+                    actionInProgress = uiState.actionInProgress,
+                    onJoin = onJoin,
+                    onQuit = onQuit
+                )
+                LotterySectionHeader(title = "中签结果")
+                CurrentLotteryResultPanel(
+                    meeting = uiState.currentDisplayMeeting,
+                    resultRound = uiState.currentDisplayResultRound,
+                    session = uiState.currentDisplaySession,
+                    isWideLayout = false,
+                    widePanelHeight = null
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LotteryPanelBodyContainer(
+    modifier: Modifier = Modifier,
+    minHeight: Dp = LotteryPanelMinHeight,
+    contentAlignment: Alignment = Alignment.Center,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight),
+        contentAlignment = contentAlignment
+    ) {
+        content()
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CurrentLotteryPanel(
@@ -318,24 +376,29 @@ private fun CurrentLotteryPanel(
     modifier: Modifier = Modifier
 ) {
     if (meeting == null) {
-        LotteryEmptyStateCard(
-            icon = Icons.Default.Schedule,
-            title = "当前暂无可展示会议",
-            description = "今天还没有可展示的抽签会话。",
-            modifier = modifier
-        )
+        LotteryCardFrame(modifier = modifier) {
+            LotteryPanelBodyContainer {
+                LotteryInlineEmptyState(
+                    icon = Icons.Default.Schedule,
+                    title = "当前暂无可展示会议",
+                    description = "今天还没有可展示的抽签会话。"
+                )
+            }
+        }
         return
     }
 
     val displayRound = session?.displayRound()
     val headerState = session?.headerState()
     val actionState = session?.actionState()
-    val nextRoundHint = session?.nextRoundHint(displayRound)
     val stageMode = session?.stageMode() ?: LotteryStageMode.Idle
     val stageNames = session?.slotMachineNames().orEmpty()
     val currentResultRound = session?.currentResultRound()
+    val topActionLabel = actionState?.primaryLabel ?: actionState?.secondaryLabel
+    val topActionEnabled = actionState?.primaryEnabled == true || actionState?.secondaryEnabled == true
+    val usesPrimaryActionButton = actionState?.primaryLabel != null
 
-    LotteryCardFrame(modifier = modifier.fillMaxHeight()) {
+    LotteryCardFrame(modifier = modifier.testTag(LotteryCurrentPanelTestTag)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -367,41 +430,56 @@ private fun CurrentLotteryPanel(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            LotteryMetaChip(
-                text = headerState?.attendeeLabel ?: "待开始",
-                tone = headerState?.attendeeTone ?: LotteryChipTone.Neutral,
-                leadingIcon = if (session?.joined == true) Icons.Default.CheckCircle else Icons.Default.Schedule
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = meeting.title,
-                color = TextSecondary,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = displayRound?.title ?: "等待主持人开始抽签",
-                color = TextPrimary,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = headerState?.supportingText ?: "当前暂无抽签会话，请等待主持人设置轮次。",
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 21.sp
-            )
-        }
-
-        nextRoundHint?.let {
-            LotterySupportInfoRow(
-                label = "下一轮",
-                value = it.removePrefix("下一轮：")
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LotteryMetaChip(
+                    text = headerState?.attendeeLabel ?: "待开始",
+                    tone = headerState?.attendeeTone ?: LotteryChipTone.Neutral,
+                    leadingIcon = if (session?.joined == true) Icons.Default.CheckCircle else Icons.Default.Schedule
+                )
+                LotteryHelpMenuButton(
+                    helpText = LotteryActionHelpText,
+                    modifier = Modifier.testTag(LotteryHeaderHelpButtonTestTag)
+                )
+                topActionLabel?.let { label ->
+                    if (usesPrimaryActionButton) {
+                        Button(
+                            onClick = onJoin,
+                            enabled = topActionEnabled && !actionInProgress,
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            modifier = Modifier
+                                .sizeIn(minHeight = 40.dp)
+                                .testTag(LotteryHeaderActionButtonTestTag)
+                        ) {
+                            Text(
+                                text = if (actionInProgress) "处理中..." else label,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onQuit,
+                            enabled = topActionEnabled && !actionInProgress,
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF4A3A3)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB42318)),
+                            modifier = Modifier
+                                .sizeIn(minHeight = 40.dp)
+                                .testTag(LotteryHeaderActionButtonTestTag)
+                        ) {
+                            Text(
+                                text = if (actionInProgress) "处理中..." else label,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         when (stageMode) {
@@ -409,7 +487,7 @@ private fun CurrentLotteryPanel(
                 LotterySlotMachineStage(
                     names = stageNames,
                     modifier = Modifier.fillMaxWidth(),
-                    minHeight = 320.dp
+                    minHeight = LotteryPanelMinHeight
                 )
             }
 
@@ -421,7 +499,7 @@ private fun CurrentLotteryPanel(
                     title = currentResultRound?.title ?: displayRound?.title ?: "本轮结果",
                     winnerNames = winnerNames,
                     modifier = Modifier.fillMaxWidth(),
-                    minHeight = 320.dp
+                    minHeight = LotteryPanelMinHeight
                 )
             }
 
@@ -431,26 +509,13 @@ private fun CurrentLotteryPanel(
                     title = displayRound?.title ?: "等待主持人开始抽签",
                     description = headerState?.supportingText ?: "当前暂无抽签会话，请等待主持人设置轮次。",
                     modifier = Modifier.fillMaxWidth(),
-                    minHeight = 320.dp
+                    minHeight = LotteryPanelMinHeight
                 )
             }
         }
 
         if (!actionError.isNullOrBlank()) {
             LotteryInlineErrorCard(message = actionError)
-        }
-
-        actionState?.let { state ->
-            LotteryActionBar(
-                message = "抽签开始后，无法退出或加入。",
-                primaryLabel = state.primaryLabel,
-                primaryEnabled = state.primaryEnabled,
-                secondaryLabel = state.secondaryLabel,
-                secondaryEnabled = state.secondaryEnabled,
-                actionInProgress = actionInProgress,
-                onPrimaryClick = onJoin,
-                onSecondaryClick = onQuit
-            )
         }
     }
 }
@@ -461,6 +526,8 @@ private fun CurrentLotteryResultPanel(
     meeting: Meeting?,
     resultRound: LotteryRound?,
     session: LotterySession?,
+    isWideLayout: Boolean,
+    widePanelHeight: Dp?,
     modifier: Modifier = Modifier
 ) {
     val resultRounds = when {
@@ -468,87 +535,113 @@ private fun CurrentLotteryResultPanel(
         resultRound != null && resultRound.winners.isNotEmpty() -> listOf(resultRound)
         else -> emptyList()
     }
+    val latestRoundId = resultRounds.firstOrNull()?.id
+    val resolvedWidePanelHeight = (widePanelHeight ?: LotteryWideResultViewportHeight)
+        .coerceAtLeast(LotteryPanelMinHeight)
+    val resolvedModifier = if (isWideLayout) {
+        modifier
+            .height(resolvedWidePanelHeight)
+            .testTag(LotteryResultPanelTestTag)
+    } else {
+        modifier.testTag(LotteryResultPanelTestTag)
+    }
 
-    LotteryCardFrame(modifier = modifier.fillMaxHeight()) {
+    LotteryCardFrame(modifier = resolvedModifier) {
         when {
             meeting == null -> {
-                LotteryInlineEmptyState(
-                    icon = Icons.Default.EmojiEvents,
-                    title = "暂无结果",
-                    description = "先选择一个可展示的抽签会议。",
-                    modifier = Modifier.weight(1f, fill = true)
-                )
+                LotteryPanelBodyContainer(
+                    modifier = if (isWideLayout) Modifier.weight(1f, fill = true) else Modifier
+                ) {
+                    LotteryInlineEmptyState(
+                        icon = Icons.Default.EmojiEvents,
+                        title = "暂无结果",
+                        description = "先选择一个可展示的抽签会议。"
+                    )
+                }
             }
 
             resultRounds.isEmpty() -> {
-                LotteryInlineEmptyState(
-                    icon = Icons.Default.EmojiEvents,
-                    title = "结果暂未产生",
-                    description = "当前会议还没有可展示的中签名单。",
-                    modifier = Modifier.weight(1f, fill = true)
-                )
+                LotteryPanelBodyContainer(
+                    modifier = if (isWideLayout) Modifier.weight(1f, fill = true) else Modifier
+                ) {
+                    LotteryInlineEmptyState(
+                        icon = Icons.Default.EmojiEvents,
+                        title = "结果暂未产生",
+                        description = "当前会议还没有可展示的中签名单。"
+                    )
+                }
             }
 
             else -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    resultRounds.forEachIndexed { index, round ->
-                        val isLatest = index == 0
-                        val isCurrentResult = session?.currentResultRound()?.id == round.id
-
-                        LotteryStatusPill(
-                            text = when {
-                                isCurrentResult -> "当前结果"
-                                isLatest -> "最新结果"
-                                else -> "已抽取"
-                            },
-                            tone = when {
-                                isCurrentResult -> LotteryChipTone.Warning
-                                isLatest -> LotteryChipTone.Primary
-                                else -> LotteryChipTone.Neutral
-                            }
-                        )
-
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = round.roundOrderLabel(),
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = round.title,
-                                color = TextPrimary,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "抽取 ${round.winners.size} 人",
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                if (isWideLayout) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true)
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag(LotteryWideResultListTestTag),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                            contentPadding = PaddingValues(vertical = 4.dp)
                         ) {
-                            round.winners.forEach { winner ->
-                                LotteryMetaChip(
-                                    text = winner.displayName(),
-                                    tone = if (isLatest) LotteryChipTone.Primary else LotteryChipTone.Neutral
+                            items(resultRounds, key = { it.id }) { round ->
+                                val isLatest = latestRoundId == round.id
+                                val isCurrentResult = session?.currentResultRound()?.id == round.id
+                                val statusLabel = when {
+                                    isCurrentResult -> "当前结果"
+                                    isLatest -> "最新结果"
+                                    else -> "已抽取"
+                                }
+                                val statusTone = when {
+                                    isCurrentResult -> LotteryChipTone.Warning
+                                    isLatest -> LotteryChipTone.Primary
+                                    else -> LotteryChipTone.Neutral
+                                }
+
+                                LotteryResultRoundCard(
+                                    roundLabel = round.roundOrderLabel(),
+                                    title = round.title,
+                                    statusLabel = statusLabel,
+                                    statusTone = statusTone,
+                                    drawCount = round.winners.size,
+                                    winnerNames = round.winners.map { it.displayName() },
+                                    highlighted = isCurrentResult || isLatest
                                 )
                             }
                         }
+                    }
+                } else {
+                    LotteryPanelBodyContainer(contentAlignment = Alignment.TopStart) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            resultRounds.forEach { round ->
+                                val isLatest = latestRoundId == round.id
+                                val isCurrentResult = session?.currentResultRound()?.id == round.id
+                                val statusLabel = when {
+                                    isCurrentResult -> "当前结果"
+                                    isLatest -> "最新结果"
+                                    else -> "已抽取"
+                                }
+                                val statusTone = when {
+                                    isCurrentResult -> LotteryChipTone.Warning
+                                    isLatest -> LotteryChipTone.Primary
+                                    else -> LotteryChipTone.Neutral
+                                }
 
-                        if (index != resultRounds.lastIndex) {
-                            HorizontalDivider(color = Color(0xFFE7EDF5))
+                                LotteryResultRoundCard(
+                                    roundLabel = round.roundOrderLabel(),
+                                    title = round.title,
+                                    statusLabel = statusLabel,
+                                    statusTone = statusTone,
+                                    drawCount = round.winners.size,
+                                    winnerNames = round.winners.map { it.displayName() },
+                                    highlighted = isCurrentResult || isLatest
+                                )
+                            }
                         }
                     }
                 }

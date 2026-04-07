@@ -3,13 +3,13 @@ package com.example.paperlessmeeting.ui.components.lottery
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.LinearEasing
@@ -28,14 +29,20 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,11 +58,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.example.paperlessmeeting.ui.theme.CardBackground
 import com.example.paperlessmeeting.ui.theme.PrimaryBlue
 import com.example.paperlessmeeting.ui.theme.TextPrimary
 import com.example.paperlessmeeting.ui.theme.TextSecondary
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import kotlin.math.ceil
 
 enum class LotteryChipTone {
     Neutral,
@@ -81,6 +91,54 @@ private val LotteryStageBackground = Brush.verticalGradient(
     colors = listOf(Color(0xFFF7FBFF), Color(0xFFEAF3FF))
 )
 private val LotteryStageHighlight = Color(0xFFEDF5FF)
+private val LotterySlotItemHeight = 72.dp
+private val LotterySlotViewportHeight = 216.dp
+private const val LotterySlotColumnCount = 3
+private const val LotterySlotMinLoopItemCount = 18
+private const val LotterySlotBaseDurationMillis = 1800
+private const val LotterySlotDurationStepMillis = 220
+private const val LotterySlotDelayStepMillis = 180
+
+internal data class LotterySlotColumnSpec(
+    val items: List<String>,
+    val durationMillis: Int,
+    val startOffsetMillis: Int
+)
+
+internal fun buildLotterySlotColumns(
+    baseNames: List<String>,
+    columnCount: Int = LotterySlotColumnCount
+): List<LotterySlotColumnSpec> {
+    val names = baseNames
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .ifEmpty { listOf("待开始") }
+    val normalizedColumnCount = columnCount.coerceAtLeast(1)
+    val repeatCount = maxOf(
+        2,
+        ceil(LotterySlotMinLoopItemCount / names.size.toFloat()).toInt()
+    )
+
+    return List(normalizedColumnCount) { columnIndex ->
+        val rotated = rotateLotterySlotNames(names, columnIndex)
+        val halfTrack = buildList(rotated.size * repeatCount) {
+            repeat(repeatCount) {
+                addAll(rotated)
+            }
+        }
+        LotterySlotColumnSpec(
+            items = halfTrack + halfTrack,
+            durationMillis = LotterySlotBaseDurationMillis + (columnIndex * LotterySlotDurationStepMillis),
+            startOffsetMillis = columnIndex * LotterySlotDelayStepMillis
+        )
+    }
+}
+
+private fun rotateLotterySlotNames(names: List<String>, offset: Int): List<String> {
+    if (names.isEmpty()) return emptyList()
+    val shift = offset.mod(names.size)
+    return names.drop(shift) + names.take(shift)
+}
 
 @Composable
 fun LotteryStatusPill(
@@ -289,6 +347,53 @@ fun LotteryActionBar(
 }
 
 @Composable
+fun LotteryHelpMenuButton(
+    helpText: String,
+    modifier: Modifier = Modifier,
+    contentDescription: String = "抽签说明"
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.HelpOutline,
+                contentDescription = contentDescription,
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(max = 240.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "提示",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = helpText,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun LotteryInlineEmptyState(
     icon: ImageVector,
     title: String,
@@ -342,27 +447,22 @@ fun LotterySlotMachineStage(
     modifier: Modifier = Modifier,
     minHeight: Dp = 280.dp
 ) {
-    val columnCount = 3
-    val itemHeight = 72.dp
+    val itemHeight = LotterySlotItemHeight
     val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
-    val stageNames = if (names.isEmpty()) listOf("待开始") else names
-    val columns = List(columnCount) { columnIndex ->
-        val rotated = stageNames.drop(columnIndex) + stageNames.take(columnIndex)
-        if (rotated.isEmpty()) stageNames else rotated
-    }
+    val columns = remember(names) { buildLotterySlotColumns(names) }
     val infiniteTransition = rememberInfiniteTransition(label = "lottery-slot-stage")
-    val progresses = List(columnCount) { index ->
+    val progresses = columns.mapIndexed { index, spec ->
         infiniteTransition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
                 animation = tween(
-                    durationMillis = 1500 + index * 220,
+                    durationMillis = spec.durationMillis,
                     easing = LinearEasing
                 ),
                 repeatMode = RepeatMode.Restart,
                 initialStartOffset = StartOffset(
-                    offsetMillis = index * 180,
+                    offsetMillis = spec.startOffsetMillis,
                     offsetType = StartOffsetType.FastForward
                 )
             ),
@@ -425,29 +525,31 @@ fun LotterySlotMachineStage(
         )
 
         Row(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .height(LotterySlotViewportHeight),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            columns.forEachIndexed { index, baseNames ->
-                val trackNames = baseNames + baseNames
-                val shift = itemHeightPx * baseNames.size
+            columns.forEachIndexed { index, spec ->
+                val cycleDistance = itemHeightPx * (spec.items.size / 2f)
 
-                BoxWithConstraints(
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxSize()
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(20.dp))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .graphicsLayer {
-                                translationY = -(shift * progresses[index].value)
+                                translationY = -(cycleDistance * progresses[index].value)
                             },
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        trackNames.forEach { name ->
+                        spec.items.forEach { name ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -633,10 +735,12 @@ fun LotteryInfoChip(
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = Color(0xFFF4F7FB),
-        modifier = modifier
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
@@ -652,6 +756,141 @@ fun LotteryInfoChip(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun LotteryResultRoundCard(
+    roundLabel: String,
+    title: String,
+    statusLabel: String,
+    statusTone: LotteryChipTone,
+    drawCount: Int,
+    winnerNames: List<String>,
+    modifier: Modifier = Modifier,
+    highlighted: Boolean = false
+) {
+    val borderColor = when {
+        highlighted -> Color(0xFFD6E5FF)
+        else -> LotteryCardBorderColor
+    }
+    val nameContainerColor = when {
+        highlighted -> Color(0xFFF2F7FF)
+        else -> Color(0xFFF7F9FC)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = CardBackground,
+        border = BorderStroke(1.dp, borderColor),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = roundLabel,
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = title,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.widthIn(max = 180.dp)
+                ) {
+                    LotteryMetaChip(
+                        text = "抽取 $drawCount 人",
+                        tone = LotteryChipTone.Neutral
+                    )
+                    LotteryStatusPill(text = statusLabel, tone = statusTone)
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = nameContainerColor,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "中签名单",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    if (winnerNames.size <= 1) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 92.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = if (highlighted) Color(0xFFDCEBFF) else Color.White,
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (highlighted) Color(0xFFBCD6FF) else Color(0xFFE3EAF4)
+                                )
+                            ) {
+                                Text(
+                                    text = winnerNames.firstOrNull().orEmpty(),
+                                    color = TextPrimary,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            winnerNames.forEach { name ->
+                                LotteryMetaChip(
+                                    text = name,
+                                    tone = if (highlighted) LotteryChipTone.Primary else LotteryChipTone.Neutral
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
