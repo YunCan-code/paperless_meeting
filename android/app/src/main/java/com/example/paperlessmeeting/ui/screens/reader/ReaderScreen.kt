@@ -73,6 +73,7 @@ private val PaperSheetContainer = Color(0xFFF1E7D7)
 private val PaperPdfBackground = Color(0xFFF7EEDC)
 private val PaperPageTint = Color(0x30E7D5B4)
 private val PaperProgressTrack = Color(0xFFE4D8C6)
+private val ReaderControlCapsuleShape = RoundedCornerShape(50)
 
 private enum class ReadingDisplayMode {
     Standard,
@@ -963,68 +964,80 @@ private fun FloatingControlCapsule(
     onPenClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Surface(
-        color = palette.panelSurface,
-        shape = RoundedCornerShape(50),
-        shadowElevation = 8.dp,
+    Box(
         modifier = Modifier
-            .height(64.dp)
-            .shadow(16.dp, RoundedCornerShape(50), ambientColor = Color.Black.copy(alpha = 0.1f))
+            .padding(horizontal = 10.dp, vertical = 10.dp)
     ) {
-        Row(
+        Surface(
+            color = palette.panelSurface,
+            shape = ReaderControlCapsuleShape,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
             modifier = Modifier
-                .wrapContentWidth()
-                .padding(horizontal = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                .height(64.dp)
+                .shadow(
+                    elevation = 16.dp,
+                    shape = ReaderControlCapsuleShape,
+                    ambientColor = Color.Black.copy(alpha = 0.1f),
+                    spotColor = Color.Black.copy(alpha = 0.12f),
+                    clip = false
+                )
         ) {
-            // Left: Progress
-            Text(
-                text = "${currentPage + 1} / $totalPages",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFeatureSettings = "tnum",
-                    fontWeight = FontWeight.Medium
-                ),
-                color = palette.panelMutedText,
-                modifier = Modifier.padding(end = 16.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Left: Progress
+                Text(
+                    text = "${currentPage + 1} / $totalPages",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFeatureSettings = "tnum",
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = palette.panelMutedText,
+                    modifier = Modifier.padding(end = 16.dp)
+                )
 
-            // Vertical Divider
-            VerticalDivider(modifier = Modifier.height(20.dp), color = palette.divider)
+                // Vertical Divider
+                VerticalDivider(modifier = Modifier.height(20.dp), color = palette.divider)
 
-            // Right: Icons Container
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                
-                // 1. TOC (List)
-                IconButton(onClick = onTocClick) {
-                    Icon(Icons.Default.Menu, "TOC", tint = palette.panelMutedText)
-                }
-                
-                // 2. Thumbnails (Grid)
-                IconButton(onClick = onGridClick) {
-                    Icon(Icons.Default.Apps, "Thumbnails", tint = palette.panelMutedText)
-                }
+                // Right: Icons Container
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 
-                // 3. Annotation (Pen)
-                IconButton(
-                    onClick = onPenClick,
-                    enabled = isAnnotationEnabled
-                ) {
-                    val tint = if (isEditing) MaterialTheme.colorScheme.primary else palette.panelMutedText
-                    Icon(
-                        Icons.Default.Edit,
-                        "Annotate",
-                        tint = if (isAnnotationEnabled) tint else palette.panelMutedText.copy(alpha = 0.35f)
-                    )
-                }
+                    // 1. TOC (List)
+                    IconButton(onClick = onTocClick) {
+                        Icon(Icons.Default.Menu, "TOC", tint = palette.panelMutedText)
+                    }
 
-                // 4. Reading Background
-                IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        imageVector = Icons.Default.Palette,
-                        contentDescription = "切换阅读背景",
-                        tint = if (isPaperBackground) MaterialTheme.colorScheme.primary else palette.panelMutedText
-                    )
+                    // 2. Thumbnails (Grid)
+                    IconButton(onClick = onGridClick) {
+                        Icon(Icons.Default.Apps, "Thumbnails", tint = palette.panelMutedText)
+                    }
+
+                    // 3. Annotation (Pen)
+                    IconButton(
+                        onClick = onPenClick,
+                        enabled = isAnnotationEnabled
+                    ) {
+                        val tint = if (isEditing) MaterialTheme.colorScheme.primary else palette.panelMutedText
+                        Icon(
+                            Icons.Default.Edit,
+                            "Annotate",
+                            tint = if (isAnnotationEnabled) tint else palette.panelMutedText.copy(alpha = 0.35f)
+                        )
+                    }
+
+                    // 4. Reading Background
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = "切换阅读背景",
+                            tint = if (isPaperBackground) MaterialTheme.colorScheme.primary else palette.panelMutedText
+                        )
+                    }
                 }
             }
         }
