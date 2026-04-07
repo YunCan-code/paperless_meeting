@@ -101,6 +101,24 @@ fun LoginScreen(
                             )
                         )
                 )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 40.dp, bottom = 36.dp)
+                ) {
+                    Text(
+                        text = "阅文系统",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "绿色 · 低碳 · 高效",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
             }
 
             // Right Panel (Form)
