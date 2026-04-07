@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -44,6 +45,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,15 +69,35 @@ fun DashboardScreen(
     onReadingClick: (String, String, Int) -> Unit = { _, _, _ -> }, // url, name, page
     onLotteryClick: () -> Unit = {},
     onVoteClick: () -> Unit = {},
+    isActive: Boolean = true,
     viewModel: DashboardViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
     
     // Toast Handling
     val noticeController = LocalAppNoticeController.current
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { msg ->
             noticeController.showMessage(msg)
+        }
+    }
+
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            viewModel.refreshOnVisible()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, isActive) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && isActive) {
+                viewModel.refreshOnVisible()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

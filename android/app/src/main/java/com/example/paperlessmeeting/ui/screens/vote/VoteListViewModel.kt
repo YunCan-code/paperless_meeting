@@ -10,6 +10,7 @@ import com.example.paperlessmeeting.domain.model.Meeting
 import com.example.paperlessmeeting.domain.model.Vote
 import com.example.paperlessmeeting.domain.model.VoteResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -51,6 +52,8 @@ class VoteListViewModel @Inject constructor(
 
     private var currentVoteTimerJob: Job? = null
     private var trackedMeetingIds: Set<Int> = emptySet()
+    private var lastVisibleRefreshAtMs: Long = 0L
+    private val visibleRefreshThrottleMs: Long = 2_000L
 
     init {
         loadData()
@@ -60,7 +63,13 @@ class VoteListViewModel @Inject constructor(
     private fun observeSocketEvents() {
         viewModelScope.launch {
             socketManager.voteStateChangeEvent.collect {
-                loadData()
+                loadData(showLoading = false)
+            }
+        }
+
+        viewModelScope.launch {
+            socketManager.meetingChangedEvent.collect {
+                loadData(showLoading = false)
             }
         }
 
@@ -74,8 +83,16 @@ class VoteListViewModel @Inject constructor(
     }
 
     fun loadData() {
+        loadData(showLoading = true)
+    }
+
+    private fun loadData(showLoading: Boolean) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            if (showLoading) {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+            } else {
+                _uiState.update { it.copy(error = null) }
+            }
             try {
                 val previousState = _uiState.value
                 val previousDisplayVote = previousState.currentDisplayVote
@@ -176,11 +193,16 @@ class VoteListViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 stopCurrentVoteTimer()
+                val hasContent = _uiState.value.currentDisplayVote != null || _uiState.value.myVoteHistory.isNotEmpty()
                 _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message ?: "加载投票数据失败"
-                    )
+                    if (!showLoading && hasContent) {
+                        it.copy(isLoading = false)
+                    } else {
+                        it.copy(
+                            isLoading = false,
+                            error = e.message ?: "加载投票数据失败"
+                        )
+                    }
                 }
             }
         }
@@ -188,6 +210,14 @@ class VoteListViewModel @Inject constructor(
 
     fun refresh() {
         loadData()
+    }
+
+    fun refreshOnVisible() {
+        val now = Instant.now().toEpochMilli()
+        if (now - lastVisibleRefreshAtMs < visibleRefreshThrottleMs) return
+        lastVisibleRefreshAtMs = now
+        val hasContent = _uiState.value.currentDisplayVote != null || _uiState.value.myVoteHistory.isNotEmpty()
+        loadData(showLoading = !hasContent)
     }
 
     fun toggleCurrentVoteOption(optionId: Int) {
@@ -263,7 +293,7 @@ class VoteListViewModel @Inject constructor(
                         currentVoteActionError = null
                     )
                 }
-                loadData()
+                loadData(showLoading = false)
             } catch (e: Exception) {
                 val errorMessage = extractErrorMessage(e)
                 _uiState.update {
@@ -273,7 +303,7 @@ class VoteListViewModel @Inject constructor(
                     )
                 }
                 if (errorMessage.contains("已参与") || errorMessage.contains("已投过")) {
-                    loadData()
+                    loadData(showLoading = false)
                 }
             }
         }
@@ -400,7 +430,7 @@ class VoteListViewModel @Inject constructor(
                         }
                     }
                     if (waitLeft == 0) {
-                        loadData()
+                        loadData(showLoading = false)
                         break
                     }
                     continue
@@ -419,13 +449,13 @@ class VoteListViewModel @Inject constructor(
                         }
                     }
                     if (remainingLeft == 0) {
-                        loadData()
+                        loadData(showLoading = false)
                         break
                     }
                     continue
                 }
 
-                loadData()
+                loadData(showLoading = false)
                 break
             }
         }

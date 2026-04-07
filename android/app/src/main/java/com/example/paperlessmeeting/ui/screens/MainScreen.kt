@@ -260,7 +260,8 @@ fun MainScreen(
                                     },
                                     onLotteryClick = {
                                         navController.navigate(Screen.LotteryList.route)
-                                    }
+                                    },
+                                    isActive = currentRoute == MAIN_TABS_ROUTE && currentMainTabIndex == 0
                                 )
 
                                 1 -> com.example.paperlessmeeting.ui.screens.adaptive.AdaptiveMeetingScreen(
@@ -273,7 +274,9 @@ fun MainScreen(
                                     viewModel = sharedMeetingViewModel
                                 )
 
-                                2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen()
+                                2 -> com.example.paperlessmeeting.ui.screens.media.MediaScreen(
+                                    isActive = currentRoute == MAIN_TABS_ROUTE && currentMainTabIndex == 2
+                                )
 
                                 3 -> com.example.paperlessmeeting.ui.screens.settings.SettingsScreen(
                                     onLogout = onLogout

@@ -12,6 +12,7 @@ import com.example.paperlessmeeting.domain.model.LotterySession
 import com.example.paperlessmeeting.domain.model.LotteryWinner
 import com.example.paperlessmeeting.domain.model.Meeting
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,6 +35,7 @@ data class LotteryListUiState(
     val currentDisplaySession: LotterySession? = null,
     val currentDisplayResultRound: LotteryRound? = null,
     val historyLotteries: List<LotteryHistoryResponse> = emptyList(),
+    val expandedHistoryMeetingIds: Set<Int> = emptySet(),
     val isLoading: Boolean = false,
     val actionInProgress: Boolean = false,
     val error: String? = null,
@@ -57,6 +59,8 @@ class LotteryListViewModel @Inject constructor(
     private var currentUserId: Int? = null
     private var listenersStarted = false
     private var subscribedMeetingId: Int? = null
+    private var lastVisibleRefreshAtMs: Long = 0L
+    private val visibleRefreshThrottleMs: Long = 2_000L
 
     init {
         initSocketListener()
@@ -64,8 +68,16 @@ class LotteryListViewModel @Inject constructor(
     }
 
     fun loadData() {
+        loadData(showLoading = true)
+    }
+
+    private fun loadData(showLoading: Boolean) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            if (showLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            } else {
+                _uiState.value = _uiState.value.copy(error = null)
+            }
             try {
                 val todayStr = java.time.LocalDate.now().toString()
                 currentUserId = userPreferences.getUserId().takeIf { it > 0 }
@@ -98,16 +110,37 @@ class LotteryListViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "加载失败"
-                )
+                val hasContent = _uiState.value.currentDisplayMeeting != null || _uiState.value.historyLotteries.isNotEmpty()
+                _uiState.value = if (!showLoading && hasContent) {
+                    _uiState.value.copy(isLoading = false)
+                } else {
+                    _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message ?: "加载失败"
+                    )
+                }
             }
         }
     }
 
     fun refresh() {
         loadData()
+    }
+
+    fun refreshOnVisible() {
+        val now = Instant.now().toEpochMilli()
+        if (now - lastVisibleRefreshAtMs < visibleRefreshThrottleMs) return
+        lastVisibleRefreshAtMs = now
+        val hasContent = _uiState.value.currentDisplayMeeting != null || _uiState.value.historyLotteries.isNotEmpty()
+        loadData(showLoading = !hasContent)
+    }
+
+    fun toggleHistoryMeeting(meetingId: Int) {
+        val expanded = _uiState.value.expandedHistoryMeetingIds.toMutableSet()
+        if (!expanded.add(meetingId)) {
+            expanded.remove(meetingId)
+        }
+        _uiState.value = _uiState.value.copy(expandedHistoryMeetingIds = expanded)
     }
 
     fun joinCurrentDisplayLottery() {
@@ -171,6 +204,12 @@ class LotteryListViewModel @Inject constructor(
         viewModelScope.launch {
             socketManager.lotteryErrorEvent.collect { errorMessage ->
                 _uiState.value = _uiState.value.copy(currentActionError = errorMessage)
+            }
+        }
+
+        viewModelScope.launch {
+            socketManager.meetingChangedEvent.collect {
+                loadData(showLoading = false)
             }
         }
     }

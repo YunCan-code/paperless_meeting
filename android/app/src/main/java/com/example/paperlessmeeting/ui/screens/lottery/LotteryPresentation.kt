@@ -9,6 +9,13 @@ import com.example.paperlessmeeting.ui.components.lottery.LotteryChipTone
 import java.time.LocalDateTime
 
 private val lotteryRoundNumberMap = listOf("零", "一", "二", "三", "四", "五", "六", "七", "八", "九")
+private const val LotterySlotStageMinNames = 12
+
+enum class LotteryStageMode {
+    Idle,
+    Rolling,
+    Result
+}
 
 data class LotteryHeaderState(
     val lifecycleLabel: String,
@@ -101,6 +108,46 @@ fun LotterySession.finishedRounds(): List<LotteryRound> {
     return sortedRounds().filter { it.status == "finished" || it.winners.isNotEmpty() }
 }
 
+fun LotterySession.displayResultRounds(): List<LotteryRound> {
+    val displayRounds = mutableListOf<LotteryRound>()
+    currentResultRound()?.let { displayRounds += it }
+    finishedRounds()
+        .sortedWith(
+            compareByDescending<LotteryRound> { if (it.sort_order > 0) it.sort_order else Int.MIN_VALUE }
+                .thenByDescending { it.id }
+        )
+        .forEach { round ->
+            if (displayRounds.none { it.id == round.id }) {
+                displayRounds += round
+            }
+        }
+    return displayRounds
+}
+
+fun LotterySession.stageMode(): LotteryStageMode {
+    return when {
+        session_status == "rolling" -> LotteryStageMode.Rolling
+        currentResultRound() != null || session_status == "completed" -> LotteryStageMode.Result
+        else -> LotteryStageMode.Idle
+    }
+}
+
+fun LotterySession.slotMachineNames(): List<String> {
+    val baseNames = participants
+        .mapNotNull { it.name?.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+    if (baseNames.isEmpty()) return emptyList()
+    if (baseNames.size >= LotterySlotStageMinNames) return baseNames.take(LotterySlotStageMinNames)
+
+    val filled = mutableListOf<String>()
+    while (filled.size < LotterySlotStageMinNames) {
+        filled += baseNames
+    }
+    return filled.take(LotterySlotStageMinNames)
+}
+
 fun LotterySession.mergePublicSessionUpdate(
     currentUserId: Int?,
     previousSession: LotterySession?
@@ -151,6 +198,23 @@ fun LotterySession.roundSummaryLine(): String {
     }
 }
 
+fun LotterySession.primarySummaryLine(): String {
+    val current = current_round
+    return when {
+        session_status == "rolling" && current != null -> "${formatLotteryRoundOrder(current.sort_order)}正在抽签"
+        session_status == "result" && current != null -> "${formatLotteryRoundOrder(current.sort_order)}结果展示中"
+        session_status == "completed" -> "本场抽签已结束"
+        displayRound() != null -> "等待主持人开始抽签"
+        else -> "暂未设置可抽取轮次"
+    }
+}
+
+fun LotterySession.nextRoundHint(displayRound: LotteryRound? = this.displayRound()): String? {
+    val next = next_round ?: return null
+    if (displayRound?.id == next.id) return null
+    return "下一轮：${next.roundOrderLabel()}"
+}
+
 fun LotterySession.allowRepeatLabel(): String {
     return if (displayRound()?.allow_repeat == true) "允许重复抽签" else "不允许重复抽签"
 }
@@ -174,7 +238,7 @@ fun LotterySession.headerState(): LotteryHeaderState {
         lifecycleTone = lifecycleTone,
         attendeeLabel = if (joined) "已参与" else "未参与",
         attendeeTone = attendeeTone,
-        supportingText = roundSummaryLine()
+        supportingText = primarySummaryLine()
     )
 }
 
@@ -255,3 +319,23 @@ fun LotteryRound.winnerNamesSummary(): String {
 }
 
 fun LotteryWinner.displayName(): String = name ?: user_name ?: "未知用户"
+
+fun LotteryHistoryResponse.collapsedSummary(): String {
+    val displayRounds = rounds
+        .filter { it.status == "finished" || it.winners.isNotEmpty() }
+        .sortedWith(
+            compareByDescending<LotteryRound> { if (it.sort_order > 0) it.sort_order else Int.MIN_VALUE }
+                .thenByDescending { it.id }
+        )
+
+    val latestRound = displayRounds.firstOrNull()
+    if (latestRound == null) return "暂无已抽取结果"
+
+    val winnerSummary = latestRound.winners
+        .map { it.displayName() }
+        .take(2)
+        .joinToString(separator = "、")
+        .ifBlank { "已出结果" }
+
+    return "${displayRounds.size} 轮结果 · 最近${latestRound.roundOrderLabel()} · $winnerSummary"
+}

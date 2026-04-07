@@ -50,6 +50,9 @@ class HomeViewModel @Inject constructor(
     private val _actionMessage = MutableSharedFlow<String>()
     val actionMessage: SharedFlow<String> = _actionMessage.asSharedFlow()
 
+    private val _detailRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val detailRefreshSignal: SharedFlow<Unit> = _detailRefreshSignal.asSharedFlow()
+
     private val pageSize = 20
     private var hasMoreData = true
     private var isLoadingMore = false
@@ -101,6 +104,7 @@ class HomeViewModel @Inject constructor(
                 allMeetings.addAll(meetings.distinctBy { it.id })
                 hasMoreData = meetings.size >= pageSize
                 publishSuccess()
+                _detailRefreshSignal.tryEmit(Unit)
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error(e.message ?: "Unknown Error")
             }
@@ -259,6 +263,7 @@ class HomeViewModel @Inject constructor(
             allMeetings.addAll(meetings.distinctBy { it.id })
             hasMoreData = meetings.size >= pageSize
             publishSuccess()
+            _detailRefreshSignal.tryEmit(Unit)
         } catch (e: Exception) {
             if (_uiState.value !is HomeUiState.Success) {
                 _uiState.value = HomeUiState.Error(e.message ?: "Unknown Error")

@@ -2,12 +2,16 @@ package com.example.paperlessmeeting.ui.screens.media
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.paperlessmeeting.data.remote.MediaChangedData
 import com.example.paperlessmeeting.data.remote.ApiService
+import com.example.paperlessmeeting.data.remote.SocketManager
 import com.example.paperlessmeeting.domain.model.MediaBreadcrumb
 import com.example.paperlessmeeting.domain.model.MediaItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,7 +33,8 @@ data class MediaUiState(
 @HiltViewModel
 class MediaViewModel @Inject constructor(
     private val api: ApiService,
-    private val appSettingsState: com.example.paperlessmeeting.data.local.AppSettingsState
+    private val appSettingsState: com.example.paperlessmeeting.data.local.AppSettingsState,
+    private val socketManager: SocketManager
 ) : ViewModel() {
 
     val staticBaseUrl: String get() = appSettingsState.getStaticBaseUrl()
@@ -37,13 +42,25 @@ class MediaViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MediaUiState())
     val uiState = _uiState.asStateFlow()
 
+    private var socketInitialized = false
+    private var lastVisibleRefreshAtMs: Long = 0L
+    private val visibleRefreshThrottleMs: Long = 2_000L
+
     init {
         loadItems()
+        setupSocketIfNeeded()
     }
 
-    fun loadItems() {
+    fun loadItems(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, currentPage = 0, hasMore = false) }
+            _uiState.update {
+                it.copy(
+                    isLoading = showLoading,
+                    error = null,
+                    currentPage = 0,
+                    hasMore = false
+                )
+            }
             try {
                 val kind = _uiState.value.activeFilter.takeIf { it != "all" }
                 val page = api.getMediaItems(
@@ -150,5 +167,57 @@ class MediaViewModel @Inject constructor(
         if (_uiState.value.currentFolderId != null) {
             loadBreadcrumbs()
         }
+    }
+
+    fun refreshOnVisible() {
+        val now = Instant.now().toEpochMilli()
+        if (now - lastVisibleRefreshAtMs < visibleRefreshThrottleMs) return
+        lastVisibleRefreshAtMs = now
+        refreshSilently()
+    }
+
+    private fun refreshSilently() {
+        loadItems(showLoading = false)
+        if (_uiState.value.currentFolderId != null) {
+            loadBreadcrumbs()
+        }
+    }
+
+    private fun setupSocketIfNeeded() {
+        if (socketInitialized) return
+        socketInitialized = true
+        socketManager.connect(appSettingsState.getSocketBaseUrl())
+        viewModelScope.launch {
+            socketManager.mediaChangedEvent.collectLatest { data ->
+                handleMediaChanged(data)
+            }
+        }
+    }
+
+    private fun handleMediaChanged(data: MediaChangedData) {
+        if (!shouldRefreshCurrentFolder(data) && !shouldRefreshBreadcrumbs(data)) {
+            return
+        }
+        loadItems(showLoading = false)
+        if (shouldRefreshBreadcrumbs(data) && _uiState.value.currentFolderId != null) {
+            loadBreadcrumbs()
+        }
+    }
+
+    private fun shouldRefreshCurrentFolder(data: MediaChangedData): Boolean {
+        val currentFolderId = _uiState.value.currentFolderId
+        val touchedParents = setOf(data.parent_id, data.previous_parent_id)
+        return when (currentFolderId) {
+            null -> touchedParents.any { it == null }
+            else -> currentFolderId in touchedParents || data.item_id == currentFolderId
+        }
+    }
+
+    private fun shouldRefreshBreadcrumbs(data: MediaChangedData): Boolean {
+        val currentFolderId = _uiState.value.currentFolderId ?: return false
+        val breadcrumbIds = _uiState.value.breadcrumbs.map { it.id }.toSet() + currentFolderId
+        return data.item_id in breadcrumbIds ||
+            data.parent_id in breadcrumbIds ||
+            data.previous_parent_id in breadcrumbIds
     }
 }

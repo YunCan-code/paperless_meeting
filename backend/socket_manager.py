@@ -182,6 +182,13 @@ async def broadcast_meeting_changed(action: str, meeting_data: Optional[dict] = 
     await sio.emit('meeting_changed', payload)
 
 
+async def broadcast_media_changed(action: str, media_data: Optional[dict] = None):
+    payload = {"action": action}
+    if media_data:
+        payload.update(media_data)
+    await sio.emit('media_changed', payload)
+
+
 def _normalize_round_status_value(status: Optional[str]) -> str:
     return "draft" if status in {"pending", "waiting", "active"} else (status or "draft")
 

@@ -12,6 +12,7 @@ import subprocess
 
 from database import get_session
 from models import MediaItem, MediaItemRead, MediaItemPage, MediaItemUpdate, MediaItemMove
+from socket_manager import sio, broadcast_media_changed
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -34,6 +35,17 @@ except Exception:
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
 ALLOWED_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES
+
+
+def _notify_media_changed(action: str, payload: Optional[dict] = None) -> None:
+    try:
+        sio.start_background_task(
+            broadcast_media_changed,
+            action,
+            payload or {}
+        )
+    except Exception as e:
+        print(f"[Socket.IO] failed to broadcast media_changed: {e}")
 
 
 def _format_size(size: int) -> str:
@@ -293,6 +305,16 @@ def create_folder(
     session.add(folder)
     session.commit()
     session.refresh(folder)
+    _notify_media_changed(
+        "created",
+        {
+            "item_id": folder.id,
+            "parent_id": folder.parent_id,
+            "previous_parent_id": None,
+            "kind": folder.kind,
+            "visible_on_android": folder.visible_on_android,
+        }
+    )
     return _to_read(folder, session)
 
 
@@ -348,6 +370,16 @@ def upload_files(
             _build_video_thumbnail(save_path)
 
         created.append(_to_read(item, session))
+        _notify_media_changed(
+            "created",
+            {
+                "item_id": item.id,
+                "parent_id": item.parent_id,
+                "previous_parent_id": None,
+                "kind": item.kind,
+                "visible_on_android": item.visible_on_android,
+            }
+        )
 
     if not created:
         raise HTTPException(400, "没有支持的文件被上传（仅支持图片和视频）")
@@ -366,6 +398,7 @@ def update_item(
     if not item:
         raise HTTPException(404, "媒体项不存在")
 
+    previous_parent_id = item.parent_id
     if data.title is not None:
         item.title = data.title.strip()
     if data.visible_on_android is not None:
@@ -375,6 +408,16 @@ def update_item(
     session.add(item)
     session.commit()
     session.refresh(item)
+    _notify_media_changed(
+        "updated",
+        {
+            "item_id": item.id,
+            "parent_id": item.parent_id,
+            "previous_parent_id": previous_parent_id,
+            "kind": item.kind,
+            "visible_on_android": item.visible_on_android,
+        }
+    )
     return _to_read(item, session)
 
 
@@ -390,6 +433,7 @@ def move_item(
     if not item:
         raise HTTPException(404, "媒体项不存在")
 
+    previous_parent_id = item.parent_id
     target_id = data.parent_id
     if target_id is not None:
         if target_id == item_id:
@@ -409,6 +453,16 @@ def move_item(
     session.add(item)
     session.commit()
     session.refresh(item)
+    _notify_media_changed(
+        "moved",
+        {
+            "item_id": item.id,
+            "parent_id": item.parent_id,
+            "previous_parent_id": previous_parent_id,
+            "kind": item.kind,
+            "visible_on_android": item.visible_on_android,
+        }
+    )
     return _to_read(item, session)
 
 
@@ -420,8 +474,16 @@ def delete_item(item_id: int, session: Session = Depends(get_session)):
     if not item:
         raise HTTPException(404, "媒体项不存在")
 
+    deleted_payload = {
+        "item_id": item.id,
+        "parent_id": None,
+        "previous_parent_id": item.parent_id,
+        "kind": item.kind,
+        "visible_on_android": item.visible_on_android,
+    }
     _recursive_delete(item, session)
     session.commit()
+    _notify_media_changed("deleted", deleted_payload)
     return {"ok": True}
 
 

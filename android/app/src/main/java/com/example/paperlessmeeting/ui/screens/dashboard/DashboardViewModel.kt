@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
 
 sealed class DashboardUiState {
@@ -52,6 +53,8 @@ class DashboardViewModel @Inject constructor(
     private var currentMeetingIds: Set<Int> = emptySet()
     private var reconnectJob: Job? = null
     private var loadJob: Job? = null
+    private var lastSilentRefreshAtMs: Long = 0L
+    private val visibleRefreshThrottleMs: Long = 2_000L
 
     init {
         setupSocketIfNeeded()
@@ -60,6 +63,15 @@ class DashboardViewModel @Inject constructor(
 
     fun refreshData() {
         loadData()
+    }
+
+    fun refreshOnVisible() {
+        val now = Instant.now().toEpochMilli()
+        if (now - lastSilentRefreshAtMs < visibleRefreshThrottleMs) return
+        lastSilentRefreshAtMs = now
+        viewModelScope.launch {
+            refreshDataSilently()
+        }
     }
 
     fun deleteReadingProgress(uniqueId: String) {
@@ -192,7 +204,7 @@ class DashboardViewModel @Inject constructor(
 
                 launch {
                     socketManager.meetingChangedEvent.collect {
-                        loadData()
+                        refreshDataSilently()
                     }
                 }
             } catch (e: Exception) {
@@ -206,6 +218,73 @@ class DashboardViewModel @Inject constructor(
         reconnectJob = viewModelScope.launch {
             delay(1500)
             socketManager.connect(appSettingsState.getSocketBaseUrl())
+        }
+    }
+
+    private suspend fun refreshDataSilently() {
+        try {
+            val currentState = _uiState.value
+            val userName = when (currentState) {
+                is DashboardUiState.Success -> currentState.userName
+                else -> userPreferences.getUserName() ?: "用户"
+            }
+            val userId = userPreferences.getUserId().takeIf { it > 0 }
+
+            val todayStr = currentMeetingDate().toString()
+            val todayMeetings = repository.getMeetings(
+                limit = 100,
+                startDate = todayStr,
+                endDate = todayStr,
+                sort = "asc",
+                userId = userId
+            )
+
+            val now = currentMeetingDateTime()
+            val activeListWithTimes = todayMeetings.mapNotNull { meeting ->
+                try {
+                    val isoTime = meeting.startTime.replace(" ", "T")
+                    val time = java.time.LocalDateTime.parse(isoTime)
+                    Pair(meeting, time)
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            var startIndex = 0
+            for (i in 0 until activeListWithTimes.size - 1) {
+                val nextMeetingTime = activeListWithTimes[i + 1].second
+                val switchTime = nextMeetingTime.minusMinutes(15)
+                if (now.isAfter(switchTime)) {
+                    startIndex = i + 1
+                } else {
+                    break
+                }
+            }
+
+            val recentFiles = todayMeetings.flatMap { it.attachments.orEmpty() }.take(10)
+            val readingProgress = if (currentState is DashboardUiState.Success) {
+                currentState.readingProgress
+            } else {
+                readingProgressManager.getAllProgress()
+            }
+
+            _uiState.value = DashboardUiState.Success(
+                meetings = todayMeetings,
+                activeMeetings = todayMeetings,
+                recentFiles = recentFiles,
+                readingProgress = readingProgress,
+                initialPageIndex = startIndex,
+                userName = userName
+            )
+
+            currentMeetingIds = todayMeetings.map { it.id }.toSet()
+            joinMeetingRooms()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (_uiState.value !is DashboardUiState.Success) {
+                _uiState.value = DashboardUiState.Error(e.message ?: "Unknown error")
+            }
         }
     }
 }

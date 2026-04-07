@@ -73,7 +73,10 @@ import com.example.paperlessmeeting.ui.components.image.AppAsyncImage
 import com.example.paperlessmeeting.ui.components.image.MediaImageResolver
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -88,10 +91,12 @@ private val FolderBlueLight = Color(0xFFB8E8FF)
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MediaScreen(
+    isActive: Boolean = true,
     viewModel: MediaViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val staticBaseUrl = viewModel.staticBaseUrl
+    val lifecycleOwner = LocalLifecycleOwner.current
     var previewVideoItem by remember { mutableStateOf<MediaItem?>(null) }
     var previewImageItems by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
     var previewImageIndex by remember { mutableStateOf<Int?>(null) }
@@ -99,6 +104,24 @@ fun MediaScreen(
     val isPhone = screenWidthDp < 600
     val hPadding = if (isPhone) 16.dp else 28.dp
     val vPadding = if (isPhone) 16.dp else 24.dp
+
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            viewModel.refreshOnVisible()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, isActive) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && isActive) {
+                viewModel.refreshOnVisible()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     BackHandler(
         enabled = previewImageIndex != null ||

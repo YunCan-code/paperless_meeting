@@ -154,6 +154,16 @@ fun AdaptiveMeetingScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.detailRefreshSignal.collectLatest {
+            val meetingId = selectedMeetingId ?: return@collectLatest
+            refreshSelectedMeeting(
+                meetingId = meetingId,
+                showBlockingLoading = false
+            )
+        }
+    }
+
     LaunchedEffect(selectedMeetingId) {
         val meetingId = selectedMeetingId
         if (meetingId == null) {

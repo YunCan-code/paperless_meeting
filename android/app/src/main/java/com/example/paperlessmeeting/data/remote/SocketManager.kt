@@ -63,6 +63,9 @@ class SocketManager @Inject constructor(
     private val _meetingChangedEvent = MutableSharedFlow<MeetingChangedData>(extraBufferCapacity = 1)
     val meetingChangedEvent: SharedFlow<MeetingChangedData> = _meetingChangedEvent.asSharedFlow()
 
+    private val _mediaChangedEvent = MutableSharedFlow<MediaChangedData>(extraBufferCapacity = 1)
+    val mediaChangedEvent: SharedFlow<MediaChangedData> = _mediaChangedEvent.asSharedFlow()
+
     private val _connectionState = MutableSharedFlow<Boolean>(replay = 1)
     val connectionState: SharedFlow<Boolean> = _connectionState.asSharedFlow()
 
@@ -163,6 +166,17 @@ class SocketManager @Inject constructor(
                     Log.d(TAG, "Received meeting_changed: ${data.action}, meeting=${data.meeting_id}")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing meeting_changed", e)
+                }
+            }
+
+            socket?.on("media_changed") { args ->
+                try {
+                    val json = args[0] as JSONObject
+                    val data = gson.fromJson(json.toString(), MediaChangedData::class.java)
+                    _mediaChangedEvent.tryEmit(data)
+                    Log.d(TAG, "Received media_changed: action=${data.action}, item=${data.item_id}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing media_changed", e)
                 }
             }
 
@@ -320,4 +334,13 @@ data class MeetingChangedData(
     val title: String? = null,
     val start_time: String? = null,
     val setting_key: String? = null
+)
+
+data class MediaChangedData(
+    val action: String,
+    val item_id: Int? = null,
+    val parent_id: Int? = null,
+    val previous_parent_id: Int? = null,
+    val kind: String? = null,
+    val visible_on_android: Boolean? = null
 )
