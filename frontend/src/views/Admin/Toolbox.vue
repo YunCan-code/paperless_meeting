@@ -64,20 +64,20 @@ const tools = [
     color: '#2563eb'
   },
   {
-    id: 'followup',
-    title: '笔记',
-    desc: '查看和管理会议笔记（仅 Web 端使用）',
-    icon: 'Notebook',
-    bgColor: '#f5f3ff', // violet-50
-    color: '#8b5cf6'    // violet-500
-  },
-  {
     id: 'cover-center',
     title: '封面中心',
     desc: '统一管理默认封面、类型封面与登录海报',
     icon: 'PictureFilled',
     bgColor: '#ecfeff',
     color: '#0891b2'
+  },
+  {
+    id: 'followup',
+    title: '笔记',
+    desc: '查看和管理会议笔记（仅 Web 端使用）',
+    icon: 'Notebook',
+    bgColor: '#f5f3ff', // violet-50
+    color: '#8b5cf6'    // violet-500
   },
   {
     id: 'signin',

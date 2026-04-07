@@ -56,6 +56,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,6 +85,10 @@ import kotlinx.coroutines.launch
 private val MainTabAnimationEasing = CubicBezierEasing(0.24f, 0.94f, 0.32f, 1f)
 private const val MAIN_TAB_ANIMATION_DURATION_MS = 420
 private const val EXIT_PROMPT_DURATION_MS = 2000L
+private val FloatingNavBarPhoneInset = 4.dp
+private val FloatingNavBarTabletInset = 12.dp
+internal const val FloatingNavBarContainerTestTag = "floating_nav_bar_container"
+internal const val FloatingNavBarIndicatorTestTag = "floating_nav_bar_indicator"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -485,14 +490,15 @@ private fun resolveNavBarScrollPosition(
 private fun FloatingNavBar(
     tabs: List<Screen>,
     scrollPosition: Float,
-    onTabClick: (Screen) -> Unit
+    onTabClick: (Screen) -> Unit,
+    isPhoneOverride: Boolean? = null
 ) {
-    val isPhone = LocalConfiguration.current.screenWidthDp < 600
+    val isPhone = isPhoneOverride ?: (LocalConfiguration.current.screenWidthDp < 600)
     val navPillShape = RoundedCornerShape(50)
 
     val itemWidth = if (isPhone) 78.dp else 92.dp
     val itemHeight = if (isPhone) 52.dp else 56.dp
-    val horizontalPadding = if (isPhone) 8.dp else 12.dp
+    val containerHorizontalInset = if (isPhone) FloatingNavBarPhoneInset else FloatingNavBarTabletInset
     val verticalPadding = 4.dp
     val itemSpacing = if (isPhone) 4.dp else 16.dp
     val tabFrames = remember(tabs.size) {
@@ -508,7 +514,7 @@ private fun FloatingNavBar(
     val indicatorWidthPx = lerpFloat(leftFrame.width, rightFrame.width, positionFraction)
     val density = LocalDensity.current
     val fallbackIndicatorOffsetPx = with(density) {
-        (horizontalPadding + (itemWidth + itemSpacing) * clampedScrollPosition).roundToPx().toFloat()
+        (containerHorizontalInset + (itemWidth + itemSpacing) * clampedScrollPosition).roundToPx().toFloat()
     }
     val fallbackIndicatorWidthPx = with(density) { itemWidth.roundToPx().toFloat() }
     val resolvedIndicatorOffsetPx =
@@ -522,11 +528,13 @@ private fun FloatingNavBar(
         shadowElevation = 4.dp,
         tonalElevation = 2.dp,
         color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.padding(bottom = if (isPhone) 8.dp else 16.dp)
+        modifier = Modifier
+            .padding(bottom = if (isPhone) 8.dp else 16.dp)
+            .testTag(FloatingNavBarContainerTestTag)
     ) {
         Box(
             modifier = Modifier.padding(
-                horizontal = horizontalPadding,
+                horizontal = containerHorizontalInset,
                 vertical = verticalPadding
             )
         ) {
@@ -535,13 +543,10 @@ private fun FloatingNavBar(
                     .offset { androidx.compose.ui.unit.IntOffset(x = resolvedIndicatorOffsetPx.roundToInt(), y = 0) }
                     .width(resolvedIndicatorWidth)
                     .height(itemHeight)
-                    .graphicsLayer {
-                        alpha = 0.98f
-                        scaleX = 0.992f
-                        scaleY = 0.992f
-                    }
+                    .graphicsLayer { alpha = 0.98f }
                     .clip(navPillShape)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    .testTag(FloatingNavBarIndicatorTestTag)
             )
 
             Row(
@@ -567,6 +572,20 @@ private fun FloatingNavBar(
             }
         }
     }
+}
+
+@Composable
+internal fun FloatingNavBarTestHost(
+    tabs: List<Screen>,
+    scrollPosition: Float,
+    onTabClick: (Screen) -> Unit = {}
+) {
+    FloatingNavBar(
+        tabs = tabs,
+        scrollPosition = scrollPosition,
+        onTabClick = onTabClick,
+        isPhoneOverride = true
+    )
 }
 
 @Composable
