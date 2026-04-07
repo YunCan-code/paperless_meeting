@@ -101,28 +101,6 @@ fun LoginScreen(
                             )
                         )
                 )
-                
-                // Brand Text
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .windowInsetsPadding(WindowInsets.safeDrawing) // Ensure text clears nav bar/cutout
-                        .padding(48.dp)
-                ) {
-                    Text(
-                        text = "Paperless Meeting",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "绿色 · 低碳 · 高效 · 智能",
-                        fontSize = 18.sp,
-                        color = Color.White.copy(alpha = 0.8f),
-                        letterSpacing = 2.sp
-                    )
-                }
             }
 
             // Right Panel (Form)
@@ -140,18 +118,13 @@ fun LoginScreen(
                         .padding(24.dp)
                 ) {
                     Text(
-                        text = "欢迎使用",
+                        text = "欢迎使用阅文系统",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = "无纸化会议系统",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(40.dp))
+
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     OutlinedTextField(
                         value = query,
