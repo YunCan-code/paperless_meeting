@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import retrofit2.HttpException
 
 data class LoginPosterConfig(
     val posterUrl: String? = null,
@@ -90,19 +91,34 @@ class LoginViewModel @Inject constructor(
                     response.email?.let { prefs.saveUserEmail(it) }
                 }
                 _uiState.value = LoginUiState.Success(response.name)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                val msg = when {
-                    e.message?.contains("300") == true -> "存在重名，请使用手机号"
-                    e.message?.contains("404") == true -> "用户不存在"
-                    else -> "登录失败: ${e.message}"
-                }
-                _uiState.value = LoginUiState.Error(msg)
+                _uiState.value = LoginUiState.Error(mapLoginError(e))
             }
         }
     }
 
     fun resetState() {
         _uiState.value = LoginUiState.Idle
+    }
+
+    private fun mapLoginError(error: Throwable): String {
+        val statusCode = when (error) {
+            is HttpException -> error.code()
+            else -> Regex("""\b([1-5]\d{2})\b""")
+                .find(error.message.orEmpty())
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+        }
+
+        return when (statusCode) {
+            300 -> "存在重名，请使用手机号"
+            400 -> "请输入姓名或手机号"
+            401, 404 -> "用户不存在，请检查姓名或手机号"
+            else -> "登录失败，请稍后重试"
+        }
     }
 }
 
