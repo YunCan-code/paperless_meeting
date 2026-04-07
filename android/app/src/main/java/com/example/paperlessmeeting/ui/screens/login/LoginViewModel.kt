@@ -5,11 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.example.paperlessmeeting.data.local.AppSettingsState
 import com.example.paperlessmeeting.data.repository.MeetingRepository
 import com.example.paperlessmeeting.domain.model.LoginRequest
+import dagger.Lazy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class LoginPosterConfig(
@@ -19,8 +22,8 @@ data class LoginPosterConfig(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val repository: MeetingRepository,
-    private val userPreferences: com.example.paperlessmeeting.data.local.UserPreferences,
+    private val repository: Lazy<MeetingRepository>,
+    private val userPreferences: Lazy<com.example.paperlessmeeting.data.local.UserPreferences>,
     private val appSettingsState: AppSettingsState
 ) : ViewModel() {
 
@@ -30,14 +33,20 @@ class LoginViewModel @Inject constructor(
     private val _posterConfig = MutableStateFlow(LoginPosterConfig())
     val posterConfig = _posterConfig.asStateFlow()
 
-    init {
+    private var isPosterLoadRequested = false
+
+    fun ensurePosterLoaded() {
+        if (isPosterLoadRequested) return
+        isPosterLoadRequested = true
         loadLoginPoster()
     }
 
     private fun loadLoginPoster() {
         viewModelScope.launch {
             try {
-                val settings = repository.getSettings()
+                val settings = withContext(Dispatchers.IO) {
+                    repository.get().getSettings()
+                }
                 val rawUrl = settings["android_login_poster_url"]?.trim().orEmpty()
                 val resolvedUrl = when {
                     rawUrl.isBlank() -> null
@@ -66,15 +75,20 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = LoginUiState.Loading
             try {
-                val response = repository.login(LoginRequest(query))
-                userPreferences.saveUserName(response.name)
-                userPreferences.saveUserId(response.user_id)
-                userPreferences.saveToken(response.token)
-                response.role?.let { userPreferences.saveUserRole(it) }
-                response.department?.let { userPreferences.saveUserDept(it) }
-                response.district?.let { userPreferences.saveUserDistrict(it) }
-                response.phone?.let { userPreferences.saveUserPhone(it) }
-                response.email?.let { userPreferences.saveUserEmail(it) }
+                val response = withContext(Dispatchers.IO) {
+                    repository.get().login(LoginRequest(query))
+                }
+                withContext(Dispatchers.IO) {
+                    val prefs = userPreferences.get()
+                    prefs.saveUserName(response.name)
+                    prefs.saveUserId(response.user_id)
+                    prefs.saveToken(response.token)
+                    response.role?.let { prefs.saveUserRole(it) }
+                    response.department?.let { prefs.saveUserDept(it) }
+                    response.district?.let { prefs.saveUserDistrict(it) }
+                    response.phone?.let { prefs.saveUserPhone(it) }
+                    response.email?.let { prefs.saveUserEmail(it) }
+                }
                 _uiState.value = LoginUiState.Success(response.name)
             } catch (e: Exception) {
                 val msg = when {

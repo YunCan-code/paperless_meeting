@@ -2,6 +2,7 @@ package com.example.paperlessmeeting
 
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.Choreographer
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -51,7 +52,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.example.paperlessmeeting.worker.HeartbeatWorker
 import com.example.paperlessmeeting.worker.OfflineReportWorker
 import java.util.concurrent.TimeUnit
 
@@ -60,8 +60,10 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var appSettingsState: AppSettingsState
+    private var deferredStartupScheduled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupTrace.mark("MainActivity.onCreate.start")
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
@@ -83,14 +85,8 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-
-        // Avoid adding extra startup pressure before the first frame is drawn.
-        window.decorView.post {
-            (application as? PaperlessApp)?.ensureBackgroundServicesStarted()
-            val authRequest = OneTimeWorkRequestBuilder<HeartbeatWorker>()
-                .build()
-            WorkManager.getInstance(this).enqueue(authRequest)
-        }
+        StartupTrace.mark("MainActivity.setContent.complete")
+        scheduleDeferredStartupAfterFirstFrame()
     }
 
     override fun onStart() {
@@ -118,6 +114,22 @@ class MainActivity : ComponentActivity() {
             ExistingWorkPolicy.REPLACE,
             request
         )
+    }
+
+    private fun scheduleDeferredStartupAfterFirstFrame() {
+        if (deferredStartupScheduled) return
+        deferredStartupScheduled = true
+        window.decorView.post {
+            Choreographer.getInstance().postFrameCallback {
+                StartupTrace.mark("MainActivity.first_frame.committed")
+                startDeferredStartupOnce()
+            }
+        }
+    }
+
+    private fun startDeferredStartupOnce() {
+        StartupTrace.mark("MainActivity.deferred_startup.begin")
+        (application as? PaperlessApp)?.ensureDeferredStartupTasksStarted()
     }
 
     companion object {

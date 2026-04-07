@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.paperlessmeeting.worker.HeartbeatWorker
@@ -32,9 +33,13 @@ class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
     @Volatile
     private var backgroundServicesStarted = false
 
+    @Volatile
+    private var initialHeartbeatEnqueued = false
+
     override fun newImageLoader(): ImageLoader {
+        StartupTrace.mark("PaperlessApp.newImageLoader.begin")
         val memoryCachePercent = if (isLowRamDevice()) 0.15 else 0.25
-        return ImageLoader.Builder(this)
+        val imageLoader = ImageLoader.Builder(this)
             .okHttpClient(okHttpClient.get())
             .crossfade(true)
             .memoryCache {
@@ -49,6 +54,8 @@ class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
                     .build()
             }
             .build()
+        StartupTrace.mark("PaperlessApp.newImageLoader.end")
+        return imageLoader
     }
 
     private fun isLowRamDevice(): Boolean {
@@ -63,24 +70,35 @@ class PaperlessApp : Application(), Configuration.Provider, ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        StartupTrace.mark("PaperlessApp.onCreate")
     }
 
-    fun ensureBackgroundServicesStarted() {
-        if (backgroundServicesStarted) return
+    fun ensureDeferredStartupTasksStarted() {
+        if (backgroundServicesStarted && initialHeartbeatEnqueued) return
         synchronized(this) {
-            if (backgroundServicesStarted) return
-            foregroundHeartbeatManager.get().register()
+            if (backgroundServicesStarted && initialHeartbeatEnqueued) return
+            StartupTrace.mark("PaperlessApp.deferred_startup.begin")
+            if (!backgroundServicesStarted) {
+                foregroundHeartbeatManager.get().register()
 
-            val heartbeatRequest = PeriodicWorkRequestBuilder<HeartbeatWorker>(15, TimeUnit.MINUTES)
-                .build()
+                val heartbeatRequest = PeriodicWorkRequestBuilder<HeartbeatWorker>(15, TimeUnit.MINUTES)
+                    .build()
 
-            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                "HeartbeatWork",
-                ExistingPeriodicWorkPolicy.KEEP,
-                heartbeatRequest
-            )
+                WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                    "HeartbeatWork",
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    heartbeatRequest
+                )
+                backgroundServicesStarted = true
+            }
 
-            backgroundServicesStarted = true
+            if (!initialHeartbeatEnqueued) {
+                val initialHeartbeatRequest = OneTimeWorkRequestBuilder<HeartbeatWorker>()
+                    .build()
+                WorkManager.getInstance(this).enqueue(initialHeartbeatRequest)
+                initialHeartbeatEnqueued = true
+            }
+            StartupTrace.mark("PaperlessApp.deferred_startup.end")
         }
     }
 }

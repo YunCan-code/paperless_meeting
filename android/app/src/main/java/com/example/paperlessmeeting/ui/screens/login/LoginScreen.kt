@@ -8,6 +8,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.paperlessmeeting.StartupTrace
 import com.example.paperlessmeeting.ui.components.image.AppAsyncImage
 import com.example.paperlessmeeting.ui.components.image.MeetingImageResolver
 
@@ -31,7 +33,27 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsState()
     val posterConfig by viewModel.posterConfig.collectAsState()
     var query by remember { mutableStateOf("") }
+    var enableRemotePoster by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        StartupTrace.mark("LoginScreen.first_frame")
+        enableRemotePoster = true
+    }
+
+    LaunchedEffect(enableRemotePoster) {
+        if (!enableRemotePoster) return@LaunchedEffect
+        StartupTrace.mark("LoginScreen.remote_poster.begin")
+        viewModel.ensurePosterLoaded()
+    }
+
+    val posterModel = remember(enableRemotePoster, posterConfig.posterUrl, posterConfig.posterVersion) {
+        MeetingImageResolver.loginPosterModel(
+            posterUrl = posterConfig.posterUrl?.takeIf { enableRemotePoster },
+            posterVersion = posterConfig.posterVersion?.takeIf { enableRemotePoster }
+        )
+    }
 
     LaunchedEffect(uiState) {
         when (uiState) {
@@ -66,12 +88,7 @@ fun LoginScreen(
                     .fillMaxHeight()
             ) {
                 AppAsyncImage(
-                    model = remember(posterConfig.posterUrl, posterConfig.posterVersion) {
-                        MeetingImageResolver.loginPosterModel(
-                            posterUrl = posterConfig.posterUrl,
-                            posterVersion = posterConfig.posterVersion
-                        )
-                    },
+                    model = posterModel,
                     modifier = Modifier.fillMaxSize()
                 )
                 // Overlay
