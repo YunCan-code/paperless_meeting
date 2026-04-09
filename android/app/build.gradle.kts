@@ -1,9 +1,30 @@
+import org.gradle.api.GradleException
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+val requestedTasks = gradle.startParameter.taskNames.joinToString(" ")
+val buildingRelease = requestedTasks.contains("Release", ignoreCase = true)
+val configuredMeetingServerHost = (
+    (findProperty("meetingServerHost") as String?)
+        ?: System.getenv("MEETING_SERVER_HOST")
+        ?: ""
+).trim().trimEnd('/')
+val defaultDebugServerHost = "http://10.0.2.2:5000"
+val appServerHost = when {
+    configuredMeetingServerHost.isNotBlank() -> configuredMeetingServerHost
+    buildingRelease -> throw GradleException(
+        "Release build requires meetingServerHost or MEETING_SERVER_HOST, for example http://192.168.1.20:5000"
+    )
+    else -> defaultDebugServerHost
+}
+val apiBaseUrl = "$appServerHost/api/"
+val socketBaseUrl = appServerHost
+val staticBaseUrl = "$appServerHost/static/"
 
 android {
     namespace = "com.example.paperlessmeeting"
@@ -15,9 +36,9 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "API_BASE_URL", "\"https://coso.top/api/\"")
-        buildConfigField("String", "SOCKET_BASE_URL", "\"https://coso.top\"")
-        buildConfigField("String", "STATIC_BASE_URL", "\"https://coso.top/static/\"")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "SOCKET_BASE_URL", "\"$socketBaseUrl\"")
+        buildConfigField("String", "STATIC_BASE_URL", "\"$staticBaseUrl\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -29,9 +50,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("String", "API_BASE_URL", "\"https://coso.top/api/\"")
-            buildConfigField("String", "SOCKET_BASE_URL", "\"https://coso.top\"")
-            buildConfigField("String", "STATIC_BASE_URL", "\"https://coso.top/static/\"")
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+            buildConfigField("String", "SOCKET_BASE_URL", "\"$socketBaseUrl\"")
+            buildConfigField("String", "STATIC_BASE_URL", "\"$staticBaseUrl\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

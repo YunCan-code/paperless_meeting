@@ -13,6 +13,17 @@ from sqlmodel import SQLModel, create_engine, Session
 
 DATABASE_URL = os.getenv("DATABASE_URL", None)
 
+
+def _int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return int(raw_value)
+    except ValueError:
+        print(f"[WARN] Invalid integer for {name}={raw_value!r}, fallback to {default}")
+        return default
+
 if DATABASE_URL is None:
     # 默认: SQLite (开发环境)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,13 +41,17 @@ elif "sqlite" in DATABASE_URL:
     
 else:
     # PostgreSQL / MySQL 生产环境配置
-    # 连接池优化: 支持高并发
+    # 连接池按环境变量控制，避免多 worker 时把数据库连接打满。
+    pool_size = _int_env("DB_POOL_SIZE", 5)
+    max_overflow = _int_env("DB_MAX_OVERFLOW", 5)
+    pool_timeout = _int_env("DB_POOL_TIMEOUT", 15)
+    pool_recycle = _int_env("DB_POOL_RECYCLE", 1800)
     engine = create_engine(
         DATABASE_URL,
-        pool_size=20,         # 保持的连接数
-        max_overflow=10,      # 最大溢出连接数
-        pool_timeout=30,      # 获取连接超时时间(秒)
-        pool_recycle=1800,    # 连接回收时间(秒), 防止数据库断连
+        pool_size=pool_size,      # 每个 worker 保持的连接数
+        max_overflow=max_overflow,  # 每个 worker 的最大溢出连接数
+        pool_timeout=pool_timeout,  # 获取连接超时时间(秒)
+        pool_recycle=pool_recycle,  # 连接回收时间(秒), 防止数据库断连
         pool_pre_ping=True    # 使用前检测连接是否有效
     )
 

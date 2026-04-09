@@ -37,8 +37,14 @@ services:
       - redis
     environment:
       - TZ=Asia/Shanghai
+      - WORKERS=4
       # 连接到名为 'db' 的服务
       - DATABASE_URL=postgresql://paperless:123456@db:5432/paperless_meeting
+      # 按 worker 缩小单进程连接池，避免现场高峰时把 PostgreSQL 打满
+      - DB_POOL_SIZE=5
+      - DB_MAX_OVERFLOW=5
+      - DB_POOL_TIMEOUT=15
+      - DB_POOL_RECYCLE=1800
       # Redis 连接 (用于 Socket.IO 跨 Worker 通信)
       - REDIS_URL=redis://redis:6379
       # 生产环境关闭调试模式

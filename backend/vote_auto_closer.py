@@ -2,10 +2,29 @@
 自动检测并关闭过期投票的后台任务
 """
 import asyncio
+from sqlalchemy import text
 from sqlmodel import Session, select
 from models import Vote
 from database import engine
 from socket_manager import broadcast_vote_results, broadcast_vote_state
+
+AUTO_CLOSE_LOCK_KEY = 20260409
+
+
+def _try_acquire_iteration_lock(session: Session) -> bool:
+    """
+    多 worker 下只允许一个 worker 在同一轮扫描里真正执行关票逻辑。
+    使用 PostgreSQL 事务级 advisory lock，事务结束自动释放。
+    """
+    if engine.url.get_backend_name() != "postgresql":
+        return True
+
+    return bool(
+        session.execute(
+            text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
+            {"lock_key": AUTO_CLOSE_LOCK_KEY},
+        ).scalar()
+    )
 
 
 async def auto_close_expired_votes():
@@ -13,35 +32,45 @@ async def auto_close_expired_votes():
     while True:
         try:
             with Session(engine) as session:
-                stmt = select(Vote).where(Vote.status.in_(["countdown", "active"]))
-                runtime_votes = session.exec(stmt).all()
-                from routes.vote import _build_public_vote_snapshot, _build_vote_result, _resolve_effective_vote_state
+                if not _try_acquire_iteration_lock(session):
+                    pass
+                else:
+                    stmt = select(Vote).where(Vote.status.in_(["countdown", "active"]))
+                    runtime_votes = session.exec(stmt).all()
+                    from routes.vote import _build_public_vote_snapshot, _build_vote_result, _resolve_effective_vote_state
 
-                for vote in runtime_votes:
-                    effective_status, _, effective_closed_at = _resolve_effective_vote_state(vote)
-                    if effective_status == vote.status and effective_closed_at == vote.closed_at:
-                        continue
+                    changed_votes: list[tuple[Vote, str]] = []
+                    for vote in runtime_votes:
+                        effective_status, _, effective_closed_at = _resolve_effective_vote_state(vote)
+                        if effective_status == vote.status and effective_closed_at == vote.closed_at:
+                            continue
 
-                    previous_status = vote.status
-                    vote.status = effective_status
-                    vote.closed_at = effective_closed_at
-                    session.add(vote)
-                    session.commit()
-                    session.refresh(vote)
+                        previous_status = vote.status
+                        vote.status = effective_status
+                        vote.closed_at = effective_closed_at
+                        session.add(vote)
+                        changed_votes.append((vote, previous_status))
 
-                    try:
-                        result_payload = _build_vote_result(vote, session).model_dump(mode="json")
-                        snapshot = _build_public_vote_snapshot(vote, session)
-                        snapshot["results"] = result_payload["results"]
-                        await broadcast_vote_state(vote.meeting_id, snapshot)
-                        await broadcast_vote_results(vote.meeting_id, vote.id, result_payload)
-                    except Exception as e:
-                        print(f"[AUTO-CLOSE] Failed to broadcast vote state change: {e}")
+                    if changed_votes:
+                        session.commit()
 
-                    if previous_status == "countdown" and effective_status == "active":
-                        print(f"[AUTO-CLOSE] Activated vote {vote.id} ('{vote.title}')")
-                    elif effective_status == "closed":
-                        print(f"[AUTO-CLOSE] Closing expired vote {vote.id} ('{vote.title}')")
+                    for vote, previous_status in changed_votes:
+                        session.refresh(vote)
+                        effective_status = vote.status
+
+                        try:
+                            result_payload = _build_vote_result(vote, session).model_dump(mode="json")
+                            snapshot = _build_public_vote_snapshot(vote, session)
+                            snapshot["results"] = result_payload["results"]
+                            await broadcast_vote_state(vote.meeting_id, snapshot)
+                            await broadcast_vote_results(vote.meeting_id, vote.id, result_payload)
+                        except Exception as e:
+                            print(f"[AUTO-CLOSE] Failed to broadcast vote state change: {e}")
+
+                        if previous_status == "countdown" and effective_status == "active":
+                            print(f"[AUTO-CLOSE] Activated vote {vote.id} ('{vote.title}')")
+                        elif effective_status == "closed":
+                            print(f"[AUTO-CLOSE] Closing expired vote {vote.id} ('{vote.title}')")
 
         except Exception as e:
             print(f"[AUTO-CLOSE] Error in auto_close_expired_votes: {e}")
