@@ -84,6 +84,10 @@ logs/
 
 # Exclude specific sensitive/large directories
 doc/
+!doc/
+doc/*
+!doc/部署.md
+!doc/内网离线部署.md
 backend/uploads/
 *.apk
 pgdata/
@@ -198,3 +202,11 @@ android/.gradle-user-home/
 git_status*.txt
 *.lck
 *.part
+
+# =========================
+# Offline release artifacts
+# =========================
+release/*
+!release/.gitignore
+!release/README.md
+runtime/docker/debs/*.deb

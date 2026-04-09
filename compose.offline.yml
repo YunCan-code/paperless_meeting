@@ -1,0 +1,66 @@
+services:
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:15-alpine}
+    container_name: meeting_db
+    restart: always
+    volumes:
+      - ${APP_ROOT:-/opt/paperless_meeting}/data/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-paperless}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
+      POSTGRES_DB: ${POSTGRES_DB:-paperless_meeting}
+      TZ: ${TZ:-Asia/Shanghai}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paperless} -d ${POSTGRES_DB:-paperless_meeting}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: meeting_redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ${APP_ROOT:-/opt/paperless_meeting}/data/redis:/data
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${BACKEND_IMAGE:-paperless-meeting/backend:${APP_VERSION:-offline-latest}}
+    container_name: meeting_backend
+    restart: always
+    command: ["/bin/bash", "./run_production.sh"]
+    volumes:
+      - ${APP_ROOT:-/opt/paperless_meeting}/data/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-paperless}:${POSTGRES_PASSWORD:-123456}@db:5432/${POSTGRES_DB:-paperless_meeting}
+      REDIS_URL: redis://redis:6379
+      DEBUG: "false"
+      WORKERS: ${WORKERS:-4}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:5000,http://localhost:5000}
+    expose:
+      - "8000"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-paperless-meeting/frontend:${APP_VERSION:-offline-latest}}
+    container_name: meeting_frontend
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-5000}:80"
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}

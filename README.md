@@ -100,6 +100,37 @@ docker compose up -d --build
 - `db`：PostgreSQL 15。
 - `redis`：Socket.IO 跨进程消息支持。
 
+### 5.4 纯内网会议室离线部署
+
+如果目标环境是没有外网的会议室主机，请不要在现场执行：
+
+- `git pull`
+- `docker compose up -d --build`
+- `pip install`
+- `npm install`
+
+仓库已经提供一套离线发布流程：
+
+1. 在联网构建机执行：
+
+```bash
+bash ./scripts/intranet/prepare-release.sh <version>
+```
+
+如需让发布包自带 Docker 离线安装包，请先把相关 `.deb` 放进 `runtime/docker/debs/`。
+
+2. 把生成的 `release/<version>/` 或压缩包拷贝到会议室主机。
+3. 在会议室主机上执行：
+
+```bash
+cd /opt/paperless_meeting/scripts
+sudo bash ./install-offline.sh
+```
+
+详细步骤见：
+
+- `doc/内网离线部署.md`
+
 ## 6. 本地开发（前后端分离）
 
 ### 6.1 Backend
