@@ -77,6 +77,7 @@ class VoteListViewModel @Inject constructor(
             socketManager.connectionState.collect { connected ->
                 if (connected) {
                     trackedMeetingIds.forEach(socketManager::joinMeeting)
+                    loadData(showLoading = false)
                 }
             }
         }

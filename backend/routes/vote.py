@@ -127,6 +127,20 @@ def _get_vote_or_404(vote_id: int, session: Session) -> Vote:
     return vote
 
 
+def _is_postgresql_session(session: Session) -> bool:
+    bind = session.get_bind()
+    return bind is not None and bind.dialect.name == "postgresql"
+
+
+def _get_vote_for_update(vote_id: int, session: Session) -> Vote:
+    if _is_postgresql_session(session):
+        vote = session.exec(select(Vote).where(Vote.id == vote_id).with_for_update()).first()
+        if vote:
+            return vote
+        raise HTTPException(status_code=404, detail="投票不存在")
+    return _get_vote_or_404(vote_id, session)
+
+
 def _get_vote_options(vote_id: int, session: Session) -> List[VoteOption]:
     return session.exec(
         select(VoteOption).where(VoteOption.vote_id == vote_id).order_by(VoteOption.sort_order, VoteOption.id)
@@ -163,23 +177,29 @@ def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
     status, _, _ = _resolve_effective_vote_state(vote)
     total_voters = _get_total_voters(vote.id, session)
     options = _get_vote_options(vote.id, session)
+    option_counts = {
+        int(option_id): int(count or 0)
+        for option_id, count in session.exec(
+            select(UserVote.option_id, func.count())
+            .where(UserVote.vote_id == vote.id)
+            .group_by(UserVote.option_id)
+        ).all()
+    }
+    option_voters: dict[int, List[str]] = {}
+
+    if status == "closed" and not vote.is_anonymous:
+        for option_id, user_name in session.exec(
+            select(UserVote.option_id, User.name)
+            .join(User, User.id == UserVote.user_id)
+            .where(UserVote.vote_id == vote.id)
+            .order_by(UserVote.option_id, User.name)
+        ).all():
+            option_voters.setdefault(int(option_id), []).append(user_name)
 
     results = []
     for option in options:
-        count = session.exec(
-            select(func.count()).select_from(UserVote).where(UserVote.option_id == option.id)
-        ).one()
-        count_value = int(count or 0)
+        count_value = option_counts.get(option.id, 0)
         percent = round((count_value / total_voters * 100) if total_voters > 0 else 0, 1)
-
-        voters: List[str] = []
-        if status == "closed" and not vote.is_anonymous:
-            voters = session.exec(
-                select(User.name)
-                .join(UserVote, User.id == UserVote.user_id)
-                .where(UserVote.option_id == option.id)
-                .order_by(User.name)
-            ).all()
 
         results.append(
             {
@@ -187,7 +207,7 @@ def _build_vote_result(vote: Vote, session: Session) -> VoteResult:
                 "content": option.content,
                 "count": count_value,
                 "percent": percent,
-                "voters": voters,
+                "voters": option_voters.get(option.id, []),
             }
         )
 
@@ -246,6 +266,25 @@ def _build_public_vote_snapshot(vote: Vote, session: Session) -> dict:
     snapshot["user_voted"] = False
     snapshot["selected_option_ids"] = []
     return snapshot
+
+
+def _sync_effective_vote_state(vote: Vote, session: Session, *, commit: bool = True) -> bool:
+    effective_status, effective_started_at, effective_closed_at = _resolve_effective_vote_state(vote)
+    if (
+        effective_status == vote.status
+        and effective_started_at == vote.started_at
+        and effective_closed_at == vote.closed_at
+    ):
+        return False
+
+    vote.status = effective_status
+    vote.started_at = effective_started_at
+    vote.closed_at = effective_closed_at
+    session.add(vote)
+    if commit:
+        session.commit()
+        session.refresh(vote)
+    return True
 
 
 async def _broadcast_vote_snapshot(vote_id: int, session: Session) -> None:
@@ -406,8 +445,20 @@ def get_vote(vote_id: int, user_id: Optional[int] = None, session: Session = Dep
 
 @router.post("/{vote_id}/start")
 async def start_vote(vote_id: int, session: Session = Depends(get_session)):
-    vote = _get_vote_or_404(vote_id, session)
+    vote = _get_vote_for_update(vote_id, session)
+    state_changed = _sync_effective_vote_state(vote, session, commit=False)
+
+    if vote.status in {"countdown", "active"}:
+        if state_changed:
+            session.commit()
+            session.refresh(vote)
+            await _broadcast_vote_snapshot_safely(vote.id, session)
+        return {"success": True, "vote_id": vote.id}
     if vote.status != "draft":
+        if state_changed:
+            session.commit()
+            session.refresh(vote)
+            await _broadcast_vote_snapshot_safely(vote.id, session)
         raise HTTPException(status_code=400, detail="只能启动草稿状态的投票")
 
     vote.status = "countdown"
@@ -423,8 +474,20 @@ async def start_vote(vote_id: int, session: Session = Depends(get_session)):
 
 @router.post("/{vote_id}/close")
 async def close_vote(vote_id: int, session: Session = Depends(get_session)):
-    vote = _get_vote_or_404(vote_id, session)
+    vote = _get_vote_for_update(vote_id, session)
+    state_changed = _sync_effective_vote_state(vote, session, commit=False)
+
+    if vote.status == "closed":
+        if state_changed:
+            session.commit()
+            session.refresh(vote)
+            await _broadcast_vote_snapshot_safely(vote.id, session)
+        return {"success": True, "vote_id": vote.id}
     if vote.status not in {"countdown", "active"}:
+        if state_changed:
+            session.commit()
+            session.refresh(vote)
+            await _broadcast_vote_snapshot_safely(vote.id, session)
         raise HTTPException(status_code=400, detail="当前投票不在进行中")
 
     vote.status = "closed"
@@ -440,6 +503,10 @@ async def close_vote(vote_id: int, session: Session = Depends(get_session)):
 @router.post("/{vote_id}/submit")
 async def submit_vote(vote_id: int, data: VoteSubmit, session: Session = Depends(get_session)):
     vote = _get_vote_or_404(vote_id, session)
+    state_changed = _sync_effective_vote_state(vote, session)
+    if state_changed:
+        await _broadcast_vote_snapshot_safely(vote.id, session)
+
     if vote.status != "active":
         raise HTTPException(status_code=400, detail="投票未开始或已结束")
 

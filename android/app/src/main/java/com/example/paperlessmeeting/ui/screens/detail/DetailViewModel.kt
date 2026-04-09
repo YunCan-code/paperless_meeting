@@ -240,19 +240,29 @@ class DetailViewModel @Inject constructor(
     private fun checkActiveVote() {
         val id = meetingId?.toIntOrNull() ?: return
         viewModelScope.launch {
-            try {
-                val vote = repository.getActiveVote(id, currentUserIdOrNull())
-                if (vote != null) {
-                    _currentVote.value = vote
-                    _hasVoted.value = vote.user_voted
+            refreshActiveVoteState(id, openVoteSheet = true)
+        }
+    }
+
+    private suspend fun refreshActiveVoteState(
+        meetingId: Int,
+        openVoteSheet: Boolean
+    ) {
+        try {
+            val vote = repository.getActiveVote(meetingId, currentUserIdOrNull())
+            if (vote != null) {
+                val mergedVote = mergePublicVoteState(vote)
+                _currentVote.value = mergedVote
+                _hasVoted.value = mergedVote.user_voted
+                if (openVoteSheet) {
                     _showVoteSheet.value = true
-                } else {
-                    _currentVote.value = null
-                    _hasVoted.value = false
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } else {
+                _currentVote.value = null
+                _hasVoted.value = false
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -311,7 +321,16 @@ class DetailViewModel @Inject constructor(
                 socketManager.connectionState.collectLatest { connected ->
                     if (connected) {
                         val id = meetingId?.toIntOrNull() ?: return@collectLatest
+                        val previousVoteId = _currentVote.value?.id
                         socketManager.joinMeeting(id)
+                        refreshMeetingSilently(hiddenMessage = DEFAULT_HIDDEN_MESSAGE)
+                        refreshActiveVoteState(id, openVoteSheet = _showVoteSheet.value)
+                        previousVoteId?.let { voteId ->
+                            refreshCurrentVoteFromServer(voteId)
+                            if (_currentVote.value?.status == "closed") {
+                                fetchVoteResult(voteId)
+                            }
+                        }
                     }
                 }
             }

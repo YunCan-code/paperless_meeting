@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models import Meeting, Vote
 from services.lottery_service import build_session_snapshot
-from routes.vote import _build_vote_read, _get_vote_or_404
+from routes.vote import _build_vote_read
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
 
@@ -26,7 +26,7 @@ def get_meeting_interaction_overview(
         raise HTTPException(status_code=404, detail="会议不存在")
 
     votes = session.exec(select(Vote).where(Vote.meeting_id == meeting_id).order_by(Vote.created_at.desc())).all()
-    vote_items = [_build_vote_read(_get_vote_or_404(vote.id, session), session, user_id=user_id).model_dump() for vote in votes]
+    vote_items = [_build_vote_read(vote, session, user_id=user_id).model_dump() for vote in votes]
     active_vote = next((item for item in vote_items if item["status"] in {"countdown", "active"}), None)
     lottery_snapshot = build_session_snapshot(meeting_id, session, user_id=user_id)
 

@@ -141,7 +141,14 @@
                           <el-icon><Edit /></el-icon>
                           <span>编辑</span>
                         </el-button>
-                        <el-button v-if="['countdown', 'active'].includes(vote.status)" link class="action-link action-close" @click="closeVote(vote)">
+                        <el-button
+                          v-if="['countdown', 'active'].includes(vote.status)"
+                          link
+                          class="action-link action-close"
+                          :loading="isVoteClosing(vote.id)"
+                          :disabled="isVoteClosing(vote.id)"
+                          @click="closeVote(vote)"
+                        >
                           <el-icon><CircleClose /></el-icon>
                           <span>结束</span>
                         </el-button>
@@ -309,6 +316,7 @@ const loadingMeetings = ref(false)
 const loadingOverview = ref(false)
 const savingVote = ref(false)
 const savingLotteryRound = ref(false)
+const closingVoteIds = ref([])
 const activeTab = ref('vote')
 const voteResultVisible = ref(false)
 const voteResult = ref(null)
@@ -361,9 +369,11 @@ const fetchMeetings = async () => {
   }
 }
 
-const fetchOverview = async () => {
+const fetchOverview = async (showLoading = true) => {
   if (!selectedMeetingId.value) return
-  loadingOverview.value = true
+  if (showLoading) {
+    loadingOverview.value = true
+  }
   try {
     const overview = await request.get(`/interactions/meeting/${selectedMeetingId.value}/overview`)
     interactionOverview.vote = overview.vote || interactionOverview.vote
@@ -371,18 +381,21 @@ const fetchOverview = async () => {
   } catch (error) {
     ElMessage.error('加载互动中心失败')
   } finally {
-    loadingOverview.value = false
+    if (showLoading) {
+      loadingOverview.value = false
+    }
   }
 }
 
 const connectSocket = () => {
   if (!selectedMeetingId.value || socket) return
   const url = import.meta.env.VITE_API_URL || window.location.origin
-  socket = io(url, { path: '/socket.io', transports: ['websocket', 'polling'], reconnection: true })
+  socket = io(url, { path: '/socket.io', transports: ['websocket'], reconnection: true })
   socket.on('connect', () => {
     socket.emit('join_meeting', { meeting_id: selectedMeetingId.value })
+    fetchOverview(false)
   })
-  const refresh = () => fetchOverview()
+  const refresh = () => fetchOverview(false)
   socket.on('vote_state_change', refresh)
   socket.on('vote_results_change', refresh)
   socket.on('lottery_session_change', refresh)
@@ -412,6 +425,8 @@ const removeVoteOption = (index) => {
     voteForm.options.splice(index, 1)
   }
 }
+
+const isVoteClosing = (voteId) => closingVoteIds.value.includes(voteId)
 
 const fillVoteForm = (vote) => {
   voteForm.id = vote.id
@@ -459,11 +474,16 @@ const saveVoteDraft = async () => {
 }
 
 const closeVote = async (vote) => {
+  if (isVoteClosing(vote.id)) return
+  closingVoteIds.value = [...closingVoteIds.value, vote.id]
   try {
     await request.post(`/vote/${vote.id}/close`)
     ElMessage.success('投票已结束')
     await fetchOverview()
-  } catch (error) {}
+  } catch (error) {
+  } finally {
+    closingVoteIds.value = closingVoteIds.value.filter(id => id !== vote.id)
+  }
 }
 
 const deleteVote = async (vote) => {

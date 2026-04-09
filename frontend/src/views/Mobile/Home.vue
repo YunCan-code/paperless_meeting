@@ -488,8 +488,10 @@ const fetchMeetingDetail = async (meetingId) => {
   }
 }
 
-const fetchInteractionOverview = async (meetingId) => {
-  overviewLoading.value = true
+const fetchInteractionOverview = async (meetingId, showLoading = true) => {
+  if (showLoading) {
+    overviewLoading.value = true
+  }
   try {
     const overview = await request.get(`/interactions/meeting/${meetingId}/overview`, {
       params: { user_id: userId }
@@ -497,7 +499,9 @@ const fetchInteractionOverview = async (meetingId) => {
     interactionOverview.vote = overview.vote || interactionOverview.vote
     interactionOverview.lottery = overview.lottery || interactionOverview.lottery
   } finally {
-    overviewLoading.value = false
+    if (showLoading) {
+      overviewLoading.value = false
+    }
   }
 }
 
@@ -514,13 +518,14 @@ const connectSocket = (meetingId) => {
   const url = import.meta.env.VITE_API_URL || window.location.origin
   socket = io(url, {
     path: '/socket.io',
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     reconnection: true
   })
   socket.on('connect', () => {
     socket.emit('join_meeting', { meeting_id: meetingId })
+    fetchInteractionOverview(meetingId, false)
   })
-  const refreshOverview = () => fetchInteractionOverview(meetingId)
+  const refreshOverview = () => fetchInteractionOverview(meetingId, false)
   socket.on('vote_state_change', refreshOverview)
   socket.on('vote_results_change', refreshOverview)
   socket.on('lottery_session_change', refreshOverview)

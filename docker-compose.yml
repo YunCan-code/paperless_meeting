@@ -57,6 +57,8 @@ services:
     build: ./frontend
     container_name: meeting_frontend
     restart: always
+    volumes:
+      - ./backend/uploads:/usr/share/nginx/static:ro
     ports:
       # 【重要】这里将容器的 80 映射到 VPS 的 5000 端口
       # 这样 VPS 的 Nginx 就可以把 coso.top 转发到 localhost:5000

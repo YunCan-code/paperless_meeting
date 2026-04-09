@@ -354,8 +354,10 @@ const applyVoteResult = (payload) => {
   totalVoters.value = payload.total_voters || totalVoters.value || 0
 }
 
-const fetchVoteBundle = async () => {
-  loading.value = true
+const fetchVoteBundle = async (showLoading = true) => {
+  if (showLoading) {
+    loading.value = true
+  }
   try {
     if (isMockMode.value) {
       applyVoteSnapshot(mockVoteState.value)
@@ -378,7 +380,9 @@ const fetchVoteBundle = async () => {
     results.value = []
     totalVoters.value = 0
   } finally {
-    loading.value = false
+    if (showLoading) {
+      loading.value = false
+    }
   }
 }
 
@@ -387,12 +391,13 @@ const connectSocket = (meetingId) => {
   const url = import.meta.env.VITE_API_URL || window.location.origin
   socket = io(url, {
     path: '/socket.io',
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     reconnection: true
   })
 
   socket.on('connect', () => {
     socket.emit('join_meeting', { meeting_id: meetingId })
+    fetchVoteBundle(false)
   })
   socket.on('vote_state_change', applyVoteSnapshot)
   socket.on('vote_results_change', applyVoteResult)
