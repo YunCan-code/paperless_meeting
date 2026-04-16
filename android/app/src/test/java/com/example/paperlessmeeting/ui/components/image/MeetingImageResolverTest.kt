@@ -1,6 +1,7 @@
 package com.example.paperlessmeeting.ui.components.image
 
 import com.example.paperlessmeeting.domain.model.Meeting
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -24,7 +25,7 @@ class MeetingImageResolverTest {
     }
 
     @Test
-    fun `会议横幅优先原图并复用卡片缓存键`() {
+    fun `会议横幅优先原图且不复用缩略图占位`() {
         val meeting = testMeeting(
             cardImageUrl = "https://example.com/original.jpg",
             cardImageThumbUrl = "https://example.com/thumb.jpg"
@@ -33,10 +34,8 @@ class MeetingImageResolverTest {
         val model = MeetingImageResolver.resolve(meeting, AppImageSlot.MeetingHero)
 
         assertEquals("https://example.com/original.jpg", model.data)
-        assertEquals(
-            "meeting-card:7:https://example.com/thumb.jpg",
-            model.placeholderMemoryCacheKey
-        )
+        assertNull(model.placeholderMemoryCacheKey)
+        assertFalse(model.allowHardware)
     }
 
     @Test

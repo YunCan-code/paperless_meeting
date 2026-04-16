@@ -125,22 +125,11 @@ object MeetingImageResolver {
                 ?: meeting.cardImageThumbUrl?.takeIf { it.isNotBlank() }
             else -> null
         }
-        val cardPlaceholderKey = meeting.cardImageThumbUrl
-            ?.takeIf { it.isNotBlank() }
-            ?.let { meetingCardMemoryKey(meeting.id, it) }
-            ?: meeting.cardImageUrl
-                ?.takeIf { it.isNotBlank() }
-                ?.let { meetingCardMemoryKey(meeting.id, it) }
-
         return AppImageModel(
             data = primaryUrl,
             diskCacheKey = primaryUrl?.let { cacheKey(slot, meeting.id, it) },
             memoryCacheKey = primaryUrl?.let { cacheKey(slot, meeting.id, it) },
-            placeholderMemoryCacheKey = if (slot == AppImageSlot.MeetingHero) {
-                cardPlaceholderKey
-            } else {
-                null
-            },
+            placeholderMemoryCacheKey = null,
             contentScale = ContentScale.Crop,
             crossfadeEnabled = true,
             crossfadeMillis = if (slot == AppImageSlot.MeetingHero) 220 else 180,
@@ -148,6 +137,7 @@ object MeetingImageResolver {
             scale = Scale.FILL,
             preferThumbnail = slot == AppImageSlot.MeetingCard,
             fallback = AppImageFallback.Meeting,
+            allowHardware = slot != AppImageSlot.MeetingHero,
             description = meeting.title
         )
     }
