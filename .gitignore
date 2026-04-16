@@ -88,6 +88,7 @@ doc/
 doc/*
 !doc/部署.md
 !doc/内网离线部署.md
+!doc/开发阶段会场稳定性检查单.md
 backend/uploads/
 *.apk
 pgdata/

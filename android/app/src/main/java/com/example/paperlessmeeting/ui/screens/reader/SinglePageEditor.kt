@@ -32,7 +32,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private val OverlayIconGrey = Color(0xFF5F6368)
-private val OverlayFloatingSurface = Color.White.copy(alpha = 0.95f)
+private val OverlayFloatingSurface = Color(0xFFF7F8FA).copy(alpha = 0.98f)
+private val OverlayFloatingBorder = Color(0x245F6368)
+private val OverlayFloatingShadowAmbient = Color.Black.copy(alpha = 0.14f)
+private val OverlayFloatingShadowSpot = Color.Black.copy(alpha = 0.18f)
+private val OverlayFloatingShape = RoundedCornerShape(50)
 
 private val PenColors = listOf(
     Color(0xFFE53935),
@@ -302,12 +306,19 @@ fun InlineAnnotationOverlay(
         // ---- Bottom floating toolbar ----
         Surface(
             color = OverlayFloatingSurface,
-            shape = RoundedCornerShape(50),
-            shadowElevation = 8.dp,
+            shape = OverlayFloatingShape,
+            shadowElevation = 0.dp,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp)
-                .shadow(16.dp, RoundedCornerShape(50), ambientColor = Color.Black.copy(alpha = 0.08f))
+                .shadow(
+                    elevation = 16.dp,
+                    shape = OverlayFloatingShape,
+                    ambientColor = OverlayFloatingShadowAmbient,
+                    spotColor = OverlayFloatingShadowSpot,
+                    clip = false
+                )
+                .border(1.dp, OverlayFloatingBorder, OverlayFloatingShape)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),

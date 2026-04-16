@@ -359,38 +359,10 @@ fun DashboardContent(
                 }
             }
         } else {
-         Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isPhone) 100.dp else 120.dp) // 压缩空状态高度 120->100
-                    .padding(horizontal = contentPadding)
-                    .clip(RoundedCornerShape(16.dp)) // 圆角降为 16.dp
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f),
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.1f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-             ) {
-                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                     Icon(
-                         imageVector = Icons.Default.EventAvailable, // Or similar icon
-                         contentDescription = null,
-                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                         modifier = Modifier.size(36.dp) // 图标从 48 -> 36
-                     )
-                     Spacer(modifier = Modifier.height(8.dp)) // 间距 12 -> 8
-                     Text(
-                         text = "\u4eca\u65e5\u6682\u65e0\u4f1a\u8bae\u5b89\u6392",
-                         style = MaterialTheme.typography.titleMedium,
-                         color = MaterialTheme.colorScheme.onSurface,
-                         fontWeight = FontWeight.Medium
-                     )
-                 }
-             }
+            TodayMeetingEmptyCard(
+                heroCardHeight = heroCardHeight,
+                contentPadding = contentPadding
+            )
         }
 
         Spacer(modifier = Modifier.height(if (isPhone) 16.dp else 24.dp))
@@ -851,3 +823,51 @@ private data class DashboardQuickAction(
     val title: String,
     val onClick: () -> Unit
 )
+
+@Composable
+private fun TodayMeetingEmptyCard(
+    heroCardHeight: androidx.compose.ui.unit.Dp,
+    contentPadding: androidx.compose.ui.unit.Dp
+) {
+    val cardShape = RoundedCornerShape(20.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(heroCardHeight)
+            .padding(horizontal = contentPadding),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(cardShape)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.EventAvailable,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "\u4eca\u65e5\u6682\u65e0\u4f1a\u8bae\u5b89\u6392",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}

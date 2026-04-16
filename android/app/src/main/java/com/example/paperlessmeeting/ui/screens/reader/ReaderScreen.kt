@@ -63,6 +63,10 @@ private val StandardMutedText = Color(0xFF5F6368)
 private val StandardDivider = Color(0x1F5F6368)
 private val StandardSheetContainer = Color(0xFFF7F8FA)
 private val StandardProgressTrack = Color(0xFFE6E9EE)
+private val StandardCapsuleContainer = Color.White.copy(alpha = 0.985f)
+private val StandardCapsuleBorder = Color.Transparent
+private val StandardCapsuleShadowAmbient = Color.Black.copy(alpha = 0.07f)
+private val StandardCapsuleShadowSpot = Color.Black.copy(alpha = 0.09f)
 
 private val PaperRootBackground = Color(0xFFF4ECDE)
 private val PaperPanelSurface = Color(0xFFF3E7D4).copy(alpha = 0.98f)
@@ -73,6 +77,10 @@ private val PaperSheetContainer = Color(0xFFF1E7D7)
 private val PaperPdfBackground = Color(0xFFF7EEDC)
 private val PaperPageTint = Color(0x30E7D5B4)
 private val PaperProgressTrack = Color(0xFFE4D8C6)
+private val PaperCapsuleContainer = Color(0xFFF3E8D7).copy(alpha = 0.98f)
+private val PaperCapsuleBorder = Color(0x167B6A58)
+private val PaperCapsuleShadowAmbient = Color.Black.copy(alpha = 0.09f)
+private val PaperCapsuleShadowSpot = Color.Black.copy(alpha = 0.11f)
 private val ReaderControlCapsuleShape = RoundedCornerShape(50)
 
 private enum class ReadingDisplayMode {
@@ -88,7 +96,11 @@ private data class ReaderChromePalette(
     val divider: Color,
     val sheetContainer: Color,
     val pdfBackground: Color,
-    val progressTrack: Color
+    val progressTrack: Color,
+    val capsuleContainer: Color,
+    val capsuleBorder: Color,
+    val capsuleShadowAmbient: Color,
+    val capsuleShadowSpot: Color
 )
 
 private fun readerChromePalette(mode: ReadingDisplayMode): ReaderChromePalette = when (mode) {
@@ -100,7 +112,11 @@ private fun readerChromePalette(mode: ReadingDisplayMode): ReaderChromePalette =
         divider = StandardDivider,
         sheetContainer = StandardSheetContainer,
         pdfBackground = Color.White,
-        progressTrack = StandardProgressTrack
+        progressTrack = StandardProgressTrack,
+        capsuleContainer = StandardCapsuleContainer,
+        capsuleBorder = StandardCapsuleBorder,
+        capsuleShadowAmbient = StandardCapsuleShadowAmbient,
+        capsuleShadowSpot = StandardCapsuleShadowSpot
     )
     ReadingDisplayMode.Paper -> ReaderChromePalette(
         rootBackground = PaperRootBackground,
@@ -110,7 +126,11 @@ private fun readerChromePalette(mode: ReadingDisplayMode): ReaderChromePalette =
         divider = PaperDivider,
         sheetContainer = PaperSheetContainer,
         pdfBackground = PaperPdfBackground,
-        progressTrack = PaperProgressTrack
+        progressTrack = PaperProgressTrack,
+        capsuleContainer = PaperCapsuleContainer,
+        capsuleBorder = PaperCapsuleBorder,
+        capsuleShadowAmbient = PaperCapsuleShadowAmbient,
+        capsuleShadowSpot = PaperCapsuleShadowSpot
     )
 }
 
@@ -969,17 +989,17 @@ private fun FloatingControlCapsule(
             .padding(horizontal = 10.dp, vertical = 10.dp)
     ) {
         Surface(
-            color = palette.panelSurface,
+            color = palette.capsuleContainer,
             shape = ReaderControlCapsuleShape,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
             modifier = Modifier
                 .height(64.dp)
                 .shadow(
-                    elevation = 16.dp,
+                    elevation = 12.dp,
                     shape = ReaderControlCapsuleShape,
-                    ambientColor = Color.Black.copy(alpha = 0.1f),
-                    spotColor = Color.Black.copy(alpha = 0.12f),
+                    ambientColor = palette.capsuleShadowAmbient,
+                    spotColor = palette.capsuleShadowSpot,
                     clip = false
                 )
         ) {
@@ -990,7 +1010,6 @@ private fun FloatingControlCapsule(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Left: Progress
                 Text(
                     text = "${currentPage + 1} / $totalPages",
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -1001,23 +1020,17 @@ private fun FloatingControlCapsule(
                     modifier = Modifier.padding(end = 16.dp)
                 )
 
-                // Vertical Divider
                 VerticalDivider(modifier = Modifier.height(20.dp), color = palette.divider)
 
-                // Right: Icons Container
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-
-                    // 1. TOC (List)
                     IconButton(onClick = onTocClick) {
                         Icon(Icons.Default.Menu, "TOC", tint = palette.panelMutedText)
                     }
 
-                    // 2. Thumbnails (Grid)
                     IconButton(onClick = onGridClick) {
                         Icon(Icons.Default.Apps, "Thumbnails", tint = palette.panelMutedText)
                     }
 
-                    // 3. Annotation (Pen)
                     IconButton(
                         onClick = onPenClick,
                         enabled = isAnnotationEnabled
@@ -1030,7 +1043,6 @@ private fun FloatingControlCapsule(
                         )
                     }
 
-                    // 4. Reading Background
                     IconButton(onClick = onSettingsClick) {
                         Icon(
                             imageVector = Icons.Default.Palette,
